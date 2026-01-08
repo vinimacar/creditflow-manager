@@ -18,25 +18,27 @@ import {
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { useAuth } from "@/contexts/AuthContext";
 
 const menuItems = [
-  { icon: LayoutDashboard, label: "Dashboard", path: "/" },
-  { icon: Users, label: "Clientes", path: "/clientes" },
-  { icon: Building2, label: "Fornecedores", path: "/fornecedores" },
-  { icon: Package, label: "Produtos", path: "/produtos" },
-  { icon: UserCog, label: "Funcionários", path: "/funcionarios" },
-  { icon: ShoppingCart, label: "PDV", path: "/pdv" },
-  { icon: FileBarChart, label: "Relatórios", path: "/relatorios" },
-  { icon: Scale, label: "Conciliação", path: "/conciliacao" },
+  { icon: LayoutDashboard, label: "Dashboard", path: "/", roles: ["admin", "gerente", "agente", "atendente"] },
+  { icon: Users, label: "Clientes", path: "/clientes", roles: ["admin", "gerente", "agente", "atendente"] },
+  { icon: Building2, label: "Fornecedores", path: "/fornecedores", roles: ["admin", "gerente", "agente", "atendente"] },
+  { icon: Package, label: "Produtos", path: "/produtos", roles: ["admin", "gerente"] },
+  { icon: UserCog, label: "Funcionários", path: "/funcionarios", roles: ["admin", "gerente", "agente", "atendente"] },
+  { icon: ShoppingCart, label: "PDV", path: "/pdv", roles: ["admin", "gerente", "agente", "atendente"] },
+  { icon: FileBarChart, label: "Relatórios", path: "/relatorios", roles: ["admin", "gerente"] },
+  { icon: Scale, label: "Conciliação", path: "/conciliacao", roles: ["admin", "gerente"] },
 ];
 
 const bottomMenuItems = [
-  { icon: Settings, label: "Configurações", path: "/configuracoes" },
+  { icon: Settings, label: "Configurações", path: "/configuracoes", roles: ["admin", "gerente", "agente", "atendente"] },
 ];
 
 export function AppSidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
+  const { user, hasPermission } = useAuth();
 
   return (
     <aside
@@ -63,28 +65,30 @@ export function AppSidebar() {
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto py-4 px-3 scrollbar-thin">
         <ul className="space-y-1">
-          {menuItems.map((item) => {
-            const isActive = location.pathname === item.path;
-            return (
-              <li key={item.path}>
-                <Link
-                  to={item.path}
-                  className={cn(
-                    "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200",
-                    "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                    isActive
-                      ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-md"
-                      : "text-sidebar-foreground"
-                  )}
-                >
-                  <item.icon className={cn("w-5 h-5 shrink-0", isActive && "drop-shadow-sm")} />
-                  {!collapsed && (
-                    <span className="text-sm font-medium animate-fade-in">{item.label}</span>
-                  )}
-                </Link>
-              </li>
-            );
-          })}
+          {menuItems
+            .filter((item) => hasPermission(item.roles as any))
+            .map((item) => {
+              const isActive = location.pathname === item.path;
+              return (
+                <li key={item.path}>
+                  <Link
+                    to={item.path}
+                    className={cn(
+                      "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200",
+                      "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                      isActive
+                        ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-md"
+                        : "text-sidebar-foreground"
+                    )}
+                  >
+                    <item.icon className={cn("w-5 h-5 shrink-0", isActive && "drop-shadow-sm")} />
+                    {!collapsed && (
+                      <span className="text-sm font-medium animate-fade-in">{item.label}</span>
+                    )}
+                  </Link>
+                </li>
+              );
+            })}
         </ul>
       </nav>
 
@@ -92,30 +96,33 @@ export function AppSidebar() {
       <div className="px-3 pb-4">
         <Separator className="mb-4 bg-sidebar-border" />
         <ul className="space-y-1">
-          {bottomMenuItems.map((item) => {
-            const isActive = location.pathname === item.path;
-            return (
-              <li key={item.path}>
-                <Link
-                  to={item.path}
-                  className={cn(
-                    "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200",
-                    "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                    isActive
-                      ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                      : "text-sidebar-foreground"
-                  )}
-                >
-                  <item.icon className="w-5 h-5 shrink-0" />
-                  {!collapsed && (
-                    <span className="text-sm font-medium animate-fade-in">{item.label}</span>
-                  )}
-                </Link>
-              </li>
-            );
-          })}
+          {bottomMenuItems
+            .filter((item) => hasPermission(item.roles as any))
+            .map((item) => {
+              const isActive = location.pathname === item.path;
+              return (
+                <li key={item.path}>
+                  <Link
+                    to={item.path}
+                    className={cn(
+                      "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200",
+                      "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                      isActive
+                        ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                        : "text-sidebar-foreground"
+                    )}
+                  >
+                    <item.icon className="w-5 h-5 shrink-0" />
+                    {!collapsed && (
+                      <span className="text-sm font-medium animate-fade-in">{item.label}</span>
+                    )}
+                  </Link>
+                </li>
+              );
+            })}
           <li>
             <button
+              onClick={() => useAuth().signOut()}
               className="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 w-full text-sidebar-foreground hover:bg-destructive/10 hover:text-destructive"
             >
               <LogOut className="w-5 h-5 shrink-0" />

@@ -10,8 +10,23 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useAuth } from "@/contexts/AuthContext";
+import { Badge } from "@/components/ui/badge";
 
 export function AppHeader() {
+  const { user, signOut } = useAuth();
+
+  const getRoleBadge = (role: string) => {
+    const badges: Record<string, { label: string; variant: any }> = {
+      admin: { label: "Administrador", variant: "default" },
+      gerente: { label: "Gerente", variant: "secondary" },
+      agente: { label: "Agente", variant: "outline" },
+      atendente: { label: "Atendente", variant: "outline" },
+    };
+    return badges[role] || badges.agente;
+  };
+
+  const roleInfo = user ? getRoleBadge(user.role) : null;
   return (
     <header className="h-16 border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-30 flex items-center justify-between px-6">
       {/* Search */}
@@ -36,25 +51,35 @@ export function AppHeader() {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="flex items-center gap-2 px-2">
               <Avatar className="w-8 h-8">
-                <AvatarImage src="" />
+                <AvatarImage src={user?.photoURL} />
                 <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                  AD
+                  {user?.displayName?.split(" ").map(n => n[0]).join("").slice(0, 2) || "U"}
                 </AvatarFallback>
               </Avatar>
               <div className="text-left hidden md:block">
-                <p className="text-sm font-medium">Admin</p>
-                <p className="text-xs text-muted-foreground">Diretor</p>
+                <p className="text-sm font-medium">{user?.displayName || "Usuário"}</p>
+                <p className="text-xs text-muted-foreground">{roleInfo?.label}</p>
               </div>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
+            <DropdownMenuLabel>
+              <div className="flex flex-col space-y-1">
+                <p className="text-sm font-medium">{user?.displayName}</p>
+                <p className="text-xs text-muted-foreground">{user?.email}</p>
+                {roleInfo && (
+                  <Badge variant={roleInfo.variant} className="w-fit mt-1">
+                    {roleInfo.label}
+                  </Badge>
+                )}
+              </div>
+            </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem>
               <User className="w-4 h-4 mr-2" />
               Perfil
             </DropdownMenuItem>
-            <DropdownMenuItem className="text-destructive focus:text-destructive">
+            <DropdownMenuItem onClick={signOut} className="text-destructive focus:text-destructive">
               Sair
             </DropdownMenuItem>
           </DropdownMenuContent>
