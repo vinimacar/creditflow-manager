@@ -1,14 +1,13 @@
-import { createContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { 
-  User as FirebaseUser,
-  signInWithPopup,
+  User,
+  signInWithPopup, 
+  GoogleAuthProvider, 
   signOut as firebaseSignOut,
-  onAuthStateChanged,
-  GoogleAuthProvider
+  onAuthStateChanged 
 } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
 import { doc, getDoc, setDoc } from "firebase/firestore";
-import { toast } from "sonner";
 
 export type UserRole = "admin" | "gerente" | "agente" | "atendente";
 
@@ -31,7 +30,22 @@ export interface AuthContextType {
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error("useAuth must be used within an AuthProvider");
+  }
+  return context;
+}
+
+const roleHierarchy: Record<UserRole, number> = {
+  admin: 4,
+  gerente: 3,
+  agente: 2,
+  atendente: 1,
+};
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -45,61 +59,54 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     });
 
-    return unsubscribe;
+    return () => unsubscribe();
   }, []);
 
-  const loadUserProfile = async (firebaseUser: FirebaseUser) => {
+  const loadUserProfile = async (firebaseUser: User) => {
     try {
-      const userDocRef = doc(db, "users", firebaseUser.uid);
-      const userDoc = await getDoc(userDocRef);
-
+      const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
+      
       if (userDoc.exists()) {
-        const data = userDoc.data();
+        const userData = userDoc.data();
         setUser({
           uid: firebaseUser.uid,
           email: firebaseUser.email || "",
           displayName: firebaseUser.displayName || "",
           photoURL: firebaseUser.photoURL || undefined,
-          role: data.role || "agente",
-          createdAt: data.createdAt?.toDate() || new Date(),
+          role: userData.role || "atendente",
+          createdAt: userData.createdAt?.toDate() || new Date(),
         });
       } else {
-        // Primeiro login - criar perfil com role padrão "agente"
-        const newUserProfile: Omit<UserProfile, "uid"> = {
+        // Criar perfil inicial para novo usuário
+        const newUserProfile: UserProfile = {
+          uid: firebaseUser.uid,
           email: firebaseUser.email || "",
           displayName: firebaseUser.displayName || "",
           photoURL: firebaseUser.photoURL || undefined,
-          role: "agente", // Role padrão
+          role: "atendente", // role padrão
           createdAt: new Date(),
         };
-
-        await setDoc(userDocRef, {
+        
+        await setDoc(doc(db, "users", firebaseUser.uid), {
           ...newUserProfile,
           createdAt: new Date(),
         });
-
-        setUser({
-          uid: firebaseUser.uid,
-          ...newUserProfile,
-        });
-
-        toast.info("Conta criada! Aguarde aprovação do administrador para acesso completo.");
+        
+        setUser(newUserProfile);
       }
     } catch (error) {
-      console.error("Erro ao carregar perfil do usuário:", error);
-      toast.error("Erro ao carregar perfil do usuário");
+      console.error("Error loading user profile:", error);
+      setUser(null);
     }
   };
 
   const signInWithGoogle = async () => {
     try {
       const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
-      await loadUserProfile(result.user);
-      toast.success("Login realizado com sucesso!");
-    } catch (error: unknown) {
-      console.error("Erro ao fazer login:", error);
-      toast.error("Erro ao fazer login com Google");
+      await signInWithPopup(auth, provider);
+    } catch (error) {
+      console.error("Error signing in with Google:", error);
+      throw error;
     }
   };
 
@@ -107,37 +114,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await firebaseSignOut(auth);
       setUser(null);
-      toast.success("Logout realizado com sucesso!");
     } catch (error) {
-      console.error("Erro ao fazer logout:", error);
-      toast.error("Erro ao fazer logout");
+      console.error("Error signing out:", error);
+      throw error;
     }
   };
 
-  const hasPermission = (allowedRoles: UserRole[]): boolean => {
+  const hasPermission = (requiredRoles: UserRole[]): boolean => {
     if (!user) return false;
-    return allowedRoles.includes(user.role);
+    
+    const userLevel = roleHierarchy[user.role];
+    return requiredRoles.some(role => userLevel >= roleHierarchy[role]);
   };
 
-  return (
-    <AuthContext.Provider
-      value={{
-        user,
-        loading,
-        signInWithGoogle,
-        signOut,
-        hasPermission,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
-  );
+  const value: AuthContextType = {
+    user,
+    loading,
+    signInWithGoogle,
+    signOut,
+    hasPermission,
+  };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-export function useAuth() {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider");
-  }
-  return context;
-}

@@ -235,7 +235,7 @@ export async function getProdutos(): Promise<Produto[]> {
 // ===== USUÁRIOS (USERS) =====
 
 export interface UserProfile {
-  id?: string;
+  id: string;
   uid: string;
   email: string;
   displayName: string;

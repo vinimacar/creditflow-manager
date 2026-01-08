@@ -31,6 +31,7 @@ interface DataTableProps<T> {
   onEdit?: (item: T) => void;
   onDelete?: (item: T) => void;
   onView?: (item: T) => void;
+  deleteLabel?: (item: T) => string;
 }
 
 export function DataTable<T extends { id: string | number }>({
@@ -40,6 +41,7 @@ export function DataTable<T extends { id: string | number }>({
   onEdit,
   onDelete,
   onView,
+  deleteLabel,
 }: DataTableProps<T>) {
   const hasActions = onEdit || onDelete || onView;
 
@@ -99,7 +101,7 @@ export function DataTable<T extends { id: string | number }>({
                           onClick={() => onDelete(item)}
                           className="text-destructive focus:text-destructive"
                         >
-                          Excluir
+                          {deleteLabel ? deleteLabel(item) : "Excluir"}
                         </DropdownMenuItem>
                       )}
                     </DropdownMenuContent>

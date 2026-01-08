@@ -172,7 +172,7 @@ export default function Usuarios() {
         description="Gerencie permissões e acessos dos usuários do sistema"
       />
 
-      <DataTable
+      <DataTable<UserProfile>
         columns={columns}
         data={users}
         searchPlaceholder="Buscar por nome ou email..."
