@@ -8,27 +8,7 @@ import {
 } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
-
-export type UserRole = "admin" | "gerente" | "agente" | "atendente";
-
-export interface UserProfile {
-  uid: string;
-  email: string;
-  displayName: string;
-  photoURL?: string;
-  role: UserRole;
-  createdAt: Date;
-}
-
-export interface AuthContextType {
-  user: UserProfile | null;
-  loading: boolean;
-  signInWithGoogle: () => Promise<void>;
-  signOut: () => Promise<void>;
-  hasPermission: (requiredRole: UserRole[]) => boolean;
-}
-
-export const AuthContext = createContext<AuthContextType | undefined>(undefined);
+import type { UserRole, UserProfile, AuthContextType } from "./AuthTypes";
 
 const roleHierarchy: Record<UserRole, number> = {
   admin: 4,
@@ -36,6 +16,8 @@ const roleHierarchy: Record<UserRole, number> = {
   agente: 2,
   atendente: 1,
 };
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -123,6 +105,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
