@@ -16,6 +16,7 @@ import PDV from "./pages/PDV";
 import Relatorios from "./pages/Relatorios";
 import Conciliacao from "./pages/Conciliacao";
 import Configuracoes from "./pages/Configuracoes";
+import Usuarios from "./pages/Usuarios";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -103,6 +104,16 @@ function AppRoutes() {
           <AppLayout>
             <ProtectedRoute allowedRoles={["admin", "gerente"]}>
               <Conciliacao />
+            </ProtectedRoute>
+          </AppLayout>
+        }
+      />
+      <Route
+        path="/usuarios"
+        element={
+          <AppLayout>
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <Usuarios />
             </ProtectedRoute>
           </AppLayout>
         }

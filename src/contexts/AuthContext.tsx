@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useEffect, useState, ReactNode } from "react";
 import { 
   User as FirebaseUser,
   signInWithPopup,
@@ -21,7 +21,7 @@ export interface UserProfile {
   createdAt: Date;
 }
 
-interface AuthContextType {
+export interface AuthContextType {
   user: UserProfile | null;
   loading: boolean;
   signInWithGoogle: () => Promise<void>;
@@ -29,7 +29,7 @@ interface AuthContextType {
   hasPermission: (requiredRole: UserRole[]) => boolean;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -97,7 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const result = await signInWithPopup(auth, provider);
       await loadUserProfile(result.user);
       toast.success("Login realizado com sucesso!");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao fazer login:", error);
       toast.error("Erro ao fazer login com Google");
     }

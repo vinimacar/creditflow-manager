@@ -14,6 +14,7 @@ import {
   ChevronRight,
   LogOut,
   Wallet,
+  Shield,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -32,6 +33,7 @@ const menuItems = [
 ];
 
 const bottomMenuItems = [
+  { icon: Shield, label: "Usuários", path: "/usuarios", roles: ["admin"] },
   { icon: Settings, label: "Configurações", path: "/configuracoes", roles: ["admin", "gerente", "agente", "atendente"] },
 ];
 

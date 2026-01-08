@@ -231,3 +231,73 @@ export async function getProdutos(): Promise<Produto[]> {
     ...doc.data(),
   })) as Produto[];
 }
+
+// ===== USUÁRIOS (USERS) =====
+
+export interface UserProfile {
+  id?: string;
+  uid: string;
+  email: string;
+  displayName: string;
+  photoURL?: string;
+  role: "admin" | "gerente" | "agente" | "atendente";
+  status?: "ativo" | "bloqueado";
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export const usersCollection = "users";
+
+export async function getAllUsers(): Promise<UserProfile[]> {
+  const querySnapshot = await getDocs(
+    query(collection(db, usersCollection), orderBy("createdAt", "desc"))
+  );
+  return querySnapshot.docs.map((doc) => ({
+    id: doc.id,
+    uid: doc.data().uid,
+    email: doc.data().email,
+    displayName: doc.data().displayName,
+    photoURL: doc.data().photoURL,
+    role: doc.data().role,
+    status: doc.data().status || "ativo",
+    createdAt: doc.data().createdAt?.toDate(),
+    updatedAt: doc.data().updatedAt?.toDate(),
+  })) as UserProfile[];
+}
+
+export async function updateUserRole(userId: string, role: "admin" | "gerente" | "agente" | "atendente") {
+  const userRef = doc(db, usersCollection, userId);
+  await updateDoc(userRef, {
+    role,
+    updatedAt: Timestamp.now(),
+  });
+}
+
+export async function updateUserStatus(userId: string, status: "ativo" | "bloqueado") {
+  const userRef = doc(db, usersCollection, userId);
+  await updateDoc(userRef, {
+    status,
+    updatedAt: Timestamp.now(),
+  });
+}
+
+export async function getUser(userId: string): Promise<UserProfile | null> {
+  const docRef = doc(db, usersCollection, userId);
+  const docSnap = await getDoc(docRef);
+  
+  if (docSnap.exists()) {
+    const data = docSnap.data();
+    return {
+      id: docSnap.id,
+      uid: data.uid,
+      email: data.email,
+      displayName: data.displayName,
+      photoURL: data.photoURL,
+      role: data.role,
+      status: data.status || "ativo",
+      createdAt: data.createdAt?.toDate(),
+      updatedAt: data.updatedAt?.toDate(),
+    };
+  }
+  return null;
+}
