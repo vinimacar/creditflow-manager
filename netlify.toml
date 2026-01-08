@@ -1,0 +1,32 @@
+[build]
+  # Comando de build
+  command = "npm run build"
+  
+  # Diretório de output do build
+  publish = "dist"
+  
+  # Variáveis de ambiente de build
+  [build.environment]
+    NODE_VERSION = "18"
+
+# Configuração para SPA (Single Page Application)
+# Redireciona todas as rotas para index.html
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Headers de segurança
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    X-XSS-Protection = "1; mode=block"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+# Cache para assets estáticos
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
