@@ -11,10 +11,32 @@ interface jsPDFWithAutoTable extends jsPDF {
   };
 }
 
+interface Estatisticas {
+  totalDivergencias: number;
+  totalDiferencas: number;
+  totalContratos: number;
+  conciliados: number;
+  divergentes: number;
+  naoEncontrados: number;
+  total: number;
+  percentualConciliado: number;
+  totalComissaoInterno: number;
+  totalComissaoFornecedor: number;
+  diferencaTotalComissao: number;
+  [key: string]: unknown;
+}
+
+interface Filtros {
+  fornecedor?: string;
+  funcionario?: string;
+  periodo?: { inicio?: Date; fim?: Date };
+  [key: string]: unknown;
+}
+
 export async function gerarRelatorioPDF(
   divergencias: Divergencia[],
-  estatisticas: any,
-  filtros: any
+  estatisticas: Estatisticas,
+  filtros: Filtros
 ) {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();

@@ -89,8 +89,8 @@ export function FiltrosDinamicosRelatorio({
           <Label>Tipo de Relatório</Label>
           <Select
             value={filtros.tipoRelatorio}
-            onValueChange={(value: any) =>
-              onFiltrosChange({ ...filtros, tipoRelatorio: value })
+            onValueChange={(value: string) =>
+              onFiltrosChange({ ...filtros, tipoRelatorio: value as FiltrosRelatorio["tipoRelatorio"] })
             }
           >
             <SelectTrigger>
@@ -154,8 +154,8 @@ export function FiltrosDinamicosRelatorio({
           <Label>Agrupamento</Label>
           <Select
             value={filtros.agrupamento}
-            onValueChange={(value: any) =>
-              onFiltrosChange({ ...filtros, agrupamento: value })
+            onValueChange={(value: string) =>
+              onFiltrosChange({ ...filtros, agrupamento: value as FiltrosRelatorio["agrupamento"] })
             }
           >
             <SelectTrigger>

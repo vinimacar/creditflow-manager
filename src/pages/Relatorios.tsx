@@ -73,7 +73,7 @@ export default function Relatorios() {
   }, []);
 
   const gerarFeedback = () => {
-    if (estat isticas.crescimento > 10) {
+    if (estatisticas.crescimento > 10) {
       return {
         tipo: "positivo" as const,
         mensagem: `Excelente! Crescimento de ${estatisticas.crescimento.toFixed(1)}% em relação ao período anterior. Continue com o ótimo trabalho!`,

@@ -12,6 +12,8 @@ import {
   Tooltip,
   Legend,
   Filler,
+  type ChartOptions,
+  type TooltipItem,
 } from "chart.js";
 import { TrendingUp, TrendingDown, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -119,7 +121,7 @@ export function GraficoModerno({
     ],
   };
 
-  const opcoes: any = {
+  const opcoes: ChartOptions = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
@@ -135,13 +137,15 @@ export function GraficoModerno({
         borderColor: "rgba(255, 255, 255, 0.1)",
         borderWidth: 1,
         callbacks: {
-          label: function (context: any) {
-            let label = context.dataset.label || "";
+          label: function (context: unknown) {
+            const ctx = context as { dataset: { label?: string }; parsed: { y?: number } | number };
+            let label = ctx.dataset.label || "";
             if (label) {
               label += ": ";
             }
-            if (context.parsed.y !== null) {
-              label += formatarValor(context.parsed.y || context.parsed);
+            const valor = typeof ctx.parsed === 'number' ? ctx.parsed : ctx.parsed.y;
+            if (valor !== null && valor !== undefined) {
+              label += formatarValor(valor);
             }
             return label;
           },
@@ -154,8 +158,8 @@ export function GraficoModerno({
             y: {
               beginAtZero: true,
               ticks: {
-                callback: function (value: any) {
-                  return formatarValor(value);
+                callback: function (value: string | number) {
+                  return formatarValor(Number(value));
                 },
               },
               grid: {
@@ -222,9 +226,12 @@ export function GraficoModerno({
       </div>
 
       <div style={{ height: tipo === "pizza" ? "300px" : "350px" }}>
-        {tipo === "linha" && <Line data={configLinha} options={opcoes} />}
-        {tipo === "barra" && <Bar data={configBarra} options={opcoes} />}
-        {tipo === "pizza" && <Doughnut data={configPizza} options={opcoes} />}
+        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+        {tipo === "linha" && <Line data={configLinha} options={opcoes as any} />}
+        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+        {tipo === "barra" && <Bar data={configBarra} options={opcoes as any} />}
+        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+        {tipo === "pizza" && <Doughnut data={configPizza} options={opcoes as any} />}
       </div>
     </Card>
   );

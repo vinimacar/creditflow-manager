@@ -1,4 +1,4 @@
-import type { DadosExcel } from "./importarExcel";
+import type { DadosExcel } from "@/components/conciliacao/ImportarExcel";
 
 export interface Divergencia {
   id: string;

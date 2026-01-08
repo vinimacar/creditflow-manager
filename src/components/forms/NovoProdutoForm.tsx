@@ -66,7 +66,7 @@ export function NovoProdutoForm({ open, onOpenChange, onSalvar }: NovoProdutoFor
 
   const [salvando, setSalvando] = useState(false);
 
-  const handleChange = (field: keyof ProdutoNovo, value: any) => {
+  const handleChange = <K extends keyof ProdutoNovo>(field: K, value: ProdutoNovo[K]) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -271,7 +271,7 @@ export function NovoProdutoForm({ open, onOpenChange, onSalvar }: NovoProdutoFor
 
             <div className="space-y-2">
               <Label htmlFor="status">Status</Label>
-              <Select value={formData.status} onValueChange={(v: any) => handleChange("status", v)}>
+              <Select value={formData.status} onValueChange={(v: "ativo" | "inativo") => handleChange("status", v)}>
                 <SelectTrigger id="status">
                   <SelectValue />
                 </SelectTrigger>

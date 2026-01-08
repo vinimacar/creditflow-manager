@@ -54,10 +54,10 @@ export function ImportarExcel({ onImport, tipo }: ImportarExcelProps) {
       });
 
       // Mapear colunas para o formato esperado
-      const dadosFormatados: DadosExcel[] = jsonData.map((row: any) => {
+      const dadosFormatados: DadosExcel[] = jsonData.map((row: ExcelRow) => {
         // Normalizar nomes de colunas (aceitar variações)
-        const normalizar = (obj: any) => {
-          const resultado: any = {};
+        const normalizar = (obj: ExcelRow) => {
+          const resultado: Record<string, unknown> = {};
           Object.keys(obj).forEach(key => {
             const keyLower = key.toLowerCase().trim();
             resultado[keyLower] = obj[key];
@@ -68,14 +68,14 @@ export function ImportarExcel({ onImport, tipo }: ImportarExcelProps) {
         const rowNormalizada = normalizar(row);
 
         return {
-          contrato: rowNormalizada.contrato || rowNormalizada.numero_contrato || rowNormalizada.numerocontrato || "",
-          cliente: rowNormalizada.cliente || rowNormalizada.nome_cliente || rowNormalizada.nomecliente || "",
-          fornecedor: rowNormalizada.fornecedor || rowNormalizada.banco || rowNormalizada.financeira || "",
-          funcionario: rowNormalizada.funcionario || rowNormalizada.vendedor || rowNormalizada.agente || "",
+          contrato: String(rowNormalizada.contrato || rowNormalizada.numero_contrato || rowNormalizada.numerocontrato || ""),
+          cliente: String(rowNormalizada.cliente || rowNormalizada.nome_cliente || rowNormalizada.nomecliente || ""),
+          fornecedor: String(rowNormalizada.fornecedor || rowNormalizada.banco || rowNormalizada.financeira || ""),
+          funcionario: String(rowNormalizada.funcionario || rowNormalizada.vendedor || rowNormalizada.agente || ""),
           valorComissao: parseFloat(String(rowNormalizada.comissao || rowNormalizada.valor_comissao || rowNormalizada.valorcomissao || 0).replace(/[^\d.,]/g, "").replace(",", ".")) || 0,
           valorProduto: parseFloat(String(rowNormalizada.valor || rowNormalizada.valor_produto || rowNormalizada.valorproduto || 0).replace(/[^\d.,]/g, "").replace(",", ".")) || 0,
-          dataVenda: rowNormalizada.data_venda || rowNormalizada.datavenda || rowNormalizada.data ? new Date(rowNormalizada.data_venda || rowNormalizada.datavenda || rowNormalizada.data) : new Date(),
-          dataPagamento: rowNormalizada.data_pagamento || rowNormalizada.datapagamento ? new Date(rowNormalizada.data_pagamento || rowNormalizada.datapagamento) : undefined,
+          dataVenda: rowNormalizada.data_venda || rowNormalizada.datavenda || rowNormalizada.data ? new Date(String(rowNormalizada.data_venda || rowNormalizada.datavenda || rowNormalizada.data)) : new Date(),
+          dataPagamento: rowNormalizada.data_pagamento || rowNormalizada.datapagamento ? new Date(String(rowNormalizada.data_pagamento || rowNormalizada.datapagamento)) : undefined,
           ...row // Manter dados originais
         };
       });
