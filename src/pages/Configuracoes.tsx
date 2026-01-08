@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,6 +8,8 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { NovoUsuarioForm } from "@/components/forms/NovoUsuarioForm";
+import { EditarUsuarioForm } from "@/components/forms/EditarUsuarioForm";
+import type { UserProfile } from "@/contexts/AuthTypes";
 import {
   Building2,
   Bell,
@@ -15,11 +18,47 @@ import {
   Users,
 } from "lucide-react";
 import { toast } from "sonner";
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { Skeleton } from "@/components/ui/skeleton";
+
+const roleLabels: Record<string, string> = {
+  admin: "Administrador",
+  gerente: "Gerente",
+  agente: "Agente",
+  atendente: "Atendente",
+};
 
 export default function Configuracoes() {
+  const [usuarios, setUsuarios] = useState<UserProfile[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(true);
+
   const handleSave = () => {
     toast.success("Configurações salvas com sucesso!");
   };
+
+  const carregarUsuarios = async () => {
+    try {
+      setLoadingUsers(true);
+      const usersSnapshot = await getDocs(collection(db, "users"));
+      const usersData = usersSnapshot.docs.map(doc => ({
+        uid: doc.id,
+        ...doc.data(),
+        createdAt: doc.data().createdAt?.toDate() || new Date(),
+      })) as UserProfile[];
+      
+      setUsuarios(usersData);
+    } catch (error) {
+      console.error("Erro ao carregar usuários:", error);
+      toast.error("Erro ao carregar usuários");
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
+  useEffect(() => {
+    carregarUsuarios();
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -94,32 +133,37 @@ export default function Configuracoes() {
               Configure os níveis de acesso e permissões dos usuários do sistema.
             </p>
             
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
-                <div>
-                  <p className="font-medium">Admin</p>
-                  <p className="text-sm text-muted-foreground">admin@empresa.com · Diretor</p>
-                </div>
-                <Button variant="outline" size="sm">Editar</Button>
+            {loadingUsers ? (
+              <div className="space-y-4">
+                <Skeleton className="h-20 w-full" />
+                <Skeleton className="h-20 w-full" />
+                <Skeleton className="h-20 w-full" />
               </div>
-              <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
-                <div>
-                  <p className="font-medium">Carlos Mendes</p>
-                  <p className="text-sm text-muted-foreground">carlos@empresa.com · Agente</p>
-                </div>
-                <Button variant="outline" size="sm">Editar</Button>
+            ) : usuarios.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                Nenhum usuário cadastrado
               </div>
-              <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
-                <div>
-                  <p className="font-medium">Fernanda Lima</p>
-                  <p className="text-sm text-muted-foreground">fernanda@empresa.com · Gerente</p>
-                </div>
-                <Button variant="outline" size="sm">Editar</Button>
+            ) : (
+              <div className="space-y-4">
+                {usuarios.map((usuario) => (
+                  <div
+                    key={usuario.uid}
+                    className="flex items-center justify-between p-4 bg-muted/50 rounded-lg"
+                  >
+                    <div>
+                      <p className="font-medium">{usuario.displayName}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {usuario.email} · {roleLabels[usuario.role]}
+                      </p>
+                    </div>
+                    <EditarUsuarioForm usuario={usuario} onUpdate={carregarUsuarios} />
+                  </div>
+                ))}
               </div>
-            </div>
+            )}
             
             <div className="flex justify-end mt-6">
-              <NovoUsuarioForm />
+              <NovoUsuarioForm onUserCreated={carregarUsuarios} />
             </div>
           </Card>
         </TabsContent>
