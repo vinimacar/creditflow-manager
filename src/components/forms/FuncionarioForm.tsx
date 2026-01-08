@@ -16,12 +16,19 @@ import { toast } from "sonner";
 import { cpfValidation, telefoneValidation, cepValidation } from "@/lib/zod-validations";
 import { mascaraCPF, mascaraTelefone, mascaraCEP, buscarCEP } from "@/lib/validations";
 import { addFuncionario, updateFuncionario } from "@/lib/firestore";
+import { createUserWithEmailAndPassword } from "firebase/auth";
+import { doc, setDoc } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
+import type { UserRole } from "@/contexts/AuthTypes";
 
 const funcionarioSchema = z.object({
   nome: z.string().min(3, "Nome deve ter pelo menos 3 caracteres"),
   cpf: cpfValidation,
   email: z.string().email("Email inválido"),
   telefone: telefoneValidation,
+  cargo: z.enum(["admin", "gerente", "agente", "atendente"], {
+    errorMap: () => ({ message: "Selecione um cargo válido" }),
+  }),
   endereco: z.string().min(5, "Endereço é obrigatório"),
   cidade: z.string().min(2, "Cidade é obrigatória"),
   uf: z.string().min(2, "UF é obrigatória"),
@@ -29,6 +36,7 @@ const funcionarioSchema = z.object({
   dataNascimento: z.string().min(10, "Data de nascimento é obrigatória"),
   dataAdmissao: z.string().min(10, "Data de admissão é obrigatória"),
   dataDemissao: z.string().optional(),
+  senhaInicial: z.string().min(6, "Senha deve ter pelo menos 6 caracteres").optional(),
 });
 
 type FuncionarioFormData = z.infer<typeof funcionarioSchema>;
@@ -101,11 +109,52 @@ export function FuncionarioForm({ onSuccess, initialData }: FuncionarioFormProps
         toast.success("Funcionário atualizado com sucesso!");
       } else {
         // Criar novo funcionário
+        const senhaInicial = data.senhaInicial || `${data.cpf.replace(/\D/g, "").slice(0, 6)}`;
+        
+        // 1. Criar usuário no Firebase Auth
+        let userId: string;
+        try {
+          const userCredential = await createUserWithEmailAndPassword(
+            auth,
+            data.email,
+            senhaInicial
+          );
+          userId = userCredential.user.uid;
+          
+          // 2. Mapear cargo para role
+          const roleMap: Record<string, UserRole> = {
+            "admin": "admin",
+            "gerente": "gerente",
+            "agente": "agente",
+            "atendente": "atendente",
+          };
+          
+          // 3. Criar perfil do usuário no Firestore
+          await setDoc(doc(db, "users", userId), {
+            uid: userId,
+            email: data.email,
+            displayName: data.nome,
+            role: roleMap[data.cargo as keyof typeof roleMap],
+            createdAt: new Date(),
+          });
+          
+          toast.success("Usuário de acesso criado com sucesso!");
+        } catch (authError: any) {
+          if (authError.code === "auth/email-already-in-use") {
+            toast.warning("Email já cadastrado. Funcionário será criado sem usuário de acesso.");
+          } else {
+            throw authError;
+          }
+        }
+        
+        // 4. Criar funcionário
         await addFuncionario({
           ...data,
+          funcao: data.cargo,
           status: "ativo",
         });
-        toast.success("Funcionário cadastrado com sucesso!");
+        
+        toast.success(`Funcionário cadastrado com sucesso! Login: ${data.email} | Senha inicial: ${senhaInicial}`);
       }
       onSuccess();
     } catch (error) {
@@ -125,7 +174,13 @@ export function FuncionarioForm({ onSuccess, initialData }: FuncionarioFormProps
 
         <div>
           <Label htmlFor="cpf">CPF *</Label>
-          <Input id="cpf" {...register("cpf")} placeholder="000.000.000-00" />
+          <Input 
+            id="cpf" 
+            {...register("cpf")} 
+            onChange={handleCPFChange}
+            placeholder="000.000.000-00"
+            maxLength={14}
+          />
           {errors.cpf && <p className="text-sm text-destructive mt-1">{errors.cpf.message}</p>}
         </div>
 
@@ -142,6 +197,22 @@ export function FuncionarioForm({ onSuccess, initialData }: FuncionarioFormProps
         </div>
 
         <div>
+          <Label htmlFor="cargo">Cargo/Nível de Acesso *</Label>
+          <Select onValueChange={(value) => setValue("cargo", value as any)}>
+            <SelectTrigger id="cargo">
+              <SelectValue placeholder="Selecione o cargo" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="atendente">Atendente (Nível 1)</SelectItem>
+              <SelectItem value="agente">Agente (Nível 2)</SelectItem>
+              <SelectItem value="gerente">Gerente (Nível 3)</SelectItem>
+              <SelectItem value="admin">Administrador (Nível 4)</SelectItem>
+            </SelectContent>
+          </Select>
+          {errors.cargo && <p className="text-sm text-destructive mt-1">{errors.cargo.message}</p>}
+        </div>
+
+        <div>
           <Label htmlFor="telefone">Telefone *</Label>
           <Input 
             id="telefone" 
@@ -152,6 +223,22 @@ export function FuncionarioForm({ onSuccess, initialData }: FuncionarioFormProps
           />
           {errors.telefone && <p className="text-sm text-destructive mt-1">{errors.telefone.message}</p>}
         </div>
+
+        {!initialData?.id && (
+          <div className="md:col-span-2">
+            <Label htmlFor="senhaInicial">Senha Inicial (opcional)</Label>
+            <Input 
+              id="senhaInicial" 
+              type="password" 
+              {...register("senhaInicial")} 
+              placeholder="Deixe vazio para usar os 6 primeiros dígitos do CPF"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Se não informada, será gerada automaticamente usando os primeiros 6 dígitos do CPF
+            </p>
+            {errors.senhaInicial && <p className="text-sm text-destructive mt-1">{errors.senhaInicial.message}</p>}
+          </div>
+        )}
 
         <div className="md:col-span-2">
           <Label htmlFor="endereco">Endereço *</Label>
