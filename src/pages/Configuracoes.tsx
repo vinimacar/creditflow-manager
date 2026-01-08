@@ -6,13 +6,13 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { NovoUsuarioForm } from "@/components/forms/NovoUsuarioForm";
 import {
   Building2,
   Bell,
   Shield,
   Palette,
   Users,
-  Key,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -119,10 +119,7 @@ export default function Configuracoes() {
             </div>
             
             <div className="flex justify-end mt-6">
-              <Button className="gap-2">
-                <Key className="w-4 h-4" />
-                Novo Usuário
-              </Button>
+              <NovoUsuarioForm />
             </div>
           </Card>
         </TabsContent>
