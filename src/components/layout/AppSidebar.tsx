@@ -40,7 +40,7 @@ const bottomMenuItems = [
 export function AppSidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
-  const { user, hasPermission } = useAuth();
+  const { user, hasPermission, signOut } = useAuth();
 
   return (
     <aside
@@ -124,7 +124,7 @@ export function AppSidebar() {
             })}
           <li>
             <button
-              onClick={() => useAuth().signOut()}
+              onClick={signOut}
               className="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 w-full text-sidebar-foreground hover:bg-destructive/10 hover:text-destructive"
             >
               <LogOut className="w-5 h-5 shrink-0" />
