@@ -183,42 +183,6 @@ export default function Conciliacao() {
         );
     }
   };
-    valorInterno: 8500,
-    valorBanco: 8200,
-    status: "divergente",
-    divergencia: "Diferença de R$ 300,00",
-  },
-  {
-    id: "3",
-    contratoInterno: "VND-001236",
-    contratoBanco: "PAN-001236",
-    cliente: "Ana Costa Ferreira",
-    valorInterno: 22000,
-    valorBanco: 22000,
-    status: "ok",
-  },
-  {
-    id: "4",
-    contratoInterno: "VND-001237",
-    contratoBanco: "-",
-    cliente: "Carlos Alberto Lima",
-    valorInterno: 12000,
-    valorBanco: 0,
-    status: "nao_encontrado",
-    divergencia: "Contrato não encontrado no extrato do banco",
-  },
-  {
-    id: "5",
-    contratoInterno: "VND-001238",
-    contratoBanco: "BRAD-001238",
-    cliente: "Lucia Ferreira Costa",
-    valorInterno: 18500,
-    valorBanco: 18500,
-    status: "ok",
-  },
-];
-
-  };
 
   return (
     <div className="space-y-6">
