@@ -11,8 +11,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ProdutoForm } from "@/components/forms/ProdutoForm";
+import { NovoProdutoForm, type ProdutoNovo } from "@/components/forms/NovoProdutoForm";
 import { ImportDialog } from "@/components/ui/ImportDialog";
 import { getProdutos, deleteProduto, type Produto } from "@/lib/firestore";
+import { addDoc, collection } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { toast } from "sonner";
 
 interface ProdutoDisplay {
@@ -81,6 +84,7 @@ const produtoTemplateColumns = [
 
 export default function Produtos() {
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isNovoProdutoOpen, setIsNovoProdutoOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [produtos, setProdutos] = useState<ProdutoDisplay[]>([]);
   const [loading, setLoading] = useState(true);
@@ -149,6 +153,21 @@ export default function Produtos() {
     loadProdutos();
   };
 
+  const handleSalvarNovoProduto = async (produto: ProdutoNovo) => {
+    try {
+      await addDoc(collection(db, "produtos"), {
+        ...produto,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      setIsNovoProdutoOpen(false);
+      loadProdutos();
+    } catch (error) {
+      console.error("Erro ao salvar produto:", error);
+      throw error;
+    }
+  };
+
   const handleImport = (data: Record<string, string>[]) => {
     console.log("Produtos importados:", data);
   };
@@ -160,9 +179,12 @@ export default function Produtos() {
         description="Catálogo de produtos de crédito consignado"
         action={{
           label: "Novo Produto",
-          onClick: () => setIsFormOpen(true),
+          onClick: () => setIsNovoProdutoOpen(true),
         }}
       >
+        <Button variant="outline" className="gap-2" onClick={() => setIsFormOpen(true)}>
+          Editar
+        </Button>
         <Button variant="outline" className="gap-2" onClick={() => setIsImportOpen(true)}>
           <Upload className="w-4 h-4" />
           Importar
@@ -177,13 +199,14 @@ export default function Produtos() {
         onDelete={handleDelete}
       />
 
+      {/* Dialog de edição - ProdutoForm existente */}
       <Dialog open={isFormOpen} onOpenChange={(open) => {
         setIsFormOpen(open);
         if (!open) setSelectedProduto(null);
       }}>
         <DialogContent className="max-w-xl">
           <DialogHeader>
-            <DialogTitle>{selectedProduto ? "Editar Produto" : "Novo Produto"}</DialogTitle>
+            <DialogTitle>{selectedProduto ? "Editar Produto" : "Produto"}</DialogTitle>
           </DialogHeader>
           <ProdutoForm 
             initialData={selectedProduto || undefined}
@@ -191,6 +214,13 @@ export default function Produtos() {
           />
         </DialogContent>
       </Dialog>
+
+      {/* Novo Dialog - NovoProdutoForm com comissões */}
+      <NovoProdutoForm
+        open={isNovoProdutoOpen}
+        onOpenChange={setIsNovoProdutoOpen}
+        onSalvar={handleSalvarNovoProduto}
+      />
 
       <ImportDialog
         open={isImportOpen}

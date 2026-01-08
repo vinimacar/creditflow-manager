@@ -5,6 +5,12 @@ import { ptBR } from "date-fns/locale";
 import type { Divergencia } from "./conciliacao";
 import type { ChartConfiguration } from "chart.js";
 
+interface jsPDFWithAutoTable extends jsPDF {
+  lastAutoTable: {
+    finalY: number;
+  };
+}
+
 export async function gerarRelatorioPDF(
   divergencias: Divergencia[],
   estatisticas: any,
@@ -140,7 +146,7 @@ export async function gerarRelatorioPDF(
       });
 
       if (divergenciasFiltradas.length > 50) {
-        const finalY = (doc as any).lastAutoTable.finalY + 10;
+        const finalY = (doc as jsPDFWithAutoTable).lastAutoTable.finalY + 10;
         doc.setFontSize(10);
         doc.setFont("helvetica", "italic");
         doc.text(

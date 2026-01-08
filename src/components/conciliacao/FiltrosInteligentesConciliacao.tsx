@@ -209,7 +209,7 @@ export function FiltrosInteligentesConciliacao({
             onValueChange={(value) =>
               onFiltrosChange({
                 ...filtros,
-                statusDivergencia: value as any,
+                statusDivergencia: value as "todos" | "ok" | "divergente" | "nao_encontrado",
               })
             }
           >

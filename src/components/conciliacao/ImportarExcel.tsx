@@ -13,7 +13,11 @@ export interface DadosExcel {
   valorProduto: number;
   dataVenda: Date;
   dataPagamento?: Date;
-  [key: string]: any;
+  [key: string]: unknown;
+}
+
+interface ExcelRow {
+  [key: string]: string | number | Date | undefined;
 }
 
 interface ImportarExcelProps {
