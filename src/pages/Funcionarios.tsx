@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { DataTable } from "@/components/ui/DataTable";
 import { Badge } from "@/components/ui/badge";
@@ -10,8 +10,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { FuncionarioForm } from "@/components/forms/FuncionarioForm";
+import { getFuncionarios, deleteFuncionario, type Funcionario } from "@/lib/firestore";
+import { toast } from "sonner";
 
-interface Funcionario {
+interface FuncionarioDisplay {
   id: string;
   nome: string;
   cpf: string;
@@ -24,69 +26,6 @@ interface Funcionario {
   status: "ativo" | "inativo";
 }
 
-const mockFuncionarios: Funcionario[] = [
-  {
-    id: "1",
-    nome: "Carlos Mendes Silva",
-    cpf: "123.456.789-00",
-    email: "carlos.mendes@empresa.com",
-    telefone: "(11) 99999-1111",
-    cidade: "São Paulo",
-    uf: "SP",
-    funcao: "Agente",
-    dataAdmissao: "15/03/2023",
-    status: "ativo",
-  },
-  {
-    id: "2",
-    nome: "Fernanda Lima Costa",
-    cpf: "987.654.321-00",
-    email: "fernanda.lima@empresa.com",
-    telefone: "(11) 99999-2222",
-    cidade: "São Paulo",
-    uf: "SP",
-    funcao: "Gerente",
-    dataAdmissao: "10/01/2022",
-    status: "ativo",
-  },
-  {
-    id: "3",
-    nome: "Ricardo Alves Santos",
-    cpf: "456.789.123-00",
-    email: "ricardo.alves@empresa.com",
-    telefone: "(21) 99999-3333",
-    cidade: "Rio de Janeiro",
-    uf: "RJ",
-    funcao: "Agente",
-    dataAdmissao: "20/06/2023",
-    status: "ativo",
-  },
-  {
-    id: "4",
-    nome: "Juliana Costa Oliveira",
-    cpf: "321.654.987-00",
-    email: "juliana.costa@empresa.com",
-    telefone: "(11) 99999-4444",
-    cidade: "São Paulo",
-    uf: "SP",
-    funcao: "Atendente",
-    dataAdmissao: "05/09/2024",
-    status: "ativo",
-  },
-  {
-    id: "5",
-    nome: "Pedro Henrique Souza",
-    cpf: "654.321.987-00",
-    email: "pedro.souza@empresa.com",
-    telefone: "(31) 99999-5555",
-    cidade: "Belo Horizonte",
-    uf: "MG",
-    funcao: "Agente",
-    dataAdmissao: "12/04/2023",
-    status: "inativo",
-  },
-];
-
 const funcaoColors: Record<string, string> = {
   Agente: "bg-primary hover:bg-primary/90",
   Gerente: "bg-accent hover:bg-accent/90",
@@ -98,7 +37,7 @@ const columns = [
   {
     key: "nome",
     header: "Funcionário",
-    render: (funcionario: Funcionario) => (
+    render: (funcionario: FuncionarioDisplay) => (
       <div className="flex items-center gap-3">
         <Avatar className="w-9 h-9">
           <AvatarFallback className="bg-primary/10 text-primary text-xs">
@@ -115,7 +54,7 @@ const columns = [
   {
     key: "funcao",
     header: "Função",
-    render: (funcionario: Funcionario) => (
+    render: (funcionario: FuncionarioDisplay) => (
       <Badge className={funcaoColors[funcionario.funcao] || "bg-secondary"}>
         {funcionario.funcao}
       </Badge>
@@ -124,7 +63,7 @@ const columns = [
   {
     key: "email",
     header: "Contato",
-    render: (funcionario: Funcionario) => (
+    render: (funcionario: FuncionarioDisplay) => (
       <div>
         <p className="text-sm">{funcionario.email}</p>
         <p className="text-xs text-muted-foreground">{funcionario.telefone}</p>
@@ -134,7 +73,7 @@ const columns = [
   {
     key: "cidade",
     header: "Localização",
-    render: (funcionario: Funcionario) => (
+    render: (funcionario: FuncionarioDisplay) => (
       <span className="text-sm">{funcionario.cidade}, {funcionario.uf}</span>
     ),
   },
@@ -145,7 +84,7 @@ const columns = [
   {
     key: "status",
     header: "Status",
-    render: (funcionario: Funcionario) => (
+    render: (funcionario: FuncionarioDisplay) => (
       <Badge
         variant={funcionario.status === "ativo" ? "default" : "secondary"}
         className={funcionario.status === "ativo" ? "bg-success hover:bg-success/90" : ""}
@@ -158,6 +97,76 @@ const columns = [
 
 export default function Funcionarios() {
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [funcionarios, setFuncionarios] = useState<FuncionarioDisplay[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedFuncionario, setSelectedFuncionario] = useState<Funcionario | null>(null);
+
+  useEffect(() => {
+    loadFuncionarios();
+  }, []);
+
+  const loadFuncionarios = async () => {
+    try {
+      setLoading(true);
+      const data = await getFuncionarios();
+      const displayData: FuncionarioDisplay[] = data.map(f => ({
+        id: f.id,
+        nome: f.nome,
+        cpf: f.cpf,
+        email: f.email,
+        telefone: f.telefone,
+        cidade: f.cidade,
+        uf: f.uf,
+        funcao: f.funcao,
+        dataAdmissao: f.dataAdmissao,
+        status: f.status as "ativo" | "inativo"
+      }));
+      setFuncionarios(displayData);
+    } catch (error) {
+      console.error("Erro ao carregar funcionários:", error);
+      toast.error("Erro ao carregar funcionários");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEdit = (funcionario: FuncionarioDisplay) => {
+    const fullData: Funcionario = {
+      id: funcionario.id,
+      nome: funcionario.nome,
+      cpf: funcionario.cpf,
+      email: funcionario.email,
+      telefone: funcionario.telefone,
+      endereco: "",
+      cidade: funcionario.cidade,
+      uf: funcionario.uf,
+      cep: "",
+      funcao: funcionario.funcao,
+      dataAdmissao: funcionario.dataAdmissao,
+      status: funcionario.status
+    };
+    setSelectedFuncionario(fullData);
+    setIsFormOpen(true);
+  };
+
+  const handleDelete = async (funcionario: FuncionarioDisplay) => {
+    if (confirm(`Deseja realmente excluir o funcionário ${funcionario.nome}?`)) {
+      try {
+        await deleteFuncionario(funcionario.id);
+        toast.success("Funcionário excluído com sucesso!");
+        loadFuncionarios();
+      } catch (error) {
+        console.error("Erro ao excluir funcionário:", error);
+        toast.error("Erro ao excluir funcionário");
+      }
+    }
+  };
+
+  const handleFormSuccess = () => {
+    setIsFormOpen(false);
+    setSelectedFuncionario(null);
+    loadFuncionarios();
+  };
 
   return (
     <div>
@@ -172,18 +181,24 @@ export default function Funcionarios() {
 
       <DataTable
         columns={columns}
-        data={mockFuncionarios}
+        data={funcionarios}
         searchPlaceholder="Buscar por nome, CPF ou função..."
-        onEdit={(funcionario) => console.log("Edit", funcionario)}
-        onDelete={(funcionario) => console.log("Delete", funcionario)}
+        onEdit={handleEdit}
+        onDelete={handleDelete}
       />
 
-      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+      <Dialog open={isFormOpen} onOpenChange={(open) => {
+        setIsFormOpen(open);
+        if (!open) setSelectedFuncionario(null);
+      }}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Novo Funcionário</DialogTitle>
+            <DialogTitle>{selectedFuncionario ? "Editar Funcionário" : "Novo Funcionário"}</DialogTitle>
           </DialogHeader>
-          <FuncionarioForm onSuccess={() => setIsFormOpen(false)} />
+          <FuncionarioForm 
+            initialData={selectedFuncionario || undefined}
+            onSuccess={handleFormSuccess} 
+          />
         </DialogContent>
       </Dialog>
     </div>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { DataTable } from "@/components/ui/DataTable";
 import { Badge } from "@/components/ui/badge";
@@ -12,8 +12,10 @@ import {
 } from "@/components/ui/dialog";
 import { ProdutoForm } from "@/components/forms/ProdutoForm";
 import { ImportDialog } from "@/components/ui/ImportDialog";
+import { getProdutos, deleteProduto, type Produto } from "@/lib/firestore";
+import { toast } from "sonner";
 
-interface Produto {
+interface ProdutoDisplay {
   id: string;
   nome: string;
   codigo: string;
@@ -25,69 +27,11 @@ interface Produto {
   status: "ativo" | "inativo";
 }
 
-const mockProdutos: Produto[] = [
-  {
-    id: "1",
-    nome: "Empréstimo Consignado INSS",
-    codigo: "CONS-INSS-001",
-    descricao: "Empréstimo consignado para beneficiários do INSS",
-    prazoMin: 12,
-    prazoMax: 84,
-    tipoTabela: "Tabela Price",
-    comissao: 3.0,
-    status: "ativo",
-  },
-  {
-    id: "2",
-    nome: "Refinanciamento",
-    codigo: "REFIN-001",
-    descricao: "Refinanciamento de contratos existentes",
-    prazoMin: 12,
-    prazoMax: 96,
-    tipoTabela: "Tabela Price",
-    comissao: 2.5,
-    status: "ativo",
-  },
-  {
-    id: "3",
-    nome: "Portabilidade",
-    codigo: "PORT-001",
-    descricao: "Portabilidade de crédito de outras instituições",
-    prazoMin: 12,
-    prazoMax: 84,
-    tipoTabela: "Tabela Price",
-    comissao: 2.8,
-    status: "ativo",
-  },
-  {
-    id: "4",
-    nome: "Cartão Consignado",
-    codigo: "CARD-001",
-    descricao: "Cartão de crédito com desconto em folha",
-    prazoMin: 1,
-    prazoMax: 12,
-    tipoTabela: "Rotativo",
-    comissao: 1.5,
-    status: "ativo",
-  },
-  {
-    id: "5",
-    nome: "Consignado Servidor Público",
-    codigo: "CONS-SP-001",
-    descricao: "Empréstimo para servidores públicos",
-    prazoMin: 12,
-    prazoMax: 96,
-    tipoTabela: "Tabela Price",
-    comissao: 3.2,
-    status: "inativo",
-  },
-];
-
 const columns = [
   {
     key: "nome",
     header: "Produto",
-    render: (produto: Produto) => (
+    render: (produto: ProdutoDisplay) => (
       <div className="flex items-center gap-3">
         <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
           <Package className="w-5 h-5 text-primary" />
@@ -102,7 +46,7 @@ const columns = [
   {
     key: "prazo",
     header: "Prazo",
-    render: (produto: Produto) => (
+    render: (produto: ProdutoDisplay) => (
       <span className="text-sm">{produto.prazoMin} - {produto.prazoMax} meses</span>
     ),
   },
@@ -113,14 +57,14 @@ const columns = [
   {
     key: "comissao",
     header: "Comissão",
-    render: (produto: Produto) => (
+    render: (produto: ProdutoDisplay) => (
       <span className="font-medium text-success">{produto.comissao}%</span>
     ),
   },
   {
     key: "status",
     header: "Status",
-    render: (produto: Produto) => (
+    render: (produto: ProdutoDisplay) => (
       <Badge
         variant={produto.status === "ativo" ? "default" : "secondary"}
         className={produto.status === "ativo" ? "bg-success hover:bg-success/90" : ""}
@@ -138,6 +82,72 @@ const produtoTemplateColumns = [
 export default function Produtos() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
+  const [produtos, setProdutos] = useState<ProdutoDisplay[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedProduto, setSelectedProduto] = useState<Produto | null>(null);
+
+  useEffect(() => {
+    loadProdutos();
+  }, []);
+
+  const loadProdutos = async () => {
+    try {
+      setLoading(true);
+      const data = await getProdutos();
+      const displayData: ProdutoDisplay[] = data.map(p => ({
+        id: p.id,
+        nome: p.nome,
+        codigo: p.codigo,
+        descricao: p.descricao,
+        prazoMin: p.prazoMin,
+        prazoMax: p.prazoMax,
+        tipoTabela: p.tipoTabela,
+        comissao: p.comissao,
+        status: p.status as "ativo" | "inativo"
+      }));
+      setProdutos(displayData);
+    } catch (error) {
+      console.error("Erro ao carregar produtos:", error);
+      toast.error("Erro ao carregar produtos");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEdit = (produto: ProdutoDisplay) => {
+    const fullData: Produto = {
+      id: produto.id,
+      nome: produto.nome,
+      codigo: produto.codigo,
+      descricao: produto.descricao,
+      prazoMin: produto.prazoMin,
+      prazoMax: produto.prazoMax,
+      tipoTabela: produto.tipoTabela,
+      comissao: produto.comissao,
+      status: produto.status
+    };
+    setSelectedProduto(fullData);
+    setIsFormOpen(true);
+  };
+
+  const handleDelete = async (produto: ProdutoDisplay) => {
+    if (confirm(`Deseja realmente excluir o produto ${produto.nome}?`)) {
+      try {
+        await deleteProduto(produto.id);
+        toast.success("Produto excluído com sucesso!");
+        loadProdutos();
+      } catch (error) {
+        console.error("Erro ao excluir produto:", error);
+        toast.error("Erro ao excluir produto");
+      }
+    }
+  };
+
+  const handleFormSuccess = () => {
+    setIsFormOpen(false);
+    setSelectedProduto(null);
+    loadProdutos();
+  };
 
   const handleImport = (data: Record<string, string>[]) => {
     console.log("Produtos importados:", data);
@@ -161,18 +171,24 @@ export default function Produtos() {
 
       <DataTable
         columns={columns}
-        data={mockProdutos}
+        data={produtos}
         searchPlaceholder="Buscar por nome ou código..."
-        onEdit={(produto) => console.log("Edit", produto)}
-        onDelete={(produto) => console.log("Delete", produto)}
+        onEdit={handleEdit}
+        onDelete={handleDelete}
       />
 
-      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+      <Dialog open={isFormOpen} onOpenChange={(open) => {
+        setIsFormOpen(open);
+        if (!open) setSelectedProduto(null);
+      }}>
         <DialogContent className="max-w-xl">
           <DialogHeader>
-            <DialogTitle>Novo Produto</DialogTitle>
+            <DialogTitle>{selectedProduto ? "Editar Produto" : "Novo Produto"}</DialogTitle>
           </DialogHeader>
-          <ProdutoForm onSuccess={() => setIsFormOpen(false)} />
+          <ProdutoForm 
+            initialData={selectedProduto || undefined}
+            onSuccess={handleFormSuccess} 
+          />
         </DialogContent>
       </Dialog>
 

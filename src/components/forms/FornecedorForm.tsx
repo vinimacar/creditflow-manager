@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { cnpjValidation, telefoneValidation } from "@/lib/zod-validations";
 import { mascaraCNPJ, mascaraTelefone } from "@/lib/validations";
+import { addFornecedor, updateFornecedor } from "@/lib/firestore";
 
 const fornecedorSchema = z.object({
   razaoSocial: z.string().min(3, "Razão Social é obrigatória"),
@@ -46,11 +47,25 @@ export function FornecedorForm({ onSuccess, initialData }: FornecedorFormProps) 
 
   const onSubmit = async (data: FornecedorFormData) => {
     try {
-      console.log("Fornecedor data:", data);
-      toast.success("Fornecedor salvo com sucesso!");
+      if (initialData?.id) {
+        // Atualizar fornecedor existente
+        await updateFornecedor(initialData.id, {
+          ...data,
+          status: "ativo",
+        });
+        toast.success("Fornecedor atualizado com sucesso!");
+      } else {
+        // Criar novo fornecedor
+        await addFornecedor({
+          ...data,
+          status: "ativo",
+        });
+        toast.success("Fornecedor cadastrado com sucesso!");
+      }
       onSuccess();
     } catch (error) {
-      toast.error("Erro ao salvar fornecedor");
+      console.error("Erro ao salvar fornecedor:", error);
+      toast.error("Erro ao salvar fornecedor. Tente novamente.");
     }
   };
 

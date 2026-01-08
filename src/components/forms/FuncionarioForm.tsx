@@ -14,7 +14,7 @@ import {
 import { toast } from "sonner";
 import { cpfValidation, telefoneValidation, cepValidation } from "@/lib/zod-validations";
 import { mascaraCPF, mascaraTelefone, mascaraCEP, buscarCEP } from "@/lib/validations";
-import { useState } from "react";
+import { addFuncionario, updateFuncionario } from "@/lib/firestore";
 
 const funcionarioSchema = z.object({
   nome: z.string().min(3, "Nome deve ter pelo menos 3 caracteres"),
@@ -91,11 +91,25 @@ export function FuncionarioForm({ onSuccess, initialData }: FuncionarioFormProps
 
   const onSubmit = async (data: FuncionarioFormData) => {
     try {
-      console.log("Funcionário data:", data);
-      toast.success("Funcionário salvo com sucesso!");
+      if (initialData?.id) {
+        // Atualizar funcionário existente
+        await updateFuncionario(initialData.id, {
+          ...data,
+          status: "ativo",
+        });
+        toast.success("Funcionário atualizado com sucesso!");
+      } else {
+        // Criar novo funcionário
+        await addFuncionario({
+          ...data,
+          status: "ativo",
+        });
+        toast.success("Funcionário cadastrado com sucesso!");
+      }
       onSuccess();
     } catch (error) {
-      toast.error("Erro ao salvar funcionário");
+      console.error("Erro ao salvar funcionário:", error);
+      toast.error("Erro ao salvar funcionário. Tente novamente.");
     }
   };
 

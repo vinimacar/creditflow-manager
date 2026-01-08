@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { DataTable } from "@/components/ui/DataTable";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +13,8 @@ import {
 } from "@/components/ui/dialog";
 import { ClienteForm } from "@/components/forms/ClienteForm";
 import { ImportDialog } from "@/components/ui/ImportDialog";
+import { getClientes, deleteCliente, type Cliente } from "@/lib/firestore";
+import { toast } from "sonner";
 
 interface Cliente {
   id: string;
@@ -26,52 +28,17 @@ interface Cliente {
   status: "ativo" | "inativo";
 }
 
-const mockClientes: Cliente[] = [
-  {
-    id: "1",
-    nome: "Maria Silva Santos",
-    cpf: "123.456.789-00",
-    email: "maria.silva@email.com",
-    telefone: "(11) 99999-1234",
-    cidade: "São Paulo",
-    estado: "SP",
-    dataNascimento: "15/03/1965",
-    status: "ativo",
-  },
-  {
-    id: "2",
-    nome: "João Pedro Oliveira",
-    cpf: "987.654.321-00",
-    email: "joao.oliveira@email.com",
-    telefone: "(21) 98888-5678",
-    cidade: "Rio de Janeiro",
-    estado: "RJ",
-    dataNascimento: "22/07/1958",
-    status: "ativo",
-  },
-  {
-    id: "3",
-    nome: "Ana Costa Ferreira",
-    cpf: "456.789.123-00",
-    email: "ana.costa@email.com",
-    telefone: "(31) 97777-9012",
-    cidade: "Belo Horizonte",
-    estado: "MG",
-    dataNascimento: "10/11/1972",
-    status: "ativo",
-  },
-  {
-    id: "4",
-    nome: "Carlos Alberto Lima",
-    cpf: "321.654.987-00",
-    email: "carlos.lima@email.com",
-    telefone: "(41) 96666-3456",
-    cidade: "Curitiba",
-    estado: "PR",
-    dataNascimento: "05/09/1960",
-    status: "inativo",
-  },
-];
+interface Cliente {
+  id: string;
+  nome: string;
+  cpf: string;
+  email: string;
+  telefone: string;
+  cidade: string;
+  estado: string;
+  dataNascimento: string;
+  status: string;
+}
 
 const columns = [
   {
@@ -135,6 +102,50 @@ const clienteTemplateColumns = [
 export default function Clientes() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
+  const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
+
+  useEffect(() => {
+    loadClientes();
+  }, []);
+
+  const loadClientes = async () => {
+    try {
+      setLoading(true);
+      const data = await getClientes();
+      setClientes(data);
+    } catch (error) {
+      console.error("Erro ao carregar clientes:", error);
+      toast.error("Erro ao carregar clientes");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEdit = (cliente: Cliente) => {
+    setSelectedCliente(cliente);
+    setIsFormOpen(true);
+  };
+
+  const handleDelete = async (cliente: Cliente) => {
+    if (confirm(`Deseja realmente excluir o cliente ${cliente.nome}?`)) {
+      try {
+        await deleteCliente(cliente.id);
+        toast.success("Cliente excluído com sucesso!");
+        loadClientes();
+      } catch (error) {
+        console.error("Erro ao excluir cliente:", error);
+        toast.error("Erro ao excluir cliente");
+      }
+    }
+  };
+
+  const handleFormSuccess = () => {
+    setIsFormOpen(false);
+    setSelectedCliente(null);
+    loadClientes();
+  };
 
   const handleImport = (data: Record<string, string>[]) => {
     console.log("Dados importados:", data);
@@ -159,19 +170,25 @@ export default function Clientes() {
 
       <DataTable
         columns={columns}
-        data={mockClientes}
+        data={clientes}
         searchPlaceholder="Buscar por nome, CPF ou email..."
-        onEdit={(cliente) => console.log("Edit", cliente)}
-        onDelete={(cliente) => console.log("Delete", cliente)}
+        onEdit={handleEdit}
+        onDelete={handleDelete}
         onView={(cliente) => console.log("View", cliente)}
       />
 
-      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+      <Dialog open={isFormOpen} onOpenChange={(open) => {
+        setIsFormOpen(open);
+        if (!open) setSelectedCliente(null);
+      }}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Novo Cliente</DialogTitle>
+            <DialogTitle>{selectedCliente ? "Editar Cliente" : "Novo Cliente"}</DialogTitle>
           </DialogHeader>
-          <ClienteForm onSuccess={() => setIsFormOpen(false)} />
+          <ClienteForm 
+            initialData={selectedCliente || undefined} 
+            onSuccess={handleFormSuccess} 
+          />
         </DialogContent>
       </Dialog>
 

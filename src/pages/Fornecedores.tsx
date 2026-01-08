@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { DataTable } from "@/components/ui/DataTable";
 import { Badge } from "@/components/ui/badge";
@@ -12,8 +12,10 @@ import {
 } from "@/components/ui/dialog";
 import { FornecedorForm } from "@/components/forms/FornecedorForm";
 import { ImportDialog } from "@/components/ui/ImportDialog";
+import { getFornecedores, deleteFornecedor, type Fornecedor } from "@/lib/firestore";
+import { toast } from "sonner";
 
-interface Fornecedor {
+interface FornecedorDisplay {
   id: string;
   razaoSocial: string;
   nomeFantasia: string;
@@ -23,50 +25,11 @@ interface Fornecedor {
   status: "ativo" | "inativo";
 }
 
-const mockFornecedores: Fornecedor[] = [
-  {
-    id: "1",
-    razaoSocial: "Banco BMG S.A.",
-    nomeFantasia: "BMG",
-    cnpj: "61.186.680/0001-74",
-    telefone: "(11) 3003-1234",
-    email: "parceiros@bmg.com.br",
-    status: "ativo",
-  },
-  {
-    id: "2",
-    razaoSocial: "Banco Pan S.A.",
-    nomeFantasia: "Banco Pan",
-    cnpj: "59.285.411/0001-13",
-    telefone: "(11) 3003-5678",
-    email: "correspondente@bancopan.com.br",
-    status: "ativo",
-  },
-  {
-    id: "3",
-    razaoSocial: "Banco Bradesco S.A.",
-    nomeFantasia: "Bradesco",
-    cnpj: "60.746.948/0001-12",
-    telefone: "(11) 4002-0022",
-    email: "correspondentes@bradesco.com.br",
-    status: "ativo",
-  },
-  {
-    id: "4",
-    razaoSocial: "Banco Itaú Consignado S.A.",
-    nomeFantasia: "Itaú Consignado",
-    cnpj: "33.885.724/0001-19",
-    telefone: "(11) 4004-4828",
-    email: "consignado@itau.com.br",
-    status: "inativo",
-  },
-];
-
 const columns = [
   {
     key: "nomeFantasia",
     header: "Fornecedor",
-    render: (fornecedor: Fornecedor) => (
+    render: (fornecedor: FornecedorDisplay) => (
       <div className="flex items-center gap-3">
         <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center">
           <Building2 className="w-5 h-5 text-accent" />
@@ -85,7 +48,7 @@ const columns = [
   {
     key: "email",
     header: "Contato",
-    render: (fornecedor: Fornecedor) => (
+    render: (fornecedor: FornecedorDisplay) => (
       <div>
         <p className="text-sm">{fornecedor.email}</p>
         <p className="text-xs text-muted-foreground">{fornecedor.telefone}</p>
@@ -95,7 +58,7 @@ const columns = [
   {
     key: "status",
     header: "Status",
-    render: (fornecedor: Fornecedor) => (
+    render: (fornecedor: FornecedorDisplay) => (
       <Badge
         variant={fornecedor.status === "ativo" ? "default" : "secondary"}
         className={fornecedor.status === "ativo" ? "bg-success hover:bg-success/90" : ""}
@@ -113,6 +76,68 @@ const fornecedorTemplateColumns = [
 export default function Fornecedores() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
+  const [fornecedores, setFornecedores] = useState<FornecedorDisplay[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedFornecedor, setSelectedFornecedor] = useState<Fornecedor | null>(null);
+
+  useEffect(() => {
+    loadFornecedores();
+  }, []);
+
+  const loadFornecedores = async () => {
+    try {
+      setLoading(true);
+      const data = await getFornecedores();
+      const displayData: FornecedorDisplay[] = data.map(f => ({
+        id: f.id,
+        razaoSocial: f.razaoSocial,
+        nomeFantasia: f.nomeFantasia,
+        cnpj: f.cnpj,
+        telefone: f.telefone,
+        email: f.email,
+        status: f.status as "ativo" | "inativo"
+      }));
+      setFornecedores(displayData);
+    } catch (error) {
+      console.error("Erro ao carregar fornecedores:", error);
+      toast.error("Erro ao carregar fornecedores");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEdit = (fornecedor: FornecedorDisplay) => {
+    const fullData: Fornecedor = {
+      id: fornecedor.id,
+      razaoSocial: fornecedor.razaoSocial,
+      nomeFantasia: fornecedor.nomeFantasia,
+      cnpj: fornecedor.cnpj,
+      telefone: fornecedor.telefone,
+      email: fornecedor.email,
+      status: fornecedor.status
+    };
+    setSelectedFornecedor(fullData);
+    setIsFormOpen(true);
+  };
+
+  const handleDelete = async (fornecedor: FornecedorDisplay) => {
+    if (confirm(`Deseja realmente excluir o fornecedor ${fornecedor.nomeFantasia}?`)) {
+      try {
+        await deleteFornecedor(fornecedor.id);
+        toast.success("Fornecedor excluído com sucesso!");
+        loadFornecedores();
+      } catch (error) {
+        console.error("Erro ao excluir fornecedor:", error);
+        toast.error("Erro ao excluir fornecedor");
+      }
+    }
+  };
+
+  const handleFormSuccess = () => {
+    setIsFormOpen(false);
+    setSelectedFornecedor(null);
+    loadFornecedores();
+  };
 
   const handleImport = (data: Record<string, string>[]) => {
     console.log("Fornecedores importados:", data);
@@ -136,18 +161,24 @@ export default function Fornecedores() {
 
       <DataTable
         columns={columns}
-        data={mockFornecedores}
+        data={fornecedores}
         searchPlaceholder="Buscar por nome ou CNPJ..."
-        onEdit={(fornecedor) => console.log("Edit", fornecedor)}
-        onDelete={(fornecedor) => console.log("Delete", fornecedor)}
+        onEdit={handleEdit}
+        onDelete={handleDelete}
       />
 
-      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+      <Dialog open={isFormOpen} onOpenChange={(open) => {
+        setIsFormOpen(open);
+        if (!open) setSelectedFornecedor(null);
+      }}>
         <DialogContent className="max-w-xl">
           <DialogHeader>
-            <DialogTitle>Novo Fornecedor</DialogTitle>
+            <DialogTitle>{selectedFornecedor ? "Editar Fornecedor" : "Novo Fornecedor"}</DialogTitle>
           </DialogHeader>
-          <FornecedorForm onSuccess={() => setIsFormOpen(false)} />
+          <FornecedorForm 
+            initialData={selectedFornecedor || undefined}
+            onSuccess={handleFormSuccess} 
+          />
         </DialogContent>
       </Dialog>
 

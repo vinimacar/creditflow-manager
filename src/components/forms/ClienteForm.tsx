@@ -15,6 +15,7 @@ import {
 import { toast } from "sonner";
 import { cpfValidation, telefoneValidation, cepValidation } from "@/lib/zod-validations";
 import { mascaraCPF, mascaraTelefone, mascaraCEP, buscarCEP } from "@/lib/validations";
+import { addCliente, updateCliente } from "@/lib/firestore";
 
 const clienteSchema = z.object({
   nome: z.string().min(3, "Nome deve ter pelo menos 3 caracteres"),
@@ -91,11 +92,25 @@ export function ClienteForm({ onSuccess, initialData }: ClienteFormProps) {
 
   const onSubmit = async (data: ClienteFormData) => {
     try {
-      console.log("Cliente data:", data);
-      toast.success("Cliente salvo com sucesso!");
+      if (initialData?.id) {
+        // Atualizar cliente existente
+        await updateCliente(initialData.id, {
+          ...data,
+          status: "ativo",
+        });
+        toast.success("Cliente atualizado com sucesso!");
+      } else {
+        // Criar novo cliente
+        await addCliente({
+          ...data,
+          status: "ativo",
+        });
+        toast.success("Cliente cadastrado com sucesso!");
+      }
       onSuccess();
     } catch (error) {
-      toast.error("Erro ao salvar cliente");
+      console.error("Erro ao salvar cliente:", error);
+      toast.error("Erro ao salvar cliente. Tente novamente.");
     }
   };
 
