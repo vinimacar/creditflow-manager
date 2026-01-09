@@ -383,7 +383,7 @@ export default function Conciliacao() {
                   <TableHead>Fornecedor</TableHead>
                   <TableHead>Funcionário</TableHead>
                   <TableHead className="text-right">Valor Produto</TableHead>
-                  <TableHead className="text-right">Comissão</TableHead>
+                  <TableHead className="text-right bg-blue-50">Comissão</TableHead>
                   <TableHead>Data Venda</TableHead>
                   <TableHead>Status</TableHead>
                 </TableRow>
@@ -401,7 +401,7 @@ export default function Conciliacao() {
                     <TableCell className="text-right">
                       R$ {venda.valorProduto.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right bg-blue-50 font-semibold text-blue-700">
                       R$ {venda.valorComissao.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                     </TableCell>
                     <TableCell className="whitespace-nowrap">

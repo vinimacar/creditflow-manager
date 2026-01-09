@@ -791,7 +791,7 @@ export default function Relatorios() {
                   <TableHead>Produto</TableHead>
                   <TableHead className="text-right">Valor Contrato</TableHead>
                   <TableHead className="text-right">Prazo</TableHead>
-                  <TableHead className="text-right">Comissão</TableHead>
+                  <TableHead className="text-right bg-green-50">Comissão</TableHead>
                   <TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
@@ -805,7 +805,7 @@ export default function Relatorios() {
                     <TableCell>{venda.produto}</TableCell>
                     <TableCell className="text-right">R$ {venda.valorContrato.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</TableCell>
                     <TableCell className="text-right">{venda.prazo} meses</TableCell>
-                    <TableCell className="text-right">R$ {venda.comissao.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</TableCell>
+                    <TableCell className="text-right bg-green-50 font-semibold text-green-700">R$ {venda.comissao.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</TableCell>
                     <TableCell>
                       <span className={`px-2 py-1 rounded text-xs font-medium ${
                         venda.status === "aprovada" ? "bg-green-100 text-green-800" :
