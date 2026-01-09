@@ -18,9 +18,10 @@ import {
   Users,
 } from "lucide-react";
 import { toast } from "sonner";
-import { collection, getDocs } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { collection, getDocs, doc, setDoc, getDoc } from "firebase/firestore";
+import { db, auth } from "@/lib/firebase";
 import { Skeleton } from "@/components/ui/skeleton";
+import { updatePassword } from "firebase/auth";
 
 const roleLabels: Record<string, string> = {
   admin: "Administrador",
@@ -29,12 +30,165 @@ const roleLabels: Record<string, string> = {
   atendente: "Atendente",
 };
 
+interface ConfigEmpresa {
+  razaoSocial: string;
+  cnpj: string;
+  telefone: string;
+  endereco: string;
+  cidade: string;
+  estado: string;
+}
+
+interface ConfigNotificacoes {
+  novasVendas: boolean;
+  divergencias: boolean;
+  relatoriosSemanais: boolean;
+  metasAtingidas: boolean;
+}
+
+interface ConfigSeguranca {
+  auth2FA: boolean;
+  timeoutSessao: boolean;
+}
+
+interface ConfigAparencia {
+  modoEscuro: boolean;
+  sidebarCompacta: boolean;
+}
+
 export default function Configuracoes() {
   const [usuarios, setUsuarios] = useState<UserProfile[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
+  
+  // Estados para cada aba
+  const [empresa, setEmpresa] = useState<ConfigEmpresa>({
+    razaoSocial: "CréditoGestor Ltda",
+    cnpj: "12.345.678/0001-90",
+    telefone: "(11) 3456-7890",
+    endereco: "Av. Paulista, 1000 - Bela Vista",
+    cidade: "São Paulo",
+    estado: "SP",
+  });
+  
+  const [notificacoes, setNotificacoes] = useState<ConfigNotificacoes>({
+    novasVendas: true,
+    divergencias: true,
+    relatoriosSemanais: false,
+    metasAtingidas: true,
+  });
+  
+  const [seguranca, setSeguranca] = useState<ConfigSeguranca>({
+    auth2FA: false,
+    timeoutSessao: true,
+  });
+  
+  const [aparencia, setAparencia] = useState<ConfigAparencia>({
+    modoEscuro: false,
+    sidebarCompacta: false,
+  });
+  
+  const [senhaAtual, setSenhaAtual] = useState("");
+  const [novaSenha, setNovaSenha] = useState("");
+  const [salvando, setSalvando] = useState(false);
 
-  const handleSave = () => {
-    toast.success("Configurações salvas com sucesso!");
+  const carregarConfiguracoes = async () => {
+    try {
+      const configDoc = await getDoc(doc(db, "configuracoes", "geral"));
+      if (configDoc.exists()) {
+        const data = configDoc.data();
+        if (data.empresa) setEmpresa(data.empresa);
+        if (data.notificacoes) setNotificacoes(data.notificacoes);
+        if (data.seguranca) setSeguranca(data.seguranca);
+        if (data.aparencia) setAparencia(data.aparencia);
+      }
+    } catch (error) {
+      console.error("Erro ao carregar configurações:", error);
+    }
+  };
+
+  const handleSaveEmpresa = async () => {
+    setSalvando(true);
+    try {
+      await setDoc(doc(db, "configuracoes", "geral"), { empresa }, { merge: true });
+      toast.success("Dados da empresa salvos com sucesso!");
+    } catch (error) {
+      console.error(error);
+      toast.error("Erro ao salvar dados da empresa");
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  const handleSaveNotificacoes = async () => {
+    setSalvando(true);
+    try {
+      await setDoc(doc(db, "configuracoes", "geral"), { notificacoes }, { merge: true });
+      toast.success("Preferências de notificação salvas!");
+    } catch (error) {
+      console.error(error);
+      toast.error("Erro ao salvar notificações");
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  const handleSaveSeguranca = async () => {
+    setSalvando(true);
+    try {
+      await setDoc(doc(db, "configuracoes", "geral"), { seguranca }, { merge: true });
+      toast.success("Configurações de segurança atualizadas!");
+    } catch (error) {
+      console.error(error);
+      toast.error("Erro ao atualizar segurança");
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  const handleAlterarSenha = async () => {
+    if (!novaSenha || novaSenha.length < 6) {
+      toast.error("A nova senha deve ter pelo menos 6 caracteres");
+      return;
+    }
+    
+    setSalvando(true);
+    try {
+      if (auth.currentUser) {
+        await updatePassword(auth.currentUser, novaSenha);
+        toast.success("Senha alterada com sucesso!");
+        setSenhaAtual("");
+        setNovaSenha("");
+      }
+    } catch (error: any) {
+      console.error(error);
+      if (error.code === "auth/requires-recent-login") {
+        toast.error("Por segurança, faça login novamente antes de alterar a senha");
+      } else {
+        toast.error("Erro ao alterar senha");
+      }
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  const handleSaveAparencia = async () => {
+    setSalvando(true);
+    try {
+      await setDoc(doc(db, "configuracoes", "geral"), { aparencia }, { merge: true });
+      toast.success("Preferências de aparência salvas!");
+      
+      // Aplicar tema escuro
+      if (aparencia.modoEscuro) {
+        document.documentElement.classList.add("dark");
+      } else {
+        document.documentElement.classList.remove("dark");
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Erro ao salvar aparência");
+    } finally {
+      setSalvando(false);
+    }
   };
 
   const carregarUsuarios = async () => {
@@ -58,6 +212,7 @@ export default function Configuracoes() {
 
   useEffect(() => {
     carregarUsuarios();
+    carregarConfiguracoes();
   }, []);
 
   return (
@@ -97,31 +252,57 @@ export default function Configuracoes() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="md:col-span-2">
                 <Label>Razão Social</Label>
-                <Input placeholder="Nome da empresa" defaultValue="CréditoGestor Ltda" />
+                <Input 
+                  placeholder="Nome da empresa" 
+                  value={empresa.razaoSocial}
+                  onChange={(e) => setEmpresa({...empresa, razaoSocial: e.target.value})}
+                />
               </div>
               <div>
                 <Label>CNPJ</Label>
-                <Input placeholder="00.000.000/0000-00" defaultValue="12.345.678/0001-90" />
+                <Input 
+                  placeholder="00.000.000/0000-00" 
+                  value={empresa.cnpj}
+                  onChange={(e) => setEmpresa({...empresa, cnpj: e.target.value})}
+                />
               </div>
               <div>
                 <Label>Telefone</Label>
-                <Input placeholder="(00) 0000-0000" defaultValue="(11) 3456-7890" />
+                <Input 
+                  placeholder="(00) 0000-0000" 
+                  value={empresa.telefone}
+                  onChange={(e) => setEmpresa({...empresa, telefone: e.target.value})}
+                />
               </div>
               <div className="md:col-span-2">
                 <Label>Endereço</Label>
-                <Input placeholder="Endereço completo" defaultValue="Av. Paulista, 1000 - Bela Vista" />
+                <Input 
+                  placeholder="Endereço completo" 
+                  value={empresa.endereco}
+                  onChange={(e) => setEmpresa({...empresa, endereco: e.target.value})}
+                />
               </div>
               <div>
                 <Label>Cidade</Label>
-                <Input placeholder="Cidade" defaultValue="São Paulo" />
+                <Input 
+                  placeholder="Cidade" 
+                  value={empresa.cidade}
+                  onChange={(e) => setEmpresa({...empresa, cidade: e.target.value})}
+                />
               </div>
               <div>
                 <Label>Estado</Label>
-                <Input placeholder="UF" defaultValue="SP" />
+                <Input 
+                  placeholder="UF" 
+                  value={empresa.estado}
+                  onChange={(e) => setEmpresa({...empresa, estado: e.target.value})}
+                />
               </div>
             </div>
             <div className="flex justify-end mt-6">
-              <Button onClick={handleSave}>Salvar Alterações</Button>
+              <Button onClick={handleSaveEmpresa} disabled={salvando}>
+                {salvando ? "Salvando..." : "Salvar Alterações"}
+              </Button>
             </div>
           </Card>
         </TabsContent>
@@ -177,7 +358,10 @@ export default function Configuracoes() {
                   <p className="font-medium">Novas vendas</p>
                   <p className="text-sm text-muted-foreground">Receber notificação quando uma venda for registrada</p>
                 </div>
-                <Switch defaultChecked />
+                <Switch 
+                  checked={notificacoes.novasVendas}
+                  onCheckedChange={(checked) => setNotificacoes({...notificacoes, novasVendas: checked})}
+                />
               </div>
               <Separator />
               <div className="flex items-center justify-between">
@@ -185,7 +369,10 @@ export default function Configuracoes() {
                   <p className="font-medium">Divergências na conciliação</p>
                   <p className="text-sm text-muted-foreground">Alertas sobre diferenças encontradas</p>
                 </div>
-                <Switch defaultChecked />
+                <Switch 
+                  checked={notificacoes.divergencias}
+                  onCheckedChange={(checked) => setNotificacoes({...notificacoes, divergencias: checked})}
+                />
               </div>
               <Separator />
               <div className="flex items-center justify-between">
@@ -193,7 +380,10 @@ export default function Configuracoes() {
                   <p className="font-medium">Relatórios semanais</p>
                   <p className="text-sm text-muted-foreground">Resumo semanal por email</p>
                 </div>
-                <Switch />
+                <Switch 
+                  checked={notificacoes.relatoriosSemanais}
+                  onCheckedChange={(checked) => setNotificacoes({...notificacoes, relatoriosSemanais: checked})}
+                />
               </div>
               <Separator />
               <div className="flex items-center justify-between">
@@ -201,11 +391,16 @@ export default function Configuracoes() {
                   <p className="font-medium">Metas atingidas</p>
                   <p className="text-sm text-muted-foreground">Notificar quando agentes atingirem metas</p>
                 </div>
-                <Switch defaultChecked />
+                <Switch 
+                  checked={notificacoes.metasAtingidas}
+                  onCheckedChange={(checked) => setNotificacoes({...notificacoes, metasAtingidas: checked})}
+                />
               </div>
             </div>
             <div className="flex justify-end mt-6">
-              <Button onClick={handleSave}>Salvar Preferências</Button>
+              <Button onClick={handleSaveNotificacoes} disabled={salvando}>
+                {salvando ? "Salvando..." : "Salvar Preferências"}
+              </Button>
             </div>
           </Card>
         </TabsContent>
@@ -219,7 +414,10 @@ export default function Configuracoes() {
                   <p className="font-medium">Autenticação em dois fatores</p>
                   <p className="text-sm text-muted-foreground">Adicione uma camada extra de segurança</p>
                 </div>
-                <Switch />
+                <Switch 
+                  checked={seguranca.auth2FA}
+                  onCheckedChange={(checked) => setSeguranca({...seguranca, auth2FA: checked})}
+                />
               </div>
               <Separator />
               <div className="flex items-center justify-between">
@@ -227,19 +425,43 @@ export default function Configuracoes() {
                   <p className="font-medium">Timeout de sessão</p>
                   <p className="text-sm text-muted-foreground">Desconectar após período de inatividade</p>
                 </div>
-                <Switch defaultChecked />
+                <Switch 
+                  checked={seguranca.timeoutSessao}
+                  onCheckedChange={(checked) => setSeguranca({...seguranca, timeoutSessao: checked})}
+                />
               </div>
               <Separator />
               <div>
                 <Label>Alterar Senha</Label>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
-                  <Input type="password" placeholder="Senha atual" />
-                  <Input type="password" placeholder="Nova senha" />
+                  <Input 
+                    type="password" 
+                    placeholder="Senha atual" 
+                    value={senhaAtual}
+                    onChange={(e) => setSenhaAtual(e.target.value)}
+                  />
+                  <Input 
+                    type="password" 
+                    placeholder="Nova senha" 
+                    value={novaSenha}
+                    onChange={(e) => setNovaSenha(e.target.value)}
+                  />
+                </div>
+                <div className="flex gap-3 mt-4">
+                  <Button 
+                    variant="outline" 
+                    onClick={handleAlterarSenha}
+                    disabled={salvando || !novaSenha}
+                  >
+                    {salvando ? "Alterando..." : "Alterar Senha"}
+                  </Button>
                 </div>
               </div>
             </div>
             <div className="flex justify-end mt-6">
-              <Button onClick={handleSave}>Atualizar Segurança</Button>
+              <Button onClick={handleSaveSeguranca} disabled={salvando}>
+                {salvando ? "Salvando..." : "Atualizar Segurança"}
+              </Button>
             </div>
           </Card>
         </TabsContent>
@@ -256,7 +478,10 @@ export default function Configuracoes() {
                   <p className="font-medium">Modo Escuro</p>
                   <p className="text-sm text-muted-foreground">Alternar entre tema claro e escuro</p>
                 </div>
-                <Switch />
+                <Switch 
+                  checked={aparencia.modoEscuro}
+                  onCheckedChange={(checked) => setAparencia({...aparencia, modoEscuro: checked})}
+                />
               </div>
               <Separator />
               <div className="flex items-center justify-between">
@@ -264,11 +489,16 @@ export default function Configuracoes() {
                   <p className="font-medium">Sidebar Compacta</p>
                   <p className="text-sm text-muted-foreground">Manter menu lateral recolhido por padrão</p>
                 </div>
-                <Switch />
+                <Switch 
+                  checked={aparencia.sidebarCompacta}
+                  onCheckedChange={(checked) => setAparencia({...aparencia, sidebarCompacta: checked})}
+                />
               </div>
             </div>
             <div className="flex justify-end mt-6">
-              <Button onClick={handleSave}>Salvar Aparência</Button>
+              <Button onClick={handleSaveAparencia} disabled={salvando}>
+                {salvando ? "Salvando..." : "Salvar Aparência"}
+              </Button>
             </div>
           </Card>
         </TabsContent>
