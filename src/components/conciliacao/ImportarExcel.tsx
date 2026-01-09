@@ -8,12 +8,18 @@ import { toast } from "sonner";
 export interface DadosExcel {
   contrato: string;
   cliente: string;
+  cpfCliente?: string;
   fornecedor: string;
   funcionario: string;
+  cpfFuncionario?: string;
+  produto: string;
+  prazo?: number;
   valorComissao: number;
   valorProduto: number;
   dataVenda: Date;
   dataPagamento?: Date;
+  status?: string;
+  observacoes?: string;
   [key: string]: unknown;
 }
 
@@ -72,12 +78,18 @@ export function ImportarExcel({ onImport, tipo, apenasButton = false }: Importar
         return {
           contrato: String(rowNormalizada.contrato || rowNormalizada.numero_contrato || rowNormalizada.numerocontrato || ""),
           cliente: String(rowNormalizada.cliente || rowNormalizada.nome_cliente || rowNormalizada.nomecliente || ""),
+          cpfCliente: String(rowNormalizada.cpf_cliente || rowNormalizada.cpfcliente || rowNormalizada.cpf || ""),
           fornecedor: String(rowNormalizada.fornecedor || rowNormalizada.banco || rowNormalizada.financeira || ""),
           funcionario: String(rowNormalizada.funcionario || rowNormalizada.vendedor || rowNormalizada.agente || ""),
+          cpfFuncionario: String(rowNormalizada.cpf_funcionario || rowNormalizada.cpffuncionario || ""),
+          produto: String(rowNormalizada.produto || rowNormalizada.nome_produto || rowNormalizada.nomeproduto || ""),
+          prazo: parseInt(String(rowNormalizada.prazo || rowNormalizada.meses || 0)) || undefined,
           valorComissao: parseFloat(String(rowNormalizada.comissao || rowNormalizada.valor_comissao || rowNormalizada.valorcomissao || 0).replace(/[^\d.,]/g, "").replace(",", ".")) || 0,
           valorProduto: parseFloat(String(rowNormalizada.valor || rowNormalizada.valor_produto || rowNormalizada.valorproduto || 0).replace(/[^\d.,]/g, "").replace(",", ".")) || 0,
           dataVenda: rowNormalizada.data_venda || rowNormalizada.datavenda || rowNormalizada.data ? new Date(String(rowNormalizada.data_venda || rowNormalizada.datavenda || rowNormalizada.data)) : new Date(),
           dataPagamento: rowNormalizada.data_pagamento || rowNormalizada.datapagamento ? new Date(String(rowNormalizada.data_pagamento || rowNormalizada.datapagamento)) : undefined,
+          status: String(rowNormalizada.status || ""),
+          observacoes: String(rowNormalizada.observacoes || rowNormalizada.obs || ""),
           ...row // Manter dados originais
         };
       });

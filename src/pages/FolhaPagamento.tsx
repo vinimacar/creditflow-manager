@@ -267,85 +267,221 @@ export default function FolhaPagamento() {
     }
 
     const pdf = new jsPDF();
-
-    // Cabeçalho
-    pdf.setFontSize(18);
-    pdf.text("HOLERITE DE PAGAMENTO", 105, 20, { align: "center" });
-
-    pdf.setFontSize(10);
-    pdf.text(`Referência: ${format(new Date(folha.mesReferencia + "-01"), "MMMM/yyyy", { locale: ptBR })}`, 105, 30, { align: "center" });
-
-    // Dados do Funcionário
-    pdf.setFontSize(12);
-    pdf.text("DADOS DO FUNCIONÁRIO", 20, 45);
-    pdf.setFontSize(10);
-    pdf.text(`Nome: ${funcionario.nome}`, 20, 55);
-    pdf.text(`CPF: ${funcionario.cpf}`, 20, 62);
-    pdf.text(`Cargo: ${funcionario.cargo}`, 20, 69);
-
-    // Proventos
-    pdf.setFontSize(12);
-    pdf.text("PROVENTOS", 20, 85);
-    pdf.setFontSize(10);
-    let y = 95;
-
-    const adicionarLinha = (descricao: string, valor: number) => {
-      if (valor > 0) {
-        pdf.text(descricao, 20, y);
-        pdf.text(`R$ ${valor.toFixed(2)}`, 160, y);
-        y += 7;
-      }
-    };
-
-    adicionarLinha("Salário Base", folha.proventos.salarioBase);
-    adicionarLinha("Horas Extras", folha.proventos.horasExtras);
-    adicionarLinha("Comissões", folha.proventos.comissoes);
-    adicionarLinha("Bônus", folha.proventos.bonus);
-    adicionarLinha("Adicional Noturno", folha.proventos.adicionalNoturno);
-    adicionarLinha("Insalubridade", folha.proventos.insalubridade);
-    adicionarLinha("Periculosidade", folha.proventos.periculosidade);
-    adicionarLinha("Outros", folha.proventos.outros);
-
-    pdf.line(20, y, 190, y);
-    y += 7;
+    const mesRef = format(new Date(folha.mesReferencia + "-01"), "MMMM/yyyy", { locale: ptBR });
+    
+    // Cabeçalho da Empresa
     pdf.setFontSize(11);
-    pdf.text("Total Proventos", 20, y);
-    pdf.text(`R$ ${folha.proventos.total.toFixed(2)}`, 160, y);
-
-    // Descontos
-    y += 15;
-    pdf.setFontSize(12);
-    pdf.text("DESCONTOS", 20, y);
-    y += 10;
-    pdf.setFontSize(10);
-
-    adicionarLinha("INSS", folha.descontos.inss);
-    adicionarLinha("IRRF", folha.descontos.irrf);
-    adicionarLinha("Vale Transporte", folha.descontos.valeTransporte);
-    adicionarLinha("Vale Refeição", folha.descontos.valeRefeicao);
-    adicionarLinha("Plano de Saúde", folha.descontos.planoDeSaude);
-    adicionarLinha("Outros", folha.descontos.outros);
-
-    pdf.line(20, y, 190, y);
-    y += 7;
-    pdf.setFontSize(11);
-    pdf.text("Total Descontos", 20, y);
-    pdf.text(`R$ ${folha.descontos.total.toFixed(2)}`, 160, y);
-
-    // Salário Líquido
-    y += 15;
-    pdf.setFontSize(14);
     pdf.setFont(undefined, "bold");
-    pdf.text("SALÁRIO LÍQUIDO", 20, y);
-    pdf.text(`R$ ${folha.salarioLiquido.toFixed(2)}`, 160, y);
-
-    // Rodapé
+    pdf.text("Nome empresa", 15, 15);
+    
     pdf.setFontSize(8);
     pdf.setFont(undefined, "normal");
-    pdf.text(`Gerado em: ${format(new Date(), "dd/MM/yyyy HH:mm", { locale: ptBR })}`, 105, 280, { align: "center" });
+    pdf.text("Endereço", 15, 20);
+    pdf.text("CNPJ: 04.290.167/0001-95", 15, 24);
+    
+    // Título do documento
+    pdf.setFontSize(12);
+    pdf.setFont(undefined, "bold");
+    pdf.text("Recibo de Pagamento de Salário", 80, 15);
+    pdf.setFontSize(9);
+    pdf.setFont(undefined, "normal");
+    pdf.text(`Mês de referência: ${mesRef}`, 80, 20);
 
-    pdf.save(`holerite_${funcionario.nome.replace(/\s/g, "_")}_${folha.mesReferencia}.pdf`);
-    toast.success("Holerite gerado com sucesso!");
+    // Caixa lateral com texto rotacionado
+    pdf.setFontSize(7);
+    pdf.text("Recibo de Pagamento de Salário", 195, 80, { angle: 90 });
+
+    // Dados do Funcionário - Tabela
+    const startY = 30;
+    pdf.setFontSize(8);
+    pdf.setFont(undefined, "bold");
+    
+    // Cabeçalhos da tabela de dados do funcionário
+    pdf.rect(15, startY, 20, 6);
+    pdf.text("Código", 17, startY + 4);
+    
+    pdf.rect(35, startY, 80, 6);
+    pdf.text("Nome do Funcionário", 37, startY + 4);
+    
+    pdf.rect(115, startY, 25, 6);
+    pdf.text("Admissão", 117, startY + 4);
+    
+    pdf.rect(140, startY, 15, 6);
+    pdf.text("CBO", 142, startY + 4);
+    
+    pdf.rect(155, startY, 40, 6);
+    pdf.text("Função", 157, startY + 4);
+
+    // Dados do funcionário
+    pdf.setFont(undefined, "normal");
+    pdf.rect(15, startY + 6, 20, 6);
+    pdf.text("cod. func", 17, startY + 10);
+    
+    pdf.rect(35, startY + 6, 80, 6);
+    pdf.text(funcionario.nome.substring(0, 40), 37, startY + 10);
+    
+    pdf.rect(115, startY + 6, 25, 6);
+    pdf.text("dt. adm", 117, startY + 10);
+    
+    pdf.rect(140, startY + 6, 15, 6);
+    pdf.text("cbo", 142, startY + 10);
+    
+    pdf.rect(155, startY + 6, 40, 6);
+    pdf.text(funcionario.cargo.substring(0, 20), 157, startY + 10);
+
+    // Tabela de Eventos (Proventos e Descontos)
+    const tableStartY = startY + 18;
+    pdf.setFont(undefined, "bold");
+    
+    // Cabeçalhos
+    pdf.rect(15, tableStartY, 15, 6);
+    pdf.text("Código", 17, tableStartY + 4);
+    
+    pdf.rect(30, tableStartY, 80, 6);
+    pdf.text("Nome do Funcionário", 32, tableStartY + 4);
+    
+    pdf.rect(110, tableStartY, 20, 6);
+    pdf.text("Referência", 112, tableStartY + 4);
+    
+    pdf.rect(130, tableStartY, 30, 6);
+    pdf.text("Vencimentos", 132, tableStartY + 4);
+    
+    pdf.rect(160, tableStartY, 30, 6);
+    pdf.text("Descontos", 162, tableStartY + 4);
+
+    // Eventos
+    let currentY = tableStartY + 6;
+    pdf.setFont(undefined, "normal");
+    
+    // Código dos eventos (exemplo)
+    const eventos: Array<{cod: string, nome: string, ref: string, venc: number, desc: number}> = [];
+    
+    if (folha.proventos.salarioBase > 0) {
+      eventos.push({cod: "001", nome: "SALÁRIO", ref: "30", venc: folha.proventos.salarioBase, desc: 0});
+    }
+    if (folha.proventos.bonus > 0) {
+      eventos.push({cod: "112", nome: "SALÁRIO FAMÍLIA", ref: "0", venc: folha.proventos.bonus, desc: 0});
+    }
+    if (folha.proventos.horasExtras > 0) {
+      eventos.push({cod: "", nome: "HORAS EXTRAS", ref: "", venc: folha.proventos.horasExtras, desc: 0});
+    }
+    if (folha.proventos.comissoes > 0) {
+      eventos.push({cod: "", nome: "COMISSÕES", ref: "", venc: folha.proventos.comissoes, desc: 0});
+    }
+    if (folha.proventos.adicionalNoturno > 0) {
+      eventos.push({cod: "", nome: "ADICIONAL NOTURNO", ref: "", venc: folha.proventos.adicionalNoturno, desc: 0});
+    }
+    if (folha.proventos.insalubridade > 0) {
+      eventos.push({cod: "", nome: "INSALUBRIDADE", ref: "", venc: folha.proventos.insalubridade, desc: 0});
+    }
+    if (folha.proventos.periculosidade > 0) {
+      eventos.push({cod: "", nome: "PERICULOSIDADE", ref: "", venc: folha.proventos.periculosidade, desc: 0});
+    }
+    
+    // Descontos
+    if (folha.descontos.inss > 0) {
+      eventos.push({cod: "108", nome: "INSS", ref: "0", venc: 0, desc: folha.descontos.inss});
+    }
+    if (folha.descontos.valeTransporte > 0) {
+      eventos.push({cod: "107", nome: "VALE TRANSPORTE", ref: "0", venc: 0, desc: folha.descontos.valeTransporte});
+    }
+    if (folha.descontos.valeRefeicao > 0) {
+      eventos.push({cod: "187", nome: "ALIMENTAÇÃO", ref: "0", venc: 0, desc: folha.descontos.valeRefeicao});
+    }
+    if (folha.descontos.planoDeSaude > 0) {
+      eventos.push({cod: "", nome: "PLANO DE SAÚDE", ref: "", venc: 0, desc: folha.descontos.planoDeSaude});
+    }
+    if (folha.descontos.irrf > 0) {
+      eventos.push({cod: "", nome: "IRRF", ref: "", venc: 0, desc: folha.descontos.irrf});
+    }
+    if (folha.descontos.outros > 0) {
+      eventos.push({cod: "106", nome: "DIFERENÇA SAL", ref: "", venc: 0, desc: folha.descontos.outros});
+    }
+
+    // Renderizar eventos
+    eventos.forEach((evento) => {
+      pdf.rect(15, currentY, 15, 5);
+      pdf.text(evento.cod, 17, currentY + 3.5);
+      
+      pdf.rect(30, currentY, 80, 5);
+      pdf.text(evento.nome, 32, currentY + 3.5);
+      
+      pdf.rect(110, currentY, 20, 5);
+      pdf.text(evento.ref, 112, currentY + 3.5);
+      
+      pdf.rect(130, currentY, 30, 5);
+      if (evento.venc > 0) {
+        pdf.text(evento.venc.toFixed(2), 132, currentY + 3.5);
+      }
+      
+      pdf.rect(160, currentY, 30, 5);
+      if (evento.desc > 0) {
+        pdf.text(evento.desc.toFixed(2), 162, currentY + 3.5);
+      }
+      
+      currentY += 5;
+    });
+
+    // Preencher espaço vazio até ter pelo menos 12 linhas
+    const minLines = 12;
+    const currentLines = eventos.length;
+    if (currentLines < minLines) {
+      for (let i = 0; i < minLines - currentLines; i++) {
+        pdf.rect(15, currentY, 15, 5);
+        pdf.rect(30, currentY, 80, 5);
+        pdf.rect(110, currentY, 20, 5);
+        pdf.rect(130, currentY, 30, 5);
+        pdf.rect(160, currentY, 30, 5);
+        currentY += 5;
+      }
+    }
+
+    // Totais
+    currentY += 5;
+    pdf.setFont(undefined, "bold");
+    pdf.text("Total de Vencimentos", 100, currentY);
+    pdf.text("Total de Descontos", 132, currentY);
+    
+    pdf.setFontSize(9);
+    pdf.text(folha.proventos.total.toFixed(2), 100, currentY + 5);
+    pdf.text(folha.descontos.total.toFixed(2), 132, currentY + 5);
+
+    // Valor Líquido com seta
+    currentY += 12;
+    pdf.setFontSize(10);
+    pdf.text("Valor Líquido", 70, currentY);
+    
+    pdf.setFontSize(8);
+    pdf.text("R$", 95, currentY);
+    
+    // Seta
+    pdf.text("═══>", 105, currentY);
+    
+    pdf.setFontSize(11);
+    pdf.setFont(undefined, "bold");
+    pdf.text(folha.salarioLiquido.toFixed(2), 120, currentY);
+
+    // Rodapé com informações adicionais
+    currentY += 10;
+    pdf.setFontSize(8);
+    pdf.setFont(undefined, "normal");
+    
+    const baseFGTS = folha.proventos.total;
+    const fgtsMes = baseFGTS * 0.08;
+    
+    pdf.text(`Salário Base: ${folha.proventos.salarioBase.toFixed(2)}`, 15, currentY);
+    pdf.text(`Salário Contr. INSS: ${(folha.proventos.total - folha.descontos.inss).toFixed(2)}`, 60, currentY);
+    pdf.text(`Base FGTS: ${baseFGTS.toFixed(2)}`, 110, currentY);
+    pdf.text(`FGTS do Mês: ${fgtsMes.toFixed(2)}`, 145, currentY);
+    pdf.text(`Base Calc.: ${folha.proventos.total.toFixed(2)}`, 175, currentY);
+
+    // Data de geração
+    currentY += 10;
+    pdf.setFontSize(7);
+    pdf.text(`Gerado em: ${format(new Date(), "dd/MM/yyyy HH:mm", { locale: ptBR })}`, 105, currentY, { align: "center" });
+
+    pdf.save(`recibo_pagamento_${funcionario.nome.replace(/\s/g, "_")}_${folha.mesReferencia}.pdf`);
+    toast.success("Recibo de pagamento gerado com sucesso!");
   };
 
   const totalFolha = folhas.reduce((acc, f) => acc + f.salarioLiquido, 0);

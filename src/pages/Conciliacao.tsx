@@ -105,12 +105,18 @@ export default function Conciliacao() {
         return {
           contrato: venda.id || "",
           cliente: cliente?.nome || "",
+          cpfCliente: cliente?.cpf || "",
           fornecedor: produto?.fornecedor || "",
           funcionario: funcionario?.nome || "",
+          cpfFuncionario: funcionario?.cpf || "",
+          produto: produto?.nome || "",
+          prazo: venda.prazo || 0,
           valorComissao: venda.comissao || 0,
           valorProduto: venda.valorContrato || 0,
           dataVenda: venda.createdAt || new Date(),
           dataPagamento: undefined,
+          status: venda.status || "pendente",
+          observacoes: venda.observacoes || "",
         };
       });
 
@@ -221,12 +227,18 @@ export default function Conciliacao() {
       const dadosExport = dadosInternos.map((venda) => ({
         "Contrato": venda.contrato,
         "Cliente": venda.cliente,
+        "CPF Cliente": venda.cpfCliente || "-",
+        "Produto": venda.produto || "-",
+        "Prazo (meses)": venda.prazo || "-",
         "Fornecedor": venda.fornecedor,
         "Funcionário": venda.funcionario,
+        "CPF Funcionário": venda.cpfFuncionario || "-",
         "Valor do Produto": venda.valorProduto.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }),
         "Comissão": venda.valorComissao.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }),
-        "Data da Venda": venda.dataVenda ? format(new Date(venda.dataVenda), "dd/MM/yyyy", { locale: ptBR }) : "-",
+        "Data da Venda": venda.dataVenda ? format(new Date(venda.dataVenda), "dd/MM/yyyy HH:mm", { locale: ptBR }) : "-",
         "Data de Pagamento": venda.dataPagamento ? format(new Date(venda.dataPagamento), "dd/MM/yyyy", { locale: ptBR }) : "-",
+        "Status": venda.status || "-",
+        "Observações": venda.observacoes || "-",
       }));
 
       // Criar CSV
@@ -349,6 +361,69 @@ export default function Conciliacao() {
         </Card>
         <ImportarExcel tipo="fornecedor" onImport={handleImportarFornecedor} />
       </div>
+
+      {/* Tabela de Dados Internos Carregados */}
+      {dadosInternos.length > 0 && divergencias.length === 0 && (
+        <Card>
+          <div className="p-6 border-b">
+            <h3 className="text-lg font-semibold">Dados Internos Carregados</h3>
+            <p className="text-sm text-muted-foreground">
+              {dadosInternos.length} {dadosInternos.length === 1 ? "venda carregada" : "vendas carregadas"}
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Contrato</TableHead>
+                  <TableHead>Cliente</TableHead>
+                  <TableHead>CPF Cliente</TableHead>
+                  <TableHead>Produto</TableHead>
+                  <TableHead>Prazo</TableHead>
+                  <TableHead>Fornecedor</TableHead>
+                  <TableHead>Funcionário</TableHead>
+                  <TableHead className="text-right">Valor Produto</TableHead>
+                  <TableHead className="text-right">Comissão</TableHead>
+                  <TableHead>Data Venda</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {dadosInternos.slice(0, 50).map((venda, index) => (
+                  <TableRow key={index}>
+                    <TableCell className="font-mono text-xs">{venda.contrato}</TableCell>
+                    <TableCell className="font-medium">{venda.cliente}</TableCell>
+                    <TableCell className="text-sm">{venda.cpfCliente || "-"}</TableCell>
+                    <TableCell>{venda.produto || "-"}</TableCell>
+                    <TableCell>{venda.prazo ? `${venda.prazo} meses` : "-"}</TableCell>
+                    <TableCell>{venda.fornecedor}</TableCell>
+                    <TableCell>{venda.funcionario}</TableCell>
+                    <TableCell className="text-right">
+                      R$ {venda.valorProduto.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      R$ {venda.valorComissao.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      {venda.dataVenda ? format(new Date(venda.dataVenda), "dd/MM/yyyy HH:mm", { locale: ptBR }) : "-"}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={venda.status === "aprovada" ? "default" : "secondary"}>
+                        {venda.status || "pendente"}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+          {dadosInternos.length > 50 && (
+            <div className="p-4 border-t text-center text-sm text-muted-foreground">
+              Mostrando 50 de {dadosInternos.length} vendas. Exporte para ver todos os dados.
+            </div>
+          )}
+        </Card>
+      )}
 
       {/* Estatísticas */}
       {divergencias.length > 0 && (
