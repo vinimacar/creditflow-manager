@@ -11,6 +11,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -22,7 +35,10 @@ import {
   Calculator,
   CheckCircle2,
   UserPlus,
+  Check,
+  ChevronsUpDown,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { getClientes, getProdutos, getFuncionarios, type Cliente, type Produto, type Funcionario } from "@/lib/firestore";
 import { collection, addDoc, Timestamp } from "firebase/firestore";
@@ -35,7 +51,7 @@ export default function PDV() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [funcionarios, setFuncionarios] = useState<Funcionario[]>([]);
-  const [buscaCliente, setBuscaCliente] = useState("");
+  const [openClienteCombobox, setOpenClienteCombobox] = useState(false);
   const [selectedCliente, setSelectedCliente] = useState<string>("");
   const [selectedProduto, setSelectedProduto] = useState<string>("");
   const [selectedFuncionario, setSelectedFuncionario] = useState<string>("");
@@ -63,11 +79,7 @@ export default function PDV() {
     }
   };
 
-  const clientesFiltrados = clientes.filter((c) =>
-    c.nome.toLowerCase().includes(buscaCliente.toLowerCase()) ||
-    c.cpf.includes(buscaCliente)
-  );
-
+  const clienteSelecionado = clientes.find((c) => c.id === selectedCliente);
   const produto = produtos.find((p) => p.id === selectedProduto);
   const comissaoPerc = produto?.comissao || 0;
   const comissaoValor = valorContrato
@@ -106,7 +118,6 @@ export default function PDV() {
       setSelectedFuncionario("");
       setValorContrato("");
       setPrazo("");
-      setBuscaCliente("");
     } catch (error) {
       console.error("Erro ao registrar venda:", error);
       toast.error("Erro ao registrar venda");
@@ -334,27 +345,57 @@ export default function PDV() {
               </div>
             </div>
             <div className="space-y-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input 
-                  placeholder="Buscar por nome ou CPF..." 
-                  className="pl-9"
-                  value={buscaCliente}
-                  onChange={(e) => setBuscaCliente(e.target.value)}
-                />
+              <div>
+                <Label>Cliente *</Label>
+                <Popover open={openClienteCombobox} onOpenChange={setOpenClienteCombobox}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={openClienteCombobox}
+                      className="w-full justify-between"
+                    >
+                      {selectedCliente
+                        ? `${clienteSelecionado?.nome} - CPF: ${clienteSelecionado?.cpf}`
+                        : "Buscar cliente por nome ou CPF..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[400px] p-0">
+                    <Command>
+                      <CommandInput placeholder="Digite o nome ou CPF do cliente..." />
+                      <CommandList>
+                        <CommandEmpty>Nenhum cliente encontrado.</CommandEmpty>
+                        <CommandGroup>
+                          {clientes.map((cliente) => (
+                            <CommandItem
+                              key={cliente.id}
+                              value={`${cliente.nome} ${cliente.cpf}`}
+                              onSelect={() => {
+                                setSelectedCliente(cliente.id!);
+                                setOpenClienteCombobox(false);
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  selectedCliente === cliente.id ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                              <div className="flex flex-col">
+                                <span className="font-medium">{cliente.nome}</span>
+                                <span className="text-xs text-muted-foreground">
+                                  CPF: {cliente.cpf}
+                                </span>
+                              </div>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
-              <Select value={selectedCliente} onValueChange={setSelectedCliente}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o cliente" />
-                </SelectTrigger>
-                <SelectContent>
-                  {clientesFiltrados.map((cliente) => (
-                    <SelectItem key={cliente.id} value={cliente.id!}>
-                      {cliente.nome} - {cliente.cpf}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
             </div>
           </Card>
 
