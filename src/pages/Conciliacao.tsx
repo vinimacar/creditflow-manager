@@ -120,6 +120,10 @@ export default function Conciliacao() {
         const produto = produtos.find(p => p.id === venda.produtoId);
         const funcionario = funcionarios.find(f => f.id === venda.funcionarioId);
 
+        // Calcular comissão usando o percentual do produto se disponível
+        const comissaoPercentual = produto?.comissao || venda.comissaoPercentual || 0;
+        const valorComissao = venda.comissao || (venda.valorContrato * (comissaoPercentual / 100));
+
         return {
           contrato: venda.id || "",
           cliente: cliente?.nome || "",
@@ -129,12 +133,12 @@ export default function Conciliacao() {
           cpfFuncionario: funcionario?.cpf || "",
           produto: produto?.nome || "",
           prazo: venda.prazo || 0,
-          valorComissao: venda.comissao || 0,
+          valorComissao: valorComissao,
           valorProduto: venda.valorContrato || 0,
           dataVenda: venda.createdAt || new Date(),
           dataPagamento: undefined,
           status: venda.status || "pendente",
-          observacoes: venda.observacoes || "",
+          observacoes: `Comissão: ${comissaoPercentual.toFixed(2)}% | ${venda.observacoes || ""}`,
         };
       });
 
@@ -503,7 +507,7 @@ export default function Conciliacao() {
 
       {/* Estatísticas */}
       {divergencias.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
           <Card className="p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -511,6 +515,21 @@ export default function Conciliacao() {
                 <h3 className="text-2xl font-bold mt-2">{estatisticas.total}</h3>
               </div>
               <FileBarChart className="w-8 h-8 text-muted-foreground" />
+            </div>
+          </Card>
+
+          <Card className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Comissões Internas</p>
+                <h3 className="text-xl font-bold mt-2 text-blue-600">
+                  R$ {divergenciasFiltradas.reduce((sum, d) => sum + d.valorComissaoInterno, 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                </h3>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Conforme cadastro
+                </p>
+              </div>
+              <DollarSign className="w-8 h-8 text-blue-600" />
             </div>
           </Card>
 

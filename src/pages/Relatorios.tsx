@@ -299,6 +299,7 @@ export default function Relatorios() {
         valorContrato: v.valorContrato,
         prazo: v.prazo,
         comissao: v.comissao,
+        comissaoPercentual: v.comissaoPercentual || (produto?.comissao || 0),
         status: v.status,
       };
     });
@@ -422,6 +423,7 @@ export default function Relatorios() {
         return {
           nome: prod?.nome || "Desconhecido",
           valor,
+          comissao: prod?.comissao || 0,
         };
       })
       .sort((a, b) => b.valor - a.valor)
@@ -517,6 +519,7 @@ export default function Relatorios() {
     const totalVendas = dados.vendas.reduce((sum, v) => sum + v.valor, 0);
     const totalAnterior = dados.vendas.slice(0, -1).reduce((sum, v) => sum + v.valor, 0);
     const crescimento = totalAnterior > 0 ? ((totalVendas - totalAnterior) / totalAnterior) * 100 : 0;
+    const totalComissoes = dados.funcionarios.reduce((sum, f) => sum + f.comissao, 0);
 
     return {
       totalVendas,
@@ -524,6 +527,7 @@ export default function Relatorios() {
       ticketMedio: totalVendas / dados.vendas.reduce((sum, v) => sum + v.quantidade, 0) || 0,
       totalFuncionarios: dados.funcionarios.length,
       produtoMaisVendido: dados.produtos[0]?.nome || "N/A",
+      totalComissoes,
     };
   }, [dadosGraficos, dadosRelatorio]);
 
@@ -704,7 +708,7 @@ export default function Relatorios() {
       />
 
       {/* KPIs */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <Card className="p-6">
           <div className="flex items-center justify-between">
             <div>
@@ -716,6 +720,19 @@ export default function Relatorios() {
                 {estatisticas!.crescimento >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
                 {estatisticas!.crescimento > 0 ? "+" : ""}{estatisticas!.crescimento.toFixed(1)}% vs período anterior
               </p>
+            </div>
+            <DollarSign className="w-8 h-8 text-green-600" />
+          </div>
+        </Card>
+
+        <Card className="p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Total Comissões</p>
+              <h3 className="text-2xl font-bold mt-2 text-green-700">
+                R$ {estatisticas!.totalComissoes.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+              </h3>
+              <p className="text-xs text-muted-foreground mt-1">Conforme cadastro de produtos</p>
             </div>
             <DollarSign className="w-8 h-8 text-green-600" />
           </div>
@@ -791,7 +808,8 @@ export default function Relatorios() {
                   <TableHead>Produto</TableHead>
                   <TableHead className="text-right">Valor Contrato</TableHead>
                   <TableHead className="text-right">Prazo</TableHead>
-                  <TableHead className="text-right bg-green-50">Comissão</TableHead>
+                  <TableHead className="text-right bg-green-50">Comissão (%)</TableHead>
+                  <TableHead className="text-right bg-green-50">Comissão (R$)</TableHead>
                   <TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
@@ -805,6 +823,7 @@ export default function Relatorios() {
                     <TableCell>{venda.produto}</TableCell>
                     <TableCell className="text-right">R$ {venda.valorContrato.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</TableCell>
                     <TableCell className="text-right">{venda.prazo} meses</TableCell>
+                    <TableCell className="text-right bg-green-50 font-semibold text-green-700">{venda.comissaoPercentual.toFixed(2)}%</TableCell>
                     <TableCell className="text-right bg-green-50 font-semibold text-green-700">R$ {venda.comissao.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</TableCell>
                     <TableCell>
                       <span className={`px-2 py-1 rounded text-xs font-medium ${

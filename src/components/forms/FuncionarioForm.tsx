@@ -29,6 +29,7 @@ const funcionarioSchema = z.object({
   cargo: z.enum(["admin", "gerente", "agente", "atendente"], {
     errorMap: () => ({ message: "Selecione um cargo válido" }),
   }),
+  salarioBruto: z.string().min(1, "Salário bruto é obrigatório"),
   endereco: z.string().min(5, "Endereço é obrigatório"),
   cidade: z.string().min(2, "Cidade é obrigatória"),
   uf: z.string().min(2, "UF é obrigatória"),
@@ -70,6 +71,16 @@ export function FuncionarioForm({ onSuccess, initialData }: FuncionarioFormProps
     setValue("cpf", valorMascarado);
   };
 
+  const handleSalarioChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let valor = e.target.value.replace(/\D/g, "");
+    valor = (Number(valor) / 100).toFixed(2);
+    const valorFormatado = new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    }).format(Number(valor));
+    setValue("salarioBruto", valorFormatado);
+  };
+
   const handleTelefoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const valorMascarado = mascaraTelefone(e.target.value);
     setValue("telefone", valorMascarado);
@@ -102,8 +113,10 @@ export function FuncionarioForm({ onSuccess, initialData }: FuncionarioFormProps
     try {
       if (initialData?.id) {
         // Atualizar funcionário existente
+        const salarioNumerico = Number(data.salarioBruto.replace(/[^0-9,]/g, "").replace(",", "."));
         await updateFuncionario(initialData.id, {
           ...data,
+          salario: salarioNumerico,
           status: "ativo",
         });
         toast.success("Funcionário atualizado com sucesso!");
@@ -148,9 +161,11 @@ export function FuncionarioForm({ onSuccess, initialData }: FuncionarioFormProps
         }
         
         // 4. Criar funcionário
+        const salarioNumerico = Number(data.salarioBruto.replace(/[^0-9,]/g, "").replace(",", "."));
         await addFuncionario({
           ...data,
           funcao: data.cargo,
+          salario: salarioNumerico,
           status: "ativo",
         });
         
@@ -210,6 +225,17 @@ export function FuncionarioForm({ onSuccess, initialData }: FuncionarioFormProps
             </SelectContent>
           </Select>
           {errors.cargo && <p className="text-sm text-destructive mt-1">{errors.cargo.message}</p>}
+        </div>
+
+        <div>
+          <Label htmlFor="salarioBruto">Salário Bruto *</Label>
+          <Input 
+            id="salarioBruto" 
+            {...register("salarioBruto")} 
+            onChange={handleSalarioChange}
+            placeholder="R$ 0,00"
+          />
+          {errors.salarioBruto && <p className="text-sm text-destructive mt-1">{errors.salarioBruto.message}</p>}
         </div>
 
         <div>
