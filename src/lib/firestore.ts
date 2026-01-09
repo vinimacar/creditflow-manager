@@ -218,6 +218,7 @@ export interface Funcionario {
   funcao?: string;
   cargo?: string;
   salario?: number;
+  salarioBruto?: number;
   dependentes?: number;
   status: "ativo" | "inativo";
   aprovado?: boolean;

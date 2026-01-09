@@ -18,7 +18,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -30,7 +29,7 @@ import { format, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { CalendarIcon, DollarSign, Download, Plus, Eye, Pencil, Trash2, Wallet } from "lucide-react";
 import { toast } from "sonner";
-import { collection, addDoc, query, where, getDocs, updateDoc, doc } from "firebase/firestore";
+import { collection, addDoc, query, where, getDocs, updateDoc, doc, deleteDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { 
   getFuncionarios, 
@@ -83,6 +82,10 @@ export default function FolhaPagamento() {
   const [outrosDescontos, setOutrosDescontos] = useState(0);
   const [optouVT, setOptouVT] = useState(true);
   const [custoVT, setCustoVT] = useState(0);
+
+  // Estados para edição de folha
+  const [editarFolhaDialog, setEditarFolhaDialog] = useState(false);
+  const [folhaEmEdicao, setFolhaEmEdicao] = useState<FolhaPagamentoType | null>(null);
 
   // Estados para gerenciar salário vigente
   const [salarioDialog, setSalarioDialog] = useState(false);
@@ -148,9 +151,11 @@ export default function FolhaPagamento() {
         return;
       }
 
-      // Buscar salário vigente do funcionário
+      // Buscar salário vigente do funcionário ou usar o cadastrado
       const salarioVigente = await getSalarioVigentePorFuncionario(funcionarioSelecionado);
-      const salarioBase = salarioVigente?.salarioBase || funcionario.salario || 0;
+      const salarioBase = salarioVigente?.salarioBase || funcionario.salarioBruto || funcionario.salario || 0;
+      
+      setSalarioBaseAtual(salarioBase);
 
       // Calcular proventos
       const proventos: Proventos = {
@@ -230,6 +235,7 @@ export default function FolhaPagamento() {
 
   const limparFormulario = () => {
     setFuncionarioSelecionado("");
+    setSalarioBaseAtual(0);
     setHorasExtras(0);
     setComissoes(0);
     setBonus(0);
@@ -242,6 +248,128 @@ export default function FolhaPagamento() {
     setOutrosDescontos(0);
     setOptouVT(true);
     setCustoVT(0);
+  };
+
+  const abrirEdicaoFolha = async (folha: FolhaPagamentoType) => {
+    setFolhaEmEdicao(folha);
+    setFuncionarioSelecionado(folha.funcionarioId);
+    
+    // Buscar salário vigente do funcionário
+    const salarioVigente = await getSalarioVigentePorFuncionario(folha.funcionarioId);
+    const funcionario = funcionarios.find((f) => f.id === folha.funcionarioId);
+    const salarioBase = salarioVigente?.salarioBase || funcionario?.salarioBruto || funcionario?.salario || 0;
+    
+    setSalarioBaseAtual(salarioBase);
+    setHorasExtras(folha.proventos.horasExtras || 0);
+    setComissoes(folha.proventos.comissoes || 0);
+    setBonus(folha.proventos.bonus || 0);
+    setAdicionalNoturno(folha.proventos.adicionalNoturno || 0);
+    setInsalubridade(folha.proventos.insalubridade || 0);
+    setPericulosidade(folha.proventos.periculosidade || 0);
+    setOutrosProventos(folha.proventos.outros || 0);
+    setValeRefeicao(folha.descontos.valeRefeicao || 0);
+    setPlanoDeSaude(folha.descontos.planoDeSaude || 0);
+    setOutrosDescontos(folha.descontos.outros || 0);
+    setCustoVT(folha.descontos.valeTransporte || 0);
+    
+    setEditarFolhaDialog(true);
+  };
+
+  const salvarEdicaoFolha = async () => {
+    if (!folhaEmEdicao) return;
+
+    setProcessando(true);
+    try {
+      const funcionario = funcionarios.find((f) => f.id === funcionarioSelecionado);
+      if (!funcionario) {
+        toast.error("Funcionário não encontrado");
+        return;
+      }
+
+      // Calcular proventos
+      const proventos: Proventos = {
+        salarioBase: salarioBaseAtual,
+        horasExtras,
+        comissoes,
+        bonus,
+        adicionalNoturno,
+        insalubridade,
+        periculosidade,
+        outros: outrosProventos,
+        total: 0,
+      };
+
+      proventos.total =
+        proventos.salarioBase +
+        proventos.horasExtras +
+        proventos.comissoes +
+        proventos.bonus +
+        proventos.adicionalNoturno +
+        proventos.insalubridade +
+        proventos.periculosidade +
+        proventos.outros;
+
+      // Calcular descontos
+      const inss = calcularINSS(proventos.total);
+      const irrf = calcularIRRF(proventos.total, inss, funcionario.dependentes || 0);
+      const vt = calcularValeTransporte(proventos.total, custoVT, optouVT);
+
+      const descontos: Descontos = {
+        inss,
+        irrf,
+        valeTransporte: vt,
+        valeRefeicao,
+        planoDeSaude,
+        outros: outrosDescontos,
+        total: 0,
+      };
+
+      descontos.total =
+        descontos.inss +
+        descontos.irrf +
+        descontos.valeTransporte +
+        descontos.valeRefeicao +
+        descontos.planoDeSaude +
+        descontos.outros;
+
+      const salarioLiquido = calcularSalarioLiquido(proventos, descontos);
+      const fgts = calcularFGTS(proventos.total);
+
+      await updateDoc(doc(db, "folhaPagamento", folhaEmEdicao.id), {
+        salarioBruto: proventos.total,
+        proventos,
+        descontos,
+        salarioLiquido,
+        fgts,
+        atualizadoEm: new Date(),
+      });
+
+      toast.success("Folha de pagamento atualizada com sucesso!");
+      setEditarFolhaDialog(false);
+      setFolhaEmEdicao(null);
+      limparFormulario();
+      carregarDados();
+    } catch (error) {
+      console.error("Erro ao atualizar folha:", error);
+      toast.error("Erro ao atualizar folha de pagamento");
+    } finally {
+      setProcessando(false);
+    }
+  };
+
+  const excluirFolha = async (folhaId: string) => {
+    if (!confirm("Tem certeza que deseja excluir esta folha de pagamento?")) {
+      return;
+    }
+
+    try {
+      await deleteDoc(doc(db, "folhaPagamento", folhaId));
+      toast.success("Folha de pagamento excluída com sucesso!");
+      carregarDados();
+    } catch (error) {
+      console.error("Erro ao excluir folha:", error);
+      toast.error("Erro ao excluir folha de pagamento");
+    }
   };
 
   const marcarComoPaga = async (folhaId: string) => {
@@ -563,7 +691,14 @@ export default function FolhaPagamento() {
               <div className="space-y-4 mt-4">
                 <div>
                   <Label>Funcionário</Label>
-                  <Select value={funcionarioSelecionado} onValueChange={setFuncionarioSelecionado}>
+                  <Select value={funcionarioSelecionado} onValueChange={async (value) => {
+                    setFuncionarioSelecionado(value);
+                    // Buscar e mostrar o salário do funcionário
+                    const salarioVigente = await getSalarioVigentePorFuncionario(value);
+                    const funcionario = funcionarios.find(f => f.id === value);
+                    const salario = salarioVigente?.salarioBase || funcionario?.salarioBruto || funcionario?.salario || 0;
+                    setSalarioBaseAtual(salario);
+                  }}>
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione o funcionário" />
                     </SelectTrigger>
@@ -579,6 +714,15 @@ export default function FolhaPagamento() {
 
                 {funcionarioSelecionado && (
                   <>
+                    <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
+                      <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                        Salário Base Cadastrado: R$ {salarioBaseAtual.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                      </p>
+                      <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
+                        Este valor será usado como salário base e somado aos proventos adicionais.
+                      </p>
+                    </div>
+
                     <Separator />
                     <h4 className="font-semibold text-sm">Proventos Adicionais</h4>
                     <div className="grid grid-cols-2 gap-4">
@@ -703,6 +847,159 @@ export default function FolhaPagamento() {
           </Dialog>
         </div>
 
+        {/* Dialog de Edição de Folha */}
+        <Dialog open={editarFolhaDialog} onOpenChange={setEditarFolhaDialog}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Editar Folha de Pagamento</DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-4 mt-4">
+              {folhaEmEdicao && funcionarioSelecionado && (
+                <>
+                  <div>
+                    <Label>Funcionário</Label>
+                    <Input 
+                      value={funcionarios.find(f => f.id === funcionarioSelecionado)?.nome || ""} 
+                      disabled 
+                    />
+                  </div>
+
+                  <div>
+                    <Label>Salário Base (do Cadastro)</Label>
+                    <Input 
+                      value={`R$ ${salarioBaseAtual.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`}
+                      disabled 
+                    />
+                  </div>
+
+                  <Separator />
+                  <h4 className="font-semibold text-sm">Proventos Adicionais</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>Horas Extras</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={horasExtras}
+                        onChange={(e) => setHorasExtras(Number(e.target.value))}
+                      />
+                    </div>
+                    <div>
+                      <Label>Comissões</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={comissoes}
+                        onChange={(e) => setComissoes(Number(e.target.value))}
+                      />
+                    </div>
+                    <div>
+                      <Label>Bônus</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={bonus}
+                        onChange={(e) => setBonus(Number(e.target.value))}
+                      />
+                    </div>
+                    <div>
+                      <Label>Adicional Noturno</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={adicionalNoturno}
+                        onChange={(e) => setAdicionalNoturno(Number(e.target.value))}
+                      />
+                    </div>
+                    <div>
+                      <Label>Insalubridade</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={insalubridade}
+                        onChange={(e) => setInsalubridade(Number(e.target.value))}
+                      />
+                    </div>
+                    <div>
+                      <Label>Periculosidade</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={periculosidade}
+                        onChange={(e) => setPericulosidade(Number(e.target.value))}
+                      />
+                    </div>
+                    <div>
+                      <Label>Outros Proventos</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={outrosProventos}
+                        onChange={(e) => setOutrosProventos(Number(e.target.value))}
+                      />
+                    </div>
+                  </div>
+
+                  <Separator />
+                  <h4 className="font-semibold text-sm">Descontos Adicionais</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>Vale Refeição</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={valeRefeicao}
+                        onChange={(e) => setValeRefeicao(Number(e.target.value))}
+                      />
+                    </div>
+                    <div>
+                      <Label>Plano de Saúde</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={planoDeSaude}
+                        onChange={(e) => setPlanoDeSaude(Number(e.target.value))}
+                      />
+                    </div>
+                    <div>
+                      <Label>Custo Vale Transporte</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={custoVT}
+                        onChange={(e) => setCustoVT(Number(e.target.value))}
+                      />
+                    </div>
+                    <div>
+                      <Label>Outros Descontos</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={outrosDescontos}
+                        onChange={(e) => setOutrosDescontos(Number(e.target.value))}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2 mt-6">
+                    <Button variant="outline" onClick={() => {
+                      setEditarFolhaDialog(false);
+                      setFolhaEmEdicao(null);
+                      limparFormulario();
+                    }}>
+                      Cancelar
+                    </Button>
+                    <Button onClick={salvarEdicaoFolha} disabled={processando}>
+                      {processando ? "Salvando..." : "Salvar Alterações"}
+                    </Button>
+                  </div>
+                </>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+
         {loading ? (
           <div className="space-y-4">
             <Skeleton className="h-12 w-full" />
@@ -761,8 +1058,25 @@ export default function FolhaPagamento() {
                           size="sm"
                           variant="outline"
                           onClick={() => gerarHolerite(folha)}
+                          title="Baixar Holerite"
                         >
                           <Download className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => abrirEdicaoFolha(folha)}
+                          title="Editar Lançamento"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => excluirFolha(folha.id)}
+                          title="Excluir Lançamento"
+                        >
+                          <Trash2 className="h-4 w-4 text-red-500" />
                         </Button>
                         {folha.status === "processada" && (
                           <Button
