@@ -12,6 +12,31 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Command,
   CommandEmpty,
   CommandGroup,
@@ -37,20 +62,27 @@ import {
   UserPlus,
   Check,
   ChevronsUpDown,
+  List,
+  Edit,
+  XCircle,
+  Shield,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { getClientes, getProdutos, getFuncionarios, type Cliente, type Produto, type Funcionario } from "@/lib/firestore";
-import { collection, addDoc, Timestamp } from "firebase/firestore";
+import { getClientes, getProdutos, getFuncionarios, getVendas, type Cliente, type Produto, type Funcionario, type Venda } from "@/lib/firestore";
+import { collection, addDoc, Timestamp, updateDoc, doc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import jsPDF from "jspdf";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 export default function PDV() {
   const { userProfile } = useAuth();
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [funcionarios, setFuncionarios] = useState<Funcionario[]>([]);
+  const [vendas, setVendas] = useState<Venda[]>([]);
   const [openClienteCombobox, setOpenClienteCombobox] = useState(false);
   const [selectedCliente, setSelectedCliente] = useState<string>("");
   const [selectedProduto, setSelectedProduto] = useState<string>("");
@@ -58,6 +90,19 @@ export default function PDV() {
   const [valorContrato, setValorContrato] = useState<string>("");
   const [prazo, setPrazo] = useState<string>("");
   const [processando, setProcessando] = useState(false);
+  
+  // Estados para consulta de vendas
+  const [consultarVendasOpen, setConsultarVendasOpen] = useState(false);
+  const [vendaSelecionada, setVendaSelecionada] = useState<Venda | null>(null);
+  const [editarVendaOpen, setEditarVendaOpen] = useState(false);
+  const [estornarConfirmOpen, setEstornarConfirmOpen] = useState(false);
+  
+  // Estados para edição
+  const [editValorContrato, setEditValorContrato] = useState<string>("");
+  const [editPrazo, setEditPrazo] = useState<string>("");
+  const [editClienteId, setEditClienteId] = useState<string>("");
+  const [editProdutoId, setEditProdutoId] = useState<string>("");
+  const [editFuncionarioId, setEditFuncionarioId] = useState<string>("");
 
   useEffect(() => {
     carregarDados();
@@ -65,14 +110,16 @@ export default function PDV() {
 
   const carregarDados = async () => {
     try {
-      const [clientesData, produtosData, funcionariosData] = await Promise.all([
+      const [clientesData, produtosData, funcionariosData, vendasData] = await Promise.all([
         getClientes(),
         getProdutos(),
         getFuncionarios(),
+        getVendas(),
       ]);
       setClientes(clientesData);
       setProdutos(produtosData);
       setFuncionarios(funcionariosData);
+      setVendas(vendasData);
     } catch (error) {
       console.error("Erro ao carregar dados:", error);
       toast.error("Erro ao carregar dados");
@@ -112,6 +159,9 @@ export default function PDV() {
 
       toast.success(`Venda registrada com sucesso! ID: ${vendaId}`);
       
+      // Recarregar vendas
+      await carregarDados();
+      
       // Limpar formulário
       setSelectedCliente("");
       setSelectedProduto("");
@@ -123,6 +173,89 @@ export default function PDV() {
       toast.error("Erro ao registrar venda");
     } finally {
       setProcessando(false);
+    }
+  };
+
+  const podeEditarOuEstornar = () => {
+    return userProfile?.papel === "Gerente" || userProfile?.papel === "Administrador";
+  };
+
+  const handleAbrirEditar = (venda: Venda) => {
+    if (!podeEditarOuEstornar()) {
+      toast.error("Apenas Gerentes e Administradores podem editar vendas");
+      return;
+    }
+    
+    setVendaSelecionada(venda);
+    setEditClienteId(venda.clienteId);
+    setEditProdutoId(venda.produtoId);
+    setEditFuncionarioId(venda.funcionarioId);
+    setEditValorContrato(venda.valorContrato.toString());
+    setEditPrazo(venda.prazo.toString());
+    setEditarVendaOpen(true);
+  };
+
+  const handleSalvarEdicao = async () => {
+    if (!vendaSelecionada || !vendaSelecionada.id) {
+      toast.error("Venda não encontrada");
+      return;
+    }
+
+    try {
+      const produtoSelecionado = produtos.find(p => p.id === editProdutoId);
+      const comissaoPerc = produtoSelecionado?.comissao || 0;
+      const valorContratoNum = parseFloat(editValorContrato);
+      const comissaoValor = (valorContratoNum * comissaoPerc) / 100;
+
+      const vendaRef = doc(db, "vendas", vendaSelecionada.id);
+      await updateDoc(vendaRef, {
+        clienteId: editClienteId,
+        produtoId: editProdutoId,
+        funcionarioId: editFuncionarioId,
+        valorContrato: valorContratoNum,
+        prazo: parseInt(editPrazo),
+        comissao: comissaoValor,
+        comissaoPercentual: comissaoPerc,
+      });
+
+      toast.success("Venda atualizada com sucesso!");
+      setEditarVendaOpen(false);
+      await carregarDados();
+    } catch (error) {
+      console.error("Erro ao atualizar venda:", error);
+      toast.error("Erro ao atualizar venda");
+    }
+  };
+
+  const handleAbrirEstornar = (venda: Venda) => {
+    if (!podeEditarOuEstornar()) {
+      toast.error("Apenas Gerentes e Administradores podem estornar vendas");
+      return;
+    }
+    
+    setVendaSelecionada(venda);
+    setEstornarConfirmOpen(true);
+  };
+
+  const handleEstornarVenda = async () => {
+    if (!vendaSelecionada || !vendaSelecionada.id) {
+      toast.error("Venda não encontrada");
+      return;
+    }
+
+    try {
+      const vendaRef = doc(db, "vendas", vendaSelecionada.id);
+      await updateDoc(vendaRef, {
+        status: "cancelada",
+      });
+
+      toast.success("Venda estornada com sucesso!");
+      setEstornarConfirmOpen(false);
+      setVendaSelecionada(null);
+      await carregarDados();
+    } catch (error) {
+      console.error("Erro ao estornar venda:", error);
+      toast.error("Erro ao estornar venda");
     }
   };
 
@@ -553,10 +686,266 @@ export default function PDV() {
                 <FileText className="w-5 h-5" />
                 Imprimir Controle de Venda
               </Button>
+              <Separator className="my-4" />
+              <Button 
+                variant="default" 
+                className="w-full gap-2 bg-blue-600 hover:bg-blue-700"
+                onClick={() => setConsultarVendasOpen(true)}
+              >
+                <List className="w-5 h-5" />
+                Consultar Vendas
+              </Button>
             </div>
           </Card>
         </div>
       </div>
+
+      {/* Dialog Consultar Vendas */}
+      <Dialog open={consultarVendasOpen} onOpenChange={setConsultarVendasOpen}>
+        <DialogContent className="max-w-6xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <List className="w-5 h-5" />
+              Consultar Vendas
+              {podeEditarOuEstornar() && (
+                <Badge variant="outline" className="ml-2">
+                  <Shield className="w-3 h-3 mr-1" />
+                  {userProfile?.papel}
+                </Badge>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="mt-4">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>ID</TableHead>
+                  <TableHead>Data</TableHead>
+                  <TableHead>Cliente</TableHead>
+                  <TableHead>Produto</TableHead>
+                  <TableHead>Valor</TableHead>
+                  <TableHead>Prazo</TableHead>
+                  <TableHead>Comissão</TableHead>
+                  <TableHead>Status</TableHead>
+                  {podeEditarOuEstornar() && <TableHead>Ações</TableHead>}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {vendas.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={podeEditarOuEstornar() ? 9 : 8} className="text-center text-muted-foreground">
+                      Nenhuma venda encontrada
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  vendas
+                    .sort((a, b) => {
+                      const dateA = a.createdAt?.toDate?.() || new Date(0);
+                      const dateB = b.createdAt?.toDate?.() || new Date(0);
+                      return dateB.getTime() - dateA.getTime();
+                    })
+                    .map((venda) => {
+                      const cliente = clientes.find(c => c.id === venda.clienteId);
+                      const produto = produtos.find(p => p.id === venda.produtoId);
+                      
+                      return (
+                        <TableRow key={venda.id}>
+                          <TableCell className="font-mono text-xs">{venda.id}</TableCell>
+                          <TableCell>
+                            {venda.createdAt?.toDate
+                              ? format(venda.createdAt.toDate(), "dd/MM/yyyy", { locale: ptBR })
+                              : "-"}
+                          </TableCell>
+                          <TableCell>{cliente?.nome || "-"}</TableCell>
+                          <TableCell>{produto?.nome || "-"}</TableCell>
+                          <TableCell className="font-semibold">
+                            R$ {Number(venda.valorContrato).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                          </TableCell>
+                          <TableCell>{venda.prazo} meses</TableCell>
+                          <TableCell className="text-green-600 font-semibold">
+                            R$ {Number(venda.comissao || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={venda.status === "cancelada" ? "destructive" : "default"}>
+                              {venda.status || "aprovada"}
+                            </Badge>
+                          </TableCell>
+                          {podeEditarOuEstornar() && (
+                            <TableCell>
+                              <div className="flex gap-2">
+                                {venda.status !== "cancelada" && (
+                                  <>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => handleAbrirEditar(venda)}
+                                    >
+                                      <Edit className="w-4 h-4" />
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="destructive"
+                                      onClick={() => handleAbrirEstornar(venda)}
+                                    >
+                                      <XCircle className="w-4 h-4" />
+                                    </Button>
+                                  </>
+                                )}
+                              </div>
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      );
+                    })
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Editar Venda */}
+      <Dialog open={editarVendaOpen} onOpenChange={setEditarVendaOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Edit className="w-5 h-5" />
+              Editar Venda
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4 mt-4">
+            <div>
+              <Label>Cliente *</Label>
+              <Select value={editClienteId} onValueChange={setEditClienteId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o cliente" />
+                </SelectTrigger>
+                <SelectContent>
+                  {clientes.map((cliente) => (
+                    <SelectItem key={cliente.id} value={cliente.id!}>
+                      {cliente.nome} - CPF: {cliente.cpf}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label>Produto *</Label>
+              <Select value={editProdutoId} onValueChange={setEditProdutoId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o produto" />
+                </SelectTrigger>
+                <SelectContent>
+                  {produtos.map((produto) => (
+                    <SelectItem key={produto.id} value={produto.id!}>
+                      {produto.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label>Agente Responsável *</Label>
+              <Select value={editFuncionarioId} onValueChange={setEditFuncionarioId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o agente" />
+                </SelectTrigger>
+                <SelectContent>
+                  {funcionarios.map((func) => (
+                    <SelectItem key={func.id} value={func.id!}>
+                      {func.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Valor do Contrato (R$) *</Label>
+                <Input
+                  type="number"
+                  value={editValorContrato}
+                  onChange={(e) => setEditValorContrato(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label>Prazo (meses) *</Label>
+                <Select value={editPrazo} onValueChange={setEditPrazo}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[300px]">
+                    {Array.from({ length: 96 }, (_, i) => i + 1).map((p) => (
+                      <SelectItem key={p} value={p.toString()}>
+                        {p} {p === 1 ? 'mês' : 'meses'}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="mt-6">
+            <Button variant="outline" onClick={() => setEditarVendaOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSalvarEdicao}>
+              Salvar Alterações
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Confirmar Estorno */}
+      <AlertDialog open={estornarConfirmOpen} onOpenChange={setEstornarConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <XCircle className="w-5 h-5 text-destructive" />
+              Confirmar Estorno de Venda
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja estornar esta venda?
+              <div className="mt-4 p-4 bg-muted rounded-lg space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">ID:</span>
+                  <span className="font-mono font-semibold">{vendaSelecionada?.id}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Cliente:</span>
+                  <span className="font-semibold">
+                    {clientes.find(c => c.id === vendaSelecionada?.clienteId)?.nome}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Valor:</span>
+                  <span className="font-semibold">
+                    R$ {Number(vendaSelecionada?.valorContrato || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+              </div>
+              <p className="mt-4 text-destructive font-semibold">
+                Esta ação não pode ser desfeita!
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleEstornarVenda}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Confirmar Estorno
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
