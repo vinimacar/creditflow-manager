@@ -178,6 +178,138 @@ export default function PDV() {
     toast.success("Contrato emitido com sucesso!");
   };
 
+  const handleImprimirControleVenda = () => {
+    if (!selectedCliente || !selectedProduto || !selectedFuncionario || !valorContrato || !prazo) {
+      toast.error("Preencha todos os dados da venda para imprimir o controle");
+      return;
+    }
+
+    const cliente = clientes.find((c) => c.id === selectedCliente);
+    const produtoInfo = produtos.find((p) => c.id === selectedProduto);
+    const funcionario = funcionarios.find((f) => f.id === selectedFuncionario);
+
+    const doc = new jsPDF();
+    
+    // Cabeçalho
+    doc.setFontSize(20);
+    doc.setFont("helvetica", "bold");
+    doc.text("CONTROLE DE VENDA", 105, 20, { align: "center" });
+    
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Gerado em: ${new Date().toLocaleString("pt-BR")}`, 105, 30, { align: "center" });
+    doc.text(`ID: VND-${Date.now().toString().slice(-8)}`, 105, 37, { align: "center" });
+    
+    // Linha separadora
+    doc.setDrawColor(0);
+    doc.setLineWidth(0.5);
+    doc.line(20, 42, 190, 42);
+    
+    // DADOS DO CLIENTE
+    let y = 55;
+    doc.setFillColor(240, 240, 240);
+    doc.rect(20, y - 6, 170, 8, 'F');
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text("DADOS DO CLIENTE", 25, y);
+    
+    y += 12;
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Nome: ${cliente?.nome || ""}`, 25, y);
+    y += 7;
+    doc.text(`CPF: ${cliente?.cpf || ""}`, 25, y);
+    y += 7;
+    doc.text(`Email: ${cliente?.email || ""}`, 25, y);
+    y += 7;
+    doc.text(`Telefone: ${cliente?.telefone || ""}`, 25, y);
+    y += 7;
+    doc.text(`Endereço: ${cliente?.endereco || ""}, ${cliente?.cidade || ""} - ${cliente?.estado || ""}`, 25, y);
+    
+    // DADOS DO PRODUTO
+    y += 15;
+    doc.setFillColor(240, 240, 240);
+    doc.rect(20, y - 6, 170, 8, 'F');
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text("DADOS DO PRODUTO/SERVIÇO", 25, y);
+    
+    y += 12;
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Produto: ${produtoInfo?.nome || ""}`, 25, y);
+    y += 7;
+    doc.text(`Fornecedor: ${produtoInfo?.fornecedor || ""}`, 25, y);
+    y += 7;
+    doc.text(`Taxa de Juros: ${produtoInfo?.taxaJuros || ""}%`, 25, y);
+    y += 7;
+    doc.text(`Comissão: ${comissao}%`, 25, y);
+    
+    // DADOS DA VENDA
+    y += 15;
+    doc.setFillColor(240, 240, 240);
+    doc.rect(20, y - 6, 170, 8, 'F');
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text("DETALHES DA VENDA", 25, y);
+    
+    y += 12;
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Valor do Contrato: R$ ${parseFloat(valorContrato).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`, 25, y);
+    y += 7;
+    doc.text(`Prazo: ${prazo} ${prazo === "1" ? "mês" : "meses"}`, 25, y);
+    y += 7;
+    const valorParcela = parseFloat(valorContrato) / parseInt(prazo);
+    doc.text(`Valor da Parcela: R$ ${valorParcela.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`, 25, y);
+    y += 7;
+    const valorComissao = (parseFloat(valorContrato) * parseFloat(comissao)) / 100;
+    doc.text(`Valor da Comissão: R$ ${valorComissao.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`, 25, y);
+    y += 7;
+    doc.text(`Data da Venda: ${new Date().toLocaleDateString("pt-BR")}`, 25, y);
+    
+    // DADOS DO AGENTE
+    y += 15;
+    doc.setFillColor(240, 240, 240);
+    doc.rect(20, y - 6, 170, 8, 'F');
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text("DADOS DO AGENTE DE VENDAS", 25, y);
+    
+    y += 12;
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Nome: ${funcionario?.nome || ""}`, 25, y);
+    y += 7;
+    doc.text(`CPF: ${funcionario?.cpf || ""}`, 25, y);
+    y += 7;
+    doc.text(`Email: ${funcionario?.email || ""}`, 25, y);
+    y += 7;
+    doc.text(`Função: ${funcionario?.funcao || funcionario?.cargo || ""}`, 25, y);
+    
+    // Resumo Financeiro
+    y += 15;
+    doc.setFillColor(220, 220, 220);
+    doc.rect(20, y - 6, 170, 20, 'F');
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text("RESUMO FINANCEIRO", 105, y, { align: "center" });
+    
+    y += 10;
+    doc.setFontSize(11);
+    doc.text(`Total do Contrato: R$ ${parseFloat(valorContrato).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`, 25, y);
+    doc.text(`Comissão do Agente: R$ ${valorComissao.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`, 120, y);
+    
+    // Rodapé
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "italic");
+    doc.text("Documento gerado automaticamente pelo sistema CréditoGestor", 105, 280, { align: "center" });
+    doc.text("Este controle de venda serve como comprovante interno da operação", 105, 285, { align: "center" });
+    
+    doc.save(`controle_venda_${Date.now()}.pdf`);
+    toast.success("Controle de Venda impresso com sucesso!");
+  };
+
   return (
     <div>
       <PageHeader
@@ -261,10 +393,10 @@ export default function PDV() {
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione" />
                   </SelectTrigger>
-                  <SelectContent>
-                    {[12, 24, 36, 48, 60, 72, 84, 96].map((p) => (
+                  <SelectContent className="max-h-[300px]">
+                    {Array.from({ length: 96 }, (_, i) => i + 1).map((p) => (
                       <SelectItem key={p} value={p.toString()}>
-                        {p} meses
+                        {p} {p === 1 ? 'mês' : 'meses'}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -370,6 +502,15 @@ export default function PDV() {
               >
                 <FileText className="w-5 h-5" />
                 Emitir Contrato
+              </Button>
+              <Button 
+                variant="secondary" 
+                className="w-full gap-2"
+                onClick={handleImprimirControleVenda}
+                disabled={!selectedCliente || !selectedProduto || !selectedFuncionario || !valorContrato || !prazo}
+              >
+                <FileText className="w-5 h-5" />
+                Imprimir Controle de Venda
               </Button>
             </div>
           </Card>

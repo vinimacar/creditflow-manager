@@ -49,15 +49,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         displayName: firebaseUser.displayName || "",
         photoURL: firebaseUser.photoURL || undefined,
         role: data.role || "atendente",
+        aprovado: data.aprovado || false,
         createdAt: data.createdAt?.toDate() || new Date(),
       };
     } else {
+      // Novo usuário - precisa ser aprovado
       const newUserProfile: UserProfile = {
         uid: firebaseUser.uid,
         email: firebaseUser.email || "",
         displayName: firebaseUser.displayName || "",
         photoURL: firebaseUser.photoURL || undefined,
         role: "atendente",
+        aprovado: false,
         createdAt: new Date(),
       };
 
@@ -66,6 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         displayName: newUserProfile.displayName,
         photoURL: newUserProfile.photoURL,
         role: newUserProfile.role,
+        aprovado: newUserProfile.aprovado,
         createdAt: newUserProfile.createdAt,
       });
 

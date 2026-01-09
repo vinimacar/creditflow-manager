@@ -17,6 +17,8 @@ import Relatorios from "./pages/Relatorios";
 import Conciliacao from "./pages/Conciliacao";
 import Configuracoes from "./pages/Configuracoes";
 import Usuarios from "./pages/Usuarios";
+import FolhaPagamento from "./pages/FolhaPagamento";
+import AguardandoAprovacao from "./pages/AguardandoAprovacao";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -36,13 +38,20 @@ function AppRoutes() {
     return <LoginPage />;
   }
 
+  // Verificar se o usuário está aprovado
+  if (!user.aprovado) {
+    return <AguardandoAprovacao />;
+  }
+
   return (
     <Routes>
       <Route
         path="/"
         element={
           <AppLayout>
-            <Dashboard />
+            <ProtectedRoute allowedRoles={["admin", "gerente"]}>
+              <Dashboard />
+            </ProtectedRoute>
           </AppLayout>
         }
       />
@@ -77,6 +86,16 @@ function AppRoutes() {
         element={
           <AppLayout>
             <Funcionarios />
+          </AppLayout>
+        }
+      />
+      <Route
+        path="/folha-pagamento"
+        element={
+          <AppLayout>
+            <ProtectedRoute allowedRoles={["admin", "gerente"]}>
+              <FolhaPagamento />
+            </ProtectedRoute>
           </AppLayout>
         }
       />

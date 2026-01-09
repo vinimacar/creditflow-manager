@@ -21,7 +21,9 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { getAllUsers, updateUserRole, updateUserStatus, UserProfile } from "@/lib/firestore";
 import { toast } from "sonner";
-import { ShieldCheck, ShieldAlert, UserCog } from "lucide-react";
+import { ShieldCheck, ShieldAlert, UserCog, CheckCircle, XCircle } from "lucide-react";
+import { doc, updateDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 type UserRole = "admin" | "gerente" | "agente" | "atendente";
 type UserStatus = "ativo" | "bloqueado";
@@ -76,6 +78,28 @@ const columns = [
       <span className="text-sm">
         {user.createdAt ? new Date(user.createdAt).toLocaleDateString("pt-BR") : "-"}
       </span>
+    ),
+  },
+  {
+    key: "aprovado",
+    header: "Aprovação",
+    render: (user: UserProfile) => (
+      <Badge
+        variant={user.aprovado ? "default" : "secondary"}
+        className={user.aprovado ? "bg-success hover:bg-success/90" : "bg-orange-500 hover:bg-orange-600"}
+      >
+        {user.aprovado ? (
+          <>
+            <CheckCircle className="w-3 h-3 mr-1" />
+            Aprovado
+          </>
+        ) : (
+          <>
+            <XCircle className="w-3 h-3 mr-1" />
+            Pendente
+          </>
+        )}
+      </Badge>
     ),
   },
   {
@@ -165,6 +189,28 @@ export default function Usuarios() {
     }
   };
 
+  const handleToggleAprovacao = async (user: UserProfile) => {
+    if (!user.id) return;
+
+    const novoEstado = !user.aprovado;
+    const action = novoEstado ? "aprovar" : "reprovar";
+
+    if (!confirm(`Deseja realmente ${action} o cadastro de ${user.displayName}?`)) {
+      return;
+    }
+
+    try {
+      await updateDoc(doc(db, "users", user.id), {
+        aprovado: novoEstado,
+      });
+      toast.success(`Cadastro ${novoEstado ? "aprovado" : "reprovado"} com sucesso!`);
+      loadUsers();
+    } catch (error) {
+      console.error(`Erro ao ${action} cadastro:`, error);
+      toast.error(`Erro ao ${action} cadastro`);
+    }
+  };
+
   return (
     <div>
       <PageHeader
@@ -181,6 +227,13 @@ export default function Usuarios() {
         deleteLabel={(user: UserProfile) => 
           user.status === "ativo" ? "Bloquear" : "Desbloquear"
         }
+        customActions={[
+          {
+            label: (user) => user.aprovado ? "Reprovar Cadastro" : "Aprovar Cadastro",
+            onClick: handleToggleAprovacao,
+            className: (user: UserProfile) => user.aprovado ? "text-orange-600 focus:text-orange-600" : "text-green-600 focus:text-green-600",
+          }
+        ]}
       />
 
       <Dialog open={!!editingUser} onOpenChange={(open) => !open && setEditingUser(null)}>

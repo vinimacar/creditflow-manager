@@ -201,7 +201,11 @@ export interface Funcionario {
   dataAdmissao: string;
   dataDemissao?: string;
   funcao?: string;
+  cargo?: string;
+  salario?: number;
+  dependentes?: number;
   status: "ativo" | "inativo";
+  aprovado?: boolean;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -298,6 +302,7 @@ export interface UserProfile {
   photoURL?: string;
   role: "admin" | "gerente" | "agente" | "atendente";
   status?: "ativo" | "bloqueado";
+  aprovado?: boolean;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -316,6 +321,7 @@ export async function getAllUsers(): Promise<UserProfile[]> {
     photoURL: doc.data().photoURL,
     role: doc.data().role,
     status: doc.data().status || "ativo",
+    aprovado: doc.data().aprovado || false,
     createdAt: doc.data().createdAt?.toDate(),
     updatedAt: doc.data().updatedAt?.toDate(),
   })) as UserProfile[];

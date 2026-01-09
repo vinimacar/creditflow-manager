@@ -24,6 +24,12 @@ interface Column<T> {
   className?: string;
 }
 
+interface CustomAction<T> {
+  label: (item: T) => string;
+  onClick: (item: T) => void;
+  className?: string | ((item: T) => string);
+}
+
 interface DataTableProps<T> {
   columns: Column<T>[];
   data: T[];
@@ -32,6 +38,7 @@ interface DataTableProps<T> {
   onDelete?: (item: T) => void;
   onView?: (item: T) => void;
   deleteLabel?: (item: T) => string;
+  customActions?: CustomAction<T>[];
 }
 
 export function DataTable<T extends { id: string | number }>({
@@ -42,8 +49,9 @@ export function DataTable<T extends { id: string | number }>({
   onDelete,
   onView,
   deleteLabel,
+  customActions,
 }: DataTableProps<T>) {
-  const hasActions = onEdit || onDelete || onView;
+  const hasActions = onEdit || onDelete || onView || (customActions && customActions.length > 0);
 
   return (
     <div className="bg-card rounded-xl border border-border/50 shadow-sm overflow-hidden animate-fade-in">
@@ -96,6 +104,15 @@ export function DataTable<T extends { id: string | number }>({
                           Editar
                         </DropdownMenuItem>
                       )}
+                      {customActions && customActions.map((action, index) => (
+                        <DropdownMenuItem
+                          key={index}
+                          onClick={() => action.onClick(item)}
+                          className={typeof action.className === 'function' ? action.className(item) : action.className}
+                        >
+                          {action.label(item)}
+                        </DropdownMenuItem>
+                      ))}
                       {onDelete && (
                         <DropdownMenuItem
                           onClick={() => onDelete(item)}

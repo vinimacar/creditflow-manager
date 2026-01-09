@@ -15,6 +15,7 @@ import {
   LogOut,
   Wallet,
   Shield,
+  DollarSign,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -22,11 +23,12 @@ import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/contexts/AuthContext";
 
 const menuItems = [
-  { icon: LayoutDashboard, label: "Dashboard", path: "/", roles: ["admin", "gerente", "agente", "atendente"] },
+  { icon: LayoutDashboard, label: "Dashboard", path: "/", roles: ["admin", "gerente"] },
   { icon: Users, label: "Clientes", path: "/clientes", roles: ["admin", "gerente", "agente", "atendente"] },
   { icon: Building2, label: "Fornecedores", path: "/fornecedores", roles: ["admin", "gerente", "agente", "atendente"] },
   { icon: Package, label: "Produtos", path: "/produtos", roles: ["admin", "gerente"] },
   { icon: UserCog, label: "Funcionários", path: "/funcionarios", roles: ["admin", "gerente", "agente", "atendente"] },
+  { icon: DollarSign, label: "Folha de Pagamento", path: "/folha-pagamento", roles: ["admin", "gerente"] },
   { icon: ShoppingCart, label: "PDV", path: "/pdv", roles: ["admin", "gerente", "agente", "atendente"] },
   { icon: FileBarChart, label: "Relatórios", path: "/relatorios", roles: ["admin", "gerente"] },
   { icon: Scale, label: "Conciliação", path: "/conciliacao", roles: ["admin", "gerente"] },
