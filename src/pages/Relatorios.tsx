@@ -531,6 +531,10 @@ export default function Relatorios() {
     const totalAnterior = dados.vendas.slice(0, -1).reduce((sum, v) => sum + v.valor, 0);
     const crescimento = totalAnterior > 0 ? ((totalVendas - totalAnterior) / totalAnterior) * 100 : 0;
     const totalComissoes = dados.funcionarios.reduce((sum, f) => sum + f.comissao, 0);
+    const totalDespesas = dados.despesas.reduce((sum, d) => sum + d.valor, 0);
+    const totalReceitas = dados.receitas.reduce((sum, r) => sum + r.valor, 0);
+    const lucroTotal = totalReceitas - totalDespesas;
+    const margemLucro = totalReceitas > 0 ? (lucroTotal / totalReceitas) * 100 : 0;
 
     return {
       totalVendas,
@@ -539,6 +543,10 @@ export default function Relatorios() {
       totalFuncionarios: dados.funcionarios.length,
       produtoMaisVendido: dados.produtos[0]?.nome || "N/A",
       totalComissoes,
+      totalDespesas,
+      totalReceitas,
+      lucroTotal,
+      margemLucro,
     };
   }, [dadosGraficos, dadosRelatorio]);
 
@@ -719,13 +727,13 @@ export default function Relatorios() {
       />
 
       {/* KPIs */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-muted-foreground">Total de Vendas</p>
-              <h3 className="text-2xl font-bold mt-2">
-                R$ {estatisticas!.totalVendas.toLocaleString("pt-BR")}
+              <p className="text-sm font-medium text-muted-foreground">Total de Receitas</p>
+              <h3 className="text-2xl font-bold mt-2 text-green-700">
+                R$ {estatisticas!.totalReceitas.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
               </h3>
               <p className={`text-sm mt-1 flex items-center gap-1 ${estatisticas!.crescimento >= 0 ? "text-green-600" : "text-red-600"}`}>
                 {estatisticas!.crescimento >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
@@ -739,16 +747,48 @@ export default function Relatorios() {
         <Card className="p-6">
           <div className="flex items-center justify-between">
             <div>
+              <p className="text-sm font-medium text-muted-foreground">Total de Despesas</p>
+              <h3 className="text-2xl font-bold mt-2 text-red-700">
+                R$ {estatisticas!.totalDespesas.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+              </h3>
+              <p className="text-xs text-muted-foreground mt-1">Despesas lançadas no período</p>
+            </div>
+            <DollarSign className="w-8 h-8 text-red-600" />
+          </div>
+        </Card>
+
+        <Card className="p-6 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-blue-900 dark:text-blue-100">Lucro Total</p>
+              <h3 className={`text-2xl font-bold mt-2 ${estatisticas!.lucroTotal >= 0 ? 'text-blue-700 dark:text-blue-300' : 'text-red-700 dark:text-red-300'}`}>
+                R$ {estatisticas!.lucroTotal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+              </h3>
+              <p className={`text-sm mt-1 flex items-center gap-1 font-semibold ${estatisticas!.lucroTotal >= 0 ? "text-blue-700 dark:text-blue-300" : "text-red-700 dark:text-red-300"}`}>
+                {estatisticas!.lucroTotal >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+                Margem: {estatisticas!.margemLucro.toFixed(1)}%
+              </p>
+            </div>
+            <DollarSign className={`w-8 h-8 ${estatisticas!.lucroTotal >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-red-600 dark:text-red-400'}`} />
+          </div>
+        </Card>
+
+        <Card className="p-6">
+          <div className="flex items-center justify-between">
+            <div>
               <p className="text-sm font-medium text-muted-foreground">Total Comissões</p>
-              <h3 className="text-2xl font-bold mt-2 text-green-700">
+              <h3 className="text-2xl font-bold mt-2 text-purple-700">
                 R$ {estatisticas!.totalComissoes.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
               </h3>
               <p className="text-xs text-muted-foreground mt-1">Conforme cadastro de produtos</p>
             </div>
-            <DollarSign className="w-8 h-8 text-green-600" />
+            <DollarSign className="w-8 h-8 text-purple-600" />
           </div>
         </Card>
+      </div>
 
+      {/* KPIs Secundários */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <Card className="p-6">
           <div className="flex items-center justify-between">
             <div>
