@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import {
   AreaChart,
   Area,
@@ -7,18 +8,73 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import { getVendas, type Venda } from "@/lib/firestore";
+import { Skeleton } from "@/components/ui/skeleton";
+import { startOfMonth, endOfMonth, format, subMonths } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
-const data = [
-  { mes: "Jul", vendas: 85000, comissoes: 2550 },
-  { mes: "Ago", vendas: 92000, comissoes: 2760 },
-  { mes: "Set", vendas: 78000, comissoes: 2340 },
-  { mes: "Out", vendas: 110000, comissoes: 3300 },
-  { mes: "Nov", vendas: 125000, comissoes: 3750 },
-  { mes: "Dez", vendas: 145000, comissoes: 4350 },
-  { mes: "Jan", vendas: 98000, comissoes: 2940 },
-];
+interface ChartData {
+  mes: string;
+  vendas: number;
+  comissoes: number;
+}
 
 export function SalesChart() {
+  const [data, setData] = useState<ChartData[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    carregarDados();
+  }, []);
+
+  const carregarDados = async () => {
+    try {
+      const vendas = await getVendas();
+      
+      // Gerar dados dos últimos 7 meses
+      const chartData: ChartData[] = [];
+      const agora = new Date();
+      
+      for (let i = 6; i >= 0; i--) {
+        const mesData = subMonths(agora, i);
+        const inicioMes = startOfMonth(mesData);
+        const fimMes = endOfMonth(mesData);
+        
+        // Filtrar vendas do mês
+        const vendasDoMes = vendas.filter((v) => {
+          const dataVenda = v.createdAt?.toDate?.() || new Date(v.createdAt);
+          return dataVenda >= inicioMes && dataVenda <= fimMes;
+        });
+        
+        const totalVendas = vendasDoMes.reduce((sum, v) => sum + v.valorContrato, 0);
+        const totalComissoes = vendasDoMes.reduce((sum, v) => sum + v.comissao, 0);
+        
+        chartData.push({
+          mes: format(mesData, "MMM", { locale: ptBR }),
+          vendas: totalVendas,
+          comissoes: totalComissoes,
+        });
+      }
+      
+      setData(chartData);
+    } catch (error) {
+      console.error("Erro ao carregar dados do gráfico:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="bg-card rounded-xl border border-border/50 shadow-sm p-6">
+        <div className="mb-6">
+          <h3 className="text-lg font-semibold">Evolução de Vendas</h3>
+          <p className="text-sm text-muted-foreground">Últimos 7 meses</p>
+        </div>
+        <Skeleton className="h-[300px] w-full" />
+      </div>
+    );
+  }
   return (
     <div className="bg-card rounded-xl border border-border/50 shadow-sm p-6 animate-fade-in">
       <div className="mb-6">

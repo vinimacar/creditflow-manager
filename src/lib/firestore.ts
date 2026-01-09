@@ -80,7 +80,63 @@ export async function getCliente(id: string): Promise<Cliente | null> {
   }
   return null;
 }
+// ===== VENDAS =====
 
+export interface Venda {
+  id?: string;
+  clienteId: string;
+  produtoId: string;
+  funcionarioId: string;
+  valorContrato: number;
+  prazo: number;
+  comissao: number;
+  comissaoPercentual: number;
+  status: "aprovada" | "pendente" | "em_analise" | "recusada";
+  criadoPor: string;
+  createdAt?: any;
+  updatedAt?: any;
+}
+
+export const vendasCollection = "vendas";
+
+export async function getVendas(): Promise<Venda[]> {
+  const querySnapshot = await getDocs(
+    query(collection(db, vendasCollection), orderBy("createdAt", "desc"))
+  );
+  return querySnapshot.docs.map((doc) => ({
+    id: doc.id,
+    ...doc.data(),
+  })) as Venda[];
+}
+
+export async function getVendasPorPeriodo(inicio: Date, fim: Date): Promise<Venda[]> {
+  const querySnapshot = await getDocs(
+    query(
+      collection(db, vendasCollection),
+      where("createdAt", ">=", Timestamp.fromDate(inicio)),
+      where("createdAt", "<=", Timestamp.fromDate(fim)),
+      orderBy("createdAt", "desc")
+    )
+  );
+  return querySnapshot.docs.map((doc) => ({
+    id: doc.id,
+    ...doc.data(),
+  })) as Venda[];
+}
+
+export async function getVendasPorFuncionario(funcionarioId: string): Promise<Venda[]> {
+  const querySnapshot = await getDocs(
+    query(
+      collection(db, vendasCollection),
+      where("funcionarioId", "==", funcionarioId),
+      orderBy("createdAt", "desc")
+    )
+  );
+  return querySnapshot.docs.map((doc) => ({
+    id: doc.id,
+    ...doc.data(),
+  })) as Venda[];
+}
 // ===== FORNECEDORES =====
 
 export interface Fornecedor {

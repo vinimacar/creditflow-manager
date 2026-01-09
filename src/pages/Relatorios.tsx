@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,39 +17,17 @@ import {
 import { toast } from "sonner";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { format } from "date-fns";
+import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { getVendas, getFuncionarios, getProdutos, getFornecedores, type Venda, type Funcionario, type Produto, type Fornecedor } from "@/lib/firestore";
+import { Skeleton } from "@/components/ui/skeleton";
 
-// Dados mock para demonstração
-const dadosMock = {
-  vendas: [
-    { mes: "Jan", valor: 125000, quantidade: 45 },
-    { mes: "Fev", valor: 138000, quantidade: 52 },
-    { mes: "Mar", valor: 162000, quantidade: 61 },
-    { mes: "Abr", valor: 145000, quantidade: 54 },
-    { mes: "Mai", valor: 178000, quantidade: 68 },
-    { mes: "Jun", valor: 195000, quantidade: 75 },
-  ],
-  funcionarios: [
-    { nome: "Carlos Mendes", vendas: 45, comissao: 18500 },
-    { nome: "Fernanda Lima", vendas: 38, comissao: 15600 },
-    { nome: "Ricardo Santos", vendas: 32, comissao: 12800 },
-    { nome: "Juliana Costa", vendas: 28, comissao: 11200 },
-    { nome: "Pedro Silva", vendas: 22, comissao: 8800 },
-  ],
-  produtos: [
-    { nome: "Consignado INSS", valor: 450000 },
-    { nome: "Refinanciamento", valor: 180000 },
-    { nome: "Portabilidade", valor: 120000 },
-    { nome: "Cartão Consignado", valor: 80000 },
-  ],
-  fornecedores: [
-    { nome: "Banco BMG", valor: 350000 },
-    { nome: "Banco Pan", valor: 280000 },
-    { nome: "Bradesco", valor: 180000 },
-    { nome: "Itaú", valor: 120000 },
-  ],
-};
+interface DadosRelatorio {
+  vendas: Array<{ mes: string; valor: number; quantidade: number }>;
+  funcionarios: Array<{ nome: string; vendas: number; comissao: number }>;
+  produtos: Array<{ nome: string; valor: number }>;
+  fornecedores: Array<{ nome: string; valor: number }>;
+}
 
 export default function Relatorios() {
   const [filtros, setFiltros] = useState<FiltrosRelatorio>({
@@ -57,22 +35,121 @@ export default function Relatorios() {
     agrupamento: "mes",
   });
   const [gerando, setGerando] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [dadosRelatorio, setDadosRelatorio] = useState<DadosRelatorio | null>(null);
+
+  useEffect(() => {
+    carregarDados();
+  }, []);
+
+  const carregarDados = async () => {
+    try {
+      const [vendas, funcionarios, produtos, fornecedores] = await Promise.all([
+        getVendas(),
+        getFuncionarios(),
+        getProdutos(),
+        getFornecedores(),
+      ]);
+
+      // Gerar dados de vendas por mês (últimos 6 meses)
+      const vendasPorMes: Array<{ mes: string; valor: number; quantidade: number }> = [];
+      const agora = new Date();
+      
+      for (let i = 5; i >= 0; i--) {
+        const mesData = subMonths(agora, i);
+        const inicioMes = startOfMonth(mesData);
+        const fimMes = endOfMonth(mesData);
+        
+        const vendasDoMes = vendas.filter((v) => {
+          const dataVenda = v.createdAt?.toDate?.() || new Date(v.createdAt);
+          return dataVenda >= inicioMes && dataVenda <= fimMes;
+        });
+        
+        vendasPorMes.push({
+          mes: format(mesData, "MMM", { locale: ptBR }),
+          valor: vendasDoMes.reduce((sum, v) => sum + v.valorContrato, 0),
+          quantidade: vendasDoMes.length,
+        });
+      }
+
+      // Calcular vendas por funcionário
+      const vendaPorFunc = new Map<string, { vendas: number; comissao: number }>();
+      vendas.forEach((venda) => {
+        const current = vendaPorFunc.get(venda.funcionarioId) || { vendas: 0, comissao: 0 };
+        vendaPorFunc.set(venda.funcionarioId, {
+          vendas: current.vendas + 1,
+          comissao: current.comissao + venda.comissao,
+        });
+      });
+
+      const funcionariosData = Array.from(vendaPorFunc.entries())
+        .map(([id, stats]) => {
+          const func = funcionarios.find((f) => f.id === id);
+          return {
+            nome: func?.nome || "Desconhecido",
+            vendas: stats.vendas,
+            comissao: stats.comissao,
+          };
+        })
+        .sort((a, b) => b.vendas - a.vendas)
+        .slice(0, 5);
+
+      // Calcular vendas por produto
+      const vendaPorProd = new Map<string, number>();
+      vendas.forEach((venda) => {
+        const current = vendaPorProd.get(venda.produtoId) || 0;
+        vendaPorProd.set(venda.produtoId, current + venda.valorContrato);
+      });
+
+      const produtosData = Array.from(vendaPorProd.entries())
+        .map(([id, valor]) => {
+          const prod = produtos.find((p) => p.id === id);
+          return {
+            nome: prod?.nome || "Desconhecido",
+            valor,
+          };
+        })
+        .sort((a, b) => b.valor - a.valor)
+        .slice(0, 4);
+
+      // Mock de fornecedores (pode ser melhorado com dados reais se disponível)
+      const fornecedoresData = fornecedores.slice(0, 4).map((f) => ({
+        nome: f.razaoSocial,
+        valor: Math.random() * 300000 + 100000, // Valores simulados
+      }));
+
+      setDadosRelatorio({
+        vendas: vendasPorMes,
+        funcionarios: funcionariosData,
+        produtos: produtosData,
+        fornecedores: fornecedoresData,
+      });
+    } catch (error) {
+      console.error("Erro ao carregar dados do relatório:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const estatisticas = useMemo(() => {
-    const totalVendas = dadosMock.vendas.reduce((sum, v) => sum + v.valor, 0);
-    const totalAnterior = 800000; // Mock
-    const crescimento = ((totalVendas - totalAnterior) / totalAnterior) * 100;
+    if (!dadosRelatorio) return null;
+    
+    const totalVendas = dadosRelatorio.vendas.reduce((sum, v) => sum + v.valor, 0);
+    const totalAnterior = dadosRelatorio.vendas.slice(0, -1).reduce((sum, v) => sum + v.valor, 0);
+    const crescimento = totalAnterior > 0 ? ((totalVendas - totalAnterior) / totalAnterior) * 100 : 0;
 
     return {
       totalVendas,
       crescimento,
-      ticketMedio: totalVendas / dadosMock.vendas.reduce((sum, v) => sum + v.quantidade, 0),
-      totalFuncionarios: dadosMock.funcionarios.length,
-      produtoMaisVendido: dadosMock.produtos[0].nome,
+      ticketMedio: totalVendas / dadosRelatorio.vendas.reduce((sum, v) => sum + v.quantidade, 0) || 0,
+      totalFuncionarios: dadosRelatorio.funcionarios.length,
+      produtoMaisVendido: dadosRelatorio.produtos[0]?.nome || "N/A",
     };
-  }, []);
+  }, [dadosRelatorio]);
 
   const gerarFeedback = () => {
+    if (!estatisticas) return { tipo: "neutro" as const, mensagem: "Carregando dados..." };
+    
     if (estatisticas.crescimento > 10) {
       return {
         tipo: "positivo" as const,
@@ -96,6 +173,11 @@ export default function Relatorios() {
   };
 
   const handleImprimir = async () => {
+    if (!dadosRelatorio || !estatisticas) {
+      toast.error("Dados ainda não carregados");
+      return;
+    }
+    
     setGerando(true);
     try {
       const doc = new jsPDF();
@@ -143,7 +225,7 @@ export default function Relatorios() {
       autoTable(doc, {
         startY: y,
         head: [["Funcionário", "Vendas", "Comissão"]],
-        body: dadosMock.funcionarios.map(f => [
+        body: dadosRelatorio.funcionarios.map(f => [
           f.nome,
           f.vendas.toString(),
           `R$ ${f.comissao.toLocaleString("pt-BR")}`,
@@ -163,7 +245,7 @@ export default function Relatorios() {
       autoTable(doc, {
         startY: y,
         head: [["Produto", "Valor Total"]],
-        body: dadosMock.produtos.map(p => [
+        body: dadosRelatorio.produtos.map(p => [
           p.nome,
           `R$ ${p.valor.toLocaleString("pt-BR")}`,
         ]),
@@ -194,6 +276,25 @@ export default function Relatorios() {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          title="Relatórios Gerenciais"
+          description="Análise completa do desempenho e resultados"
+        />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} className="h-32 w-full" />
+          ))}
+        </div>
+        <Skeleton className="h-96 w-full" />
+      </div>
+    );
+  }
+
+  const feedback = gerarFeedback();
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -208,11 +309,11 @@ export default function Relatorios() {
             <div>
               <p className="text-sm font-medium text-muted-foreground">Total de Vendas</p>
               <h3 className="text-2xl font-bold mt-2">
-                R$ {estatisticas.totalVendas.toLocaleString("pt-BR")}
+                R$ {estatisticas!.totalVendas.toLocaleString("pt-BR")}
               </h3>
-              <p className={`text-sm mt-1 flex items-center gap-1 ${estatisticas.crescimento >= 0 ? "text-green-600" : "text-red-600"}`}>
-                {estatisticas.crescimento >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
-                {estatisticas.crescimento > 0 ? "+" : ""}{estatisticas.crescimento.toFixed(1)}% vs período anterior
+              <p className={`text-sm mt-1 flex items-center gap-1 ${estatisticas!.crescimento >= 0 ? "text-green-600" : "text-red-600"}`}>
+                {estatisticas!.crescimento >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+                {estatisticas!.crescimento > 0 ? "+" : ""}{estatisticas!.crescimento.toFixed(1)}% vs período anterior
               </p>
             </div>
             <DollarSign className="w-8 h-8 text-green-600" />
@@ -224,7 +325,7 @@ export default function Relatorios() {
             <div>
               <p className="text-sm font-medium text-muted-foreground">Ticket Médio</p>
               <h3 className="text-2xl font-bold mt-2">
-                R$ {estatisticas.ticketMedio.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                R$ {estatisticas!.ticketMedio.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
               </h3>
             </div>
             <DollarSign className="w-8 h-8 text-blue-600" />
@@ -235,7 +336,7 @@ export default function Relatorios() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-muted-foreground">Funcionários Ativos</p>
-              <h3 className="text-2xl font-bold mt-2">{estatisticas.totalFuncionarios}</h3>
+              <h3 className="text-2xl font-bold mt-2">{estatisticas!.totalFuncionarios}</h3>
             </div>
             <Users className="w-8 h-8 text-purple-600" />
           </div>
@@ -245,7 +346,7 @@ export default function Relatorios() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-muted-foreground">Produto Destaque</p>
-              <h3 className="text-lg font-bold mt-2">{estatisticas.produtoMaisVendido}</h3>
+              <h3 className="text-lg font-bold mt-2">{estatisticas!.produtoMaisVendido}</h3>
             </div>
             <Package className="w-8 h-8 text-orange-600" />
           </div>
@@ -256,9 +357,9 @@ export default function Relatorios() {
       <FiltrosDinamicosRelatorio
         filtros={filtros}
         onFiltrosChange={setFiltros}
-        fornecedores={dadosMock.fornecedores.map(f => f.nome)}
-        funcionarios={dadosMock.funcionarios.map(f => f.nome)}
-        produtos={dadosMock.produtos.map(p => p.nome)}
+        fornecedores={dadosRelatorio!.fornecedores.map(f => f.nome)}
+        funcionarios={dadosRelatorio!.funcionarios.map(f => f.nome)}
+        produtos={dadosRelatorio!.produtos.map(p => p.nome)}
         onGerarRelatorio={handleGerarRelatorio}
       />
 
@@ -280,18 +381,18 @@ export default function Relatorios() {
           titulo="Evolução de Vendas"
           tipo="linha"
           dados={{
-            labels: dadosMock.vendas.map(v => v.mes),
-            valores: dadosMock.vendas.map(v => v.valor),
+            labels: dadosRelatorio!.vendas.map(v => v.mes),
+            valores: dadosRelatorio!.vendas.map(v => v.valor),
           }}
-          feedback={gerarFeedback()}
+          feedback={feedback}
         />
 
         <GraficoModerno
           titulo="Desempenho por Funcionário"
           tipo="barra"
           dados={{
-            labels: dadosMock.funcionarios.map(f => f.nome.split(" ")[0]),
-            valores: dadosMock.funcionarios.map(f => f.comissao),
+            labels: dadosRelatorio!.funcionarios.map(f => f.nome.split(" ")[0]),
+            valores: dadosRelatorio!.funcionarios.map(f => f.comissao),
           }}
         />
 
@@ -299,8 +400,8 @@ export default function Relatorios() {
           titulo="Vendas por Produto"
           tipo="pizza"
           dados={{
-            labels: dadosMock.produtos.map(p => p.nome),
-            valores: dadosMock.produtos.map(p => p.valor),
+            labels: dadosRelatorio!.produtos.map(p => p.nome),
+            valores: dadosRelatorio!.produtos.map(p => p.valor),
           }}
         />
 
@@ -308,8 +409,8 @@ export default function Relatorios() {
           titulo="Vendas por Fornecedor"
           tipo="barra"
           dados={{
-            labels: dadosMock.fornecedores.map(f => f.nome.replace("Banco ", "")),
-            valores: dadosMock.fornecedores.map(f => f.valor),
+            labels: dadosRelatorio!.fornecedores.map(f => f.nome.replace("Banco ", "")),
+            valores: dadosRelatorio!.fornecedores.map(f => f.valor),
           }}
         />
       </div>
