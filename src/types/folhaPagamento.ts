@@ -8,6 +8,7 @@ export interface FolhaPagamento {
   descontos: Descontos;
   proventos: Proventos;
   salarioLiquido: number;
+  fgts: number; // FGTS não é desconto do salário, mas deve ser calculado e registrado
   status: 'rascunho' | 'processada' | 'paga';
   dataPagamento?: Date;
   criadoEm: Date;
@@ -36,10 +37,21 @@ export interface Proventos {
   total: number;
 }
 
+export interface SalarioVigente {
+  id?: string;
+  funcionarioId: string;
+  salarioBase: number;
+  dataVigencia: Date;
+  observacao?: string;
+  criadoEm: Date;
+  atualizadoEm: Date;
+}
+
 export interface ConfiguracaoFolha {
   valeTransportePercentual: number; // padrão 6%
   valeRefeicaoValor: number;
   planoDeSaudeValor: number;
+  fgtsPercentual: number; // padrão 8%
 }
 
 // Tabelas INSS 2026 - Alíquotas Progressivas
@@ -111,6 +123,11 @@ export function calcularValeTransporte(
   if (!optouPorVT) return 0;
   const desconto = salarioBruto * 0.06;
   return Math.min(desconto, custoVT);
+}
+
+// Função para calcular FGTS (8% sobre o salário bruto)
+export function calcularFGTS(salarioBruto: number): number {
+  return Number((salarioBruto * 0.08).toFixed(2));
 }
 
 // Função para calcular o salário líquido

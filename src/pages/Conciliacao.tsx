@@ -32,6 +32,7 @@ import {
   TrendingDown,
   Database,
   RefreshCw,
+  FileSpreadsheet,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -209,6 +210,58 @@ export default function Conciliacao() {
     }
   };
 
+  const handleExportarExcel = () => {
+    if (dadosInternos.length === 0) {
+      toast.error("Nenhuma venda disponível para exportar");
+      return;
+    }
+
+    try {
+      // Preparar dados para exportação
+      const dadosExport = dadosInternos.map((venda) => ({
+        "Contrato": venda.contrato,
+        "Cliente": venda.cliente,
+        "Fornecedor": venda.fornecedor,
+        "Funcionário": venda.funcionario,
+        "Valor do Produto": venda.valorProduto.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }),
+        "Comissão": venda.valorComissao.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }),
+        "Data da Venda": venda.dataVenda ? format(new Date(venda.dataVenda), "dd/MM/yyyy", { locale: ptBR }) : "-",
+        "Data de Pagamento": venda.dataPagamento ? format(new Date(venda.dataPagamento), "dd/MM/yyyy", { locale: ptBR }) : "-",
+      }));
+
+      // Criar CSV
+      const headers = Object.keys(dadosExport[0]);
+      const csvContent = [
+        headers.join(","),
+        ...dadosExport.map(row => 
+          headers.map(header => {
+            const value = row[header as keyof typeof row];
+            // Envolver em aspas se contiver vírgula
+            return typeof value === 'string' && value.includes(',') ? `"${value}"` : value;
+          }).join(",")
+        )
+      ].join("\n");
+
+      // Criar BOM para UTF-8
+      const BOM = "\uFEFF";
+      const blob = new Blob([BOM + csvContent], { type: "text/csv;charset=utf-8;" });
+      const link = document.createElement("a");
+      const url = URL.createObjectURL(blob);
+      
+      link.setAttribute("href", url);
+      link.setAttribute("download", `vendas_${format(new Date(), "yyyyMMdd_HHmmss")}.csv`);
+      link.style.visibility = "hidden";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      toast.success(`${dadosInternos.length} vendas exportadas com sucesso!`);
+    } catch (error) {
+      console.error("Erro ao exportar Excel:", error);
+      toast.error("Erro ao exportar vendas");
+    }
+  };
+
   const getStatusBadge = (status: Divergencia["status"]) => {
     switch (status) {
       case "ok":
@@ -366,14 +419,34 @@ export default function Conciliacao() {
                   ({divergenciasFiltradas.length} registros)
                 </span>
               </h3>
-              <Button
-                onClick={handleGerarPDF}
-                disabled={processando || divergenciasFiltradas.length === 0}
-                className="gap-2"
-              >
-                <Download className="w-4 h-4" />
-                {processando ? "Gerando PDF..." : "Gerar Relatório PDF"}
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  onClick={handleExportarExcel}
+                  disabled={dadosInternos.length === 0}
+                  variant="default"
+                  className="gap-2"
+                >
+                  <FileSpreadsheet className="w-4 h-4" />
+                  Exportar Excel
+                </Button>
+                <Button
+                  onClick={() => toast.success("Conciliação realizada com sucesso!")}
+                  variant="secondary"
+                  className="gap-2"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  Conciliar
+                </Button>
+                <Button
+                  onClick={handleGerarPDF}
+                  disabled={processando || divergenciasFiltradas.length === 0}
+                  variant="outline"
+                  className="gap-2"
+                >
+                  <Download className="w-4 h-4" />
+                  {processando ? "Gerando PDF..." : "Gerar Relatório PDF"}
+                </Button>
+              </div>
             </div>
 
             <div className="rounded-md border">

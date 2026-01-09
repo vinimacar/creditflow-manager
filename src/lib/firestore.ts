@@ -62,13 +62,18 @@ export async function deleteCliente(id: string) {
 }
 
 export async function getClientes(): Promise<Cliente[]> {
-  const querySnapshot = await getDocs(
-    query(collection(db, clientesCollection), orderBy("createdAt", "desc"))
-  );
-  return querySnapshot.docs.map((doc) => ({
-    id: doc.id,
-    ...doc.data(),
-  })) as Cliente[];
+  try {
+    const querySnapshot = await getDocs(
+      query(collection(db, clientesCollection), orderBy("createdAt", "desc"))
+    );
+    return querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as Cliente[];
+  } catch (error) {
+    console.error("Erro ao buscar clientes:", error);
+    return [];
+  }
 }
 
 export async function getCliente(id: string): Promise<Cliente | null> {
@@ -100,13 +105,18 @@ export interface Venda {
 export const vendasCollection = "vendas";
 
 export async function getVendas(): Promise<Venda[]> {
-  const querySnapshot = await getDocs(
-    query(collection(db, vendasCollection), orderBy("createdAt", "desc"))
-  );
-  return querySnapshot.docs.map((doc) => ({
-    id: doc.id,
-    ...doc.data(),
-  })) as Venda[];
+  try {
+    const querySnapshot = await getDocs(
+      query(collection(db, vendasCollection), orderBy("createdAt", "desc"))
+    );
+    return querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as Venda[];
+  } catch (error) {
+    console.error("Erro ao buscar vendas:", error);
+    return [];
+  }
 }
 
 export async function getVendasPorPeriodo(inicio: Date, fim: Date): Promise<Venda[]> {
@@ -176,13 +186,18 @@ export async function deleteFornecedor(id: string) {
 }
 
 export async function getFornecedores(): Promise<Fornecedor[]> {
-  const querySnapshot = await getDocs(
-    query(collection(db, fornecedoresCollection), orderBy("createdAt", "desc"))
-  );
-  return querySnapshot.docs.map((doc) => ({
-    id: doc.id,
-    ...doc.data(),
-  })) as Fornecedor[];
+  try {
+    const querySnapshot = await getDocs(
+      query(collection(db, fornecedoresCollection), orderBy("createdAt", "desc"))
+    );
+    return querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as Fornecedor[];
+  } catch (error) {
+    console.error("Erro ao buscar fornecedores:", error);
+    return [];
+  }
 }
 
 // ===== FUNCIONÁRIOS =====
@@ -235,13 +250,18 @@ export async function deleteFuncionario(id: string) {
 }
 
 export async function getFuncionarios(): Promise<Funcionario[]> {
-  const querySnapshot = await getDocs(
-    query(collection(db, funcionariosCollection), orderBy("createdAt", "desc"))
-  );
-  return querySnapshot.docs.map((doc) => ({
-    id: doc.id,
-    ...doc.data(),
-  })) as Funcionario[];
+  try {
+    const querySnapshot = await getDocs(
+      query(collection(db, funcionariosCollection), orderBy("createdAt", "desc"))
+    );
+    return querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as Funcionario[];
+  } catch (error) {
+    console.error("Erro ao buscar funcionários:", error);
+    return [];
+  }
 }
 
 // ===== PRODUTOS =====
@@ -283,13 +303,18 @@ export async function deleteProduto(id: string) {
 }
 
 export async function getProdutos(): Promise<Produto[]> {
-  const querySnapshot = await getDocs(
-    query(collection(db, produtosCollection), orderBy("createdAt", "desc"))
-  );
-  return querySnapshot.docs.map((doc) => ({
-    id: doc.id,
-    ...doc.data(),
-  })) as Produto[];
+  try {
+    const querySnapshot = await getDocs(
+      query(collection(db, produtosCollection), orderBy("createdAt", "desc"))
+    );
+    return querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as Produto[];
+  } catch (error) {
+    console.error("Erro ao buscar produtos:", error);
+    return [];
+  }
 }
 
 // ===== USUÁRIOS (USERS) =====
@@ -362,4 +387,179 @@ export async function getUser(userId: string): Promise<UserProfile | null> {
     };
   }
   return null;
+}
+
+// ===== SALÁRIOS VIGENTES =====
+
+export interface SalarioVigente {
+  id?: string;
+  funcionarioId: string;
+  salarioBase: number;
+  dataVigencia: Date;
+  observacao?: string;
+  criadoEm: Date;
+  atualizadoEm: Date;
+}
+
+export const salariosVigentesCollection = "salariosVigentes";
+
+export async function addSalarioVigente(salario: Omit<SalarioVigente, "id">) {
+  try {
+    const docRef = await addDoc(collection(db, salariosVigentesCollection), {
+      ...salario,
+      dataVigencia: Timestamp.fromDate(new Date(salario.dataVigencia)),
+      criadoEm: Timestamp.now(),
+      atualizadoEm: Timestamp.now(),
+    });
+    return docRef.id;
+  } catch (error) {
+    console.error("Erro ao adicionar salário vigente:", error);
+    throw error;
+  }
+}
+
+export async function getSalariosVigentes(): Promise<SalarioVigente[]> {
+  try {
+    const querySnapshot = await getDocs(
+      query(collection(db, salariosVigentesCollection), orderBy("dataVigencia", "desc"))
+    );
+    return querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      funcionarioId: doc.data().funcionarioId,
+      salarioBase: doc.data().salarioBase,
+      dataVigencia: doc.data().dataVigencia?.toDate() || new Date(),
+      observacao: doc.data().observacao,
+      criadoEm: doc.data().criadoEm?.toDate() || new Date(),
+      atualizadoEm: doc.data().atualizadoEm?.toDate() || new Date(),
+    })) as SalarioVigente[];
+  } catch (error) {
+    console.error("Erro ao buscar salários vigentes:", error);
+    return [];
+  }
+}
+
+export async function getSalarioVigentePorFuncionario(funcionarioId: string): Promise<SalarioVigente | null> {
+  try {
+    const querySnapshot = await getDocs(
+      query(
+        collection(db, salariosVigentesCollection),
+        where("funcionarioId", "==", funcionarioId),
+        orderBy("dataVigencia", "desc")
+      )
+    );
+    
+    if (querySnapshot.empty) return null;
+    
+    const doc = querySnapshot.docs[0];
+    return {
+      id: doc.id,
+      funcionarioId: doc.data().funcionarioId,
+      salarioBase: doc.data().salarioBase,
+      dataVigencia: doc.data().dataVigencia?.toDate() || new Date(),
+      observacao: doc.data().observacao,
+      criadoEm: doc.data().criadoEm?.toDate() || new Date(),
+      atualizadoEm: doc.data().atualizadoEm?.toDate() || new Date(),
+    };
+  } catch (error) {
+    console.error("Erro ao buscar salário vigente do funcionário:", error);
+    return null;
+  }
+}
+
+export async function updateSalarioVigente(id: string, salario: Partial<SalarioVigente>) {
+  try {
+    const docRef = doc(db, salariosVigentesCollection, id);
+    const updateData: any = {
+      ...salario,
+      atualizadoEm: Timestamp.now(),
+    };
+    
+    if (salario.dataVigencia) {
+      updateData.dataVigencia = Timestamp.fromDate(new Date(salario.dataVigencia));
+    }
+    
+    await updateDoc(docRef, updateData);
+  } catch (error) {
+    console.error("Erro ao atualizar salário vigente:", error);
+    throw error;
+  }
+}
+
+export async function deleteSalarioVigente(id: string) {
+  try {
+    await deleteDoc(doc(db, salariosVigentesCollection, id));
+  } catch (error) {
+    console.error("Erro ao deletar salário vigente:", error);
+    throw error;
+  }
+}
+
+// ===== DESPESAS =====
+
+export interface Despesa {
+  id?: string;
+  descricao: string;
+  categoria: string;
+  valor: number;
+  dataVencimento: string;
+  dataPagamento?: string;
+  status: "Pago" | "Pendente" | "Atrasado";
+  observacoes?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export const despesasCollection = "despesas";
+
+export async function addDespesa(despesa: Omit<Despesa, "id">) {
+  try {
+    const docRef = await addDoc(collection(db, despesasCollection), {
+      ...despesa,
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+    });
+    return docRef.id;
+  } catch (error) {
+    console.error("Erro ao adicionar despesa:", error);
+    throw error;
+  }
+}
+
+export async function updateDespesa(id: string, despesa: Partial<Despesa>) {
+  try {
+    const docRef = doc(db, despesasCollection, id);
+    await updateDoc(docRef, {
+      ...despesa,
+      updatedAt: Timestamp.now(),
+    });
+  } catch (error) {
+    console.error("Erro ao atualizar despesa:", error);
+    throw error;
+  }
+}
+
+export async function deleteDespesa(id: string) {
+  try {
+    await deleteDoc(doc(db, despesasCollection, id));
+  } catch (error) {
+    console.error("Erro ao deletar despesa:", error);
+    throw error;
+  }
+}
+
+export async function getDespesas(): Promise<Despesa[]> {
+  try {
+    const querySnapshot = await getDocs(
+      query(collection(db, despesasCollection), orderBy("dataVencimento", "desc"))
+    );
+    return querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+      createdAt: doc.data().createdAt?.toDate(),
+      updatedAt: doc.data().updatedAt?.toDate(),
+    })) as Despesa[];
+  } catch (error) {
+    console.error("Erro ao buscar despesas:", error);
+    return [];
+  }
 }

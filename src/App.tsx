@@ -7,6 +7,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { LoginPage } from "@/components/auth/LoginPage";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import Dashboard from "./pages/Dashboard";
 import Clientes from "./pages/Clientes";
 import Fornecedores from "./pages/Fornecedores";
@@ -18,6 +19,7 @@ import Conciliacao from "./pages/Conciliacao";
 import Configuracoes from "./pages/Configuracoes";
 import Usuarios from "./pages/Usuarios";
 import FolhaPagamento from "./pages/FolhaPagamento";
+import Despesas from "./pages/Despesas";
 import AguardandoAprovacao from "./pages/AguardandoAprovacao";
 import NotFound from "./pages/NotFound";
 
@@ -100,6 +102,16 @@ function AppRoutes() {
         }
       />
       <Route
+        path="/despesas"
+        element={
+          <AppLayout>
+            <ProtectedRoute allowedRoles={["admin", "gerente"]}>
+              <Despesas />
+            </ProtectedRoute>
+          </AppLayout>
+        }
+      />
+      <Route
         path="/pdv"
         element={
           <AppLayout>
@@ -112,7 +124,9 @@ function AppRoutes() {
         element={
           <AppLayout>
             <ProtectedRoute allowedRoles={["admin", "gerente"]}>
-              <Relatorios />
+              <ErrorBoundary>
+                <Relatorios />
+              </ErrorBoundary>
             </ProtectedRoute>
           </AppLayout>
         }

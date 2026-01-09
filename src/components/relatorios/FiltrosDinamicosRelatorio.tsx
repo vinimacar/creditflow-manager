@@ -23,10 +23,11 @@ import { DateRange } from "react-day-picker";
 
 export interface FiltrosRelatorio {
   periodo?: DateRange;
-  tipoRelatorio: "vendas" | "funcionarios" | "produtos" | "fornecedores" | "geral";
+  tipoRelatorio: "vendas" | "funcionarios" | "produtos" | "fornecedores" | "despesas" | "receitas" | "lucros" | "geral";
   fornecedor?: string;
   funcionario?: string;
   produto?: string;
+  cliente?: string;
   agrupamento: "dia" | "semana" | "mes" | "ano";
 }
 
@@ -36,6 +37,7 @@ interface FiltrosDinamicosRelatorioProps {
   fornecedores?: string[];
   funcionarios?: string[];
   produtos?: string[];
+  clientes?: string[];
   onGerarRelatorio: () => void;
 }
 
@@ -45,6 +47,7 @@ export function FiltrosDinamicosRelatorio({
   fornecedores = [],
   funcionarios = [],
   produtos = [],
+  clientes = [],
   onGerarRelatorio,
 }: FiltrosDinamicosRelatorioProps) {
   const limparFiltros = () => {
@@ -54,7 +57,7 @@ export function FiltrosDinamicosRelatorio({
     });
   };
 
-  const temFiltrosAtivos = filtros.periodo || filtros.fornecedor || filtros.funcionario || filtros.produto;
+  const temFiltrosAtivos = filtros.periodo || filtros.fornecedor || filtros.funcionario || filtros.produto || filtros.cliente;
 
   return (
     <Card className="p-6">
@@ -99,6 +102,9 @@ export function FiltrosDinamicosRelatorio({
             <SelectContent>
               <SelectItem value="geral">📊 Visão Geral</SelectItem>
               <SelectItem value="vendas">💰 Vendas</SelectItem>
+              <SelectItem value="receitas">💵 Receitas</SelectItem>
+              <SelectItem value="despesas">💸 Despesas</SelectItem>
+              <SelectItem value="lucros">📈 Lucros</SelectItem>
               <SelectItem value="funcionarios">👥 Funcionários</SelectItem>
               <SelectItem value="produtos">📦 Produtos</SelectItem>
               <SelectItem value="fornecedores">🏢 Fornecedores</SelectItem>
@@ -247,6 +253,34 @@ export function FiltrosDinamicosRelatorio({
                 {produtos.map((p) => (
                   <SelectItem key={p} value={p}>
                     {p}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        {/* Cliente */}
+        {clientes.length > 0 && (
+          <div className="space-y-2">
+            <Label>Cliente</Label>
+            <Select
+              value={filtros.cliente || "todos"}
+              onValueChange={(value) =>
+                onFiltrosChange({
+                  ...filtros,
+                  cliente: value === "todos" ? undefined : value,
+                })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Todos" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos</SelectItem>
+                {clientes.map((c) => (
+                  <SelectItem key={c} value={c}>
+                    {c}
                   </SelectItem>
                 ))}
               </SelectContent>

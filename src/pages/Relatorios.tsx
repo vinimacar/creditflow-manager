@@ -19,7 +19,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { getVendas, getFuncionarios, getProdutos, getFornecedores, type Venda, type Funcionario, type Produto, type Fornecedor } from "@/lib/firestore";
+import { getVendas, getFuncionarios, getProdutos, getFornecedores, getClientes, getDespesas, type Venda, type Funcionario, type Produto, type Fornecedor, type Cliente, type Despesa } from "@/lib/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface DadosRelatorio {
@@ -27,6 +27,10 @@ interface DadosRelatorio {
   funcionarios: Array<{ nome: string; vendas: number; comissao: number }>;
   produtos: Array<{ nome: string; valor: number }>;
   fornecedores: Array<{ nome: string; valor: number }>;
+  clientes: Array<{ nome: string; vendas: number; valor: number }>;
+  despesas: Array<{ mes: string; valor: number; quantidade: number }>;
+  receitas: Array<{ mes: string; valor: number }>;
+  lucros: Array<{ mes: string; valor: number }>;
 }
 
 export default function Relatorios() {
@@ -39,21 +43,49 @@ export default function Relatorios() {
   const [dadosRelatorio, setDadosRelatorio] = useState<DadosRelatorio | null>(null);
 
   useEffect(() => {
-    carregarDados();
+    let mounted = true;
+    const abortController = new AbortController();
+
+    const loadData = async () => {
+      try {
+        await carregarDados(mounted);
+      } catch (error) {
+        if (mounted && !abortController.signal.aborted) {
+          console.error("Erro ao carregar dados:", error);
+          toast.error("Erro ao carregar dados do relatório");
+        }
+      }
+    };
+
+    loadData();
+
+    return () => {
+      mounted = false;
+      abortController.abort();
+    };
   }, []);
 
-  const carregarDados = async () => {
-    setLoading(true);
+  const carregarDados = async (mounted = true) => {
     try {
-      const [vendas, funcionarios, produtos, fornecedores] = await Promise.all([
-        getVendas().catch(() => []),
-        getFuncionarios().catch(() => []),
-        getProdutos().catch(() => []),
-        getFornecedores().catch(() => []),
-      ]);
+      const [vendas, funcionarios, produtos, fornecedores, clientes, despesas] = await Promise.all([
+        getVendas(),
+        getFuncionarios(),
+        getProdutos(),
+        getFornecedores(),
+        getClientes(),
+        getDespesas(),
+      ]).catch(err => {
+        console.error("Erro ao buscar dados:", err);
+        throw err;
+      });
+
+      if (!mounted) return;
 
       // Gerar dados de vendas por mês (últimos 6 meses)
       const vendasPorMes: Array<{ mes: string; valor: number; quantidade: number }> = [];
+      const despesasPorMes: Array<{ mes: string; valor: number; quantidade: number }> = [];
+      const receitasPorMes: Array<{ mes: string; valor: number }> = [];
+      const lucrosPorMes: Array<{ mes: string; valor: number }> = [];
       const agora = new Date();
       
       for (let i = 5; i >= 0; i--) {
@@ -62,29 +94,48 @@ export default function Relatorios() {
         const fimMes = endOfMonth(mesData);
         
         const vendasDoMes = vendas.filter((v) => {
-          try {
-            const dataVenda = v.createdAt?.toDate?.() || new Date(v.createdAt);
-            return dataVenda >= inicioMes && dataVenda <= fimMes;
-          } catch {
-            return false;
-          }
+          const dataVenda = v.createdAt?.toDate?.() || new Date(v.createdAt);
+          return dataVenda >= inicioMes && dataVenda <= fimMes;
         });
+
+        const despesasDoMes = despesas.filter((d) => {
+          const dataDespesa = new Date(d.dataVencimento);
+          return dataDespesa >= inicioMes && dataDespesa <= fimMes;
+        });
+
+        const valorVendas = vendasDoMes.reduce((sum, v) => sum + v.valorContrato, 0);
+        const valorDespesas = despesasDoMes.reduce((sum, d) => sum + d.valor, 0);
         
         vendasPorMes.push({
           mes: format(mesData, "MMM", { locale: ptBR }),
-          valor: vendasDoMes.reduce((sum, v) => sum + (v.valorContrato || 0), 0),
+          valor: valorVendas,
           quantidade: vendasDoMes.length,
+        });
+
+        despesasPorMes.push({
+          mes: format(mesData, "MMM", { locale: ptBR }),
+          valor: valorDespesas,
+          quantidade: despesasDoMes.length,
+        });
+
+        receitasPorMes.push({
+          mes: format(mesData, "MMM", { locale: ptBR }),
+          valor: valorVendas,
+        });
+
+        lucrosPorMes.push({
+          mes: format(mesData, "MMM", { locale: ptBR }),
+          valor: valorVendas - valorDespesas,
         });
       }
 
       // Calcular vendas por funcionário
       const vendaPorFunc = new Map<string, { vendas: number; comissao: number }>();
       vendas.forEach((venda) => {
-        if (!venda.funcionarioId) return;
         const current = vendaPorFunc.get(venda.funcionarioId) || { vendas: 0, comissao: 0 };
         vendaPorFunc.set(venda.funcionarioId, {
           vendas: current.vendas + 1,
-          comissao: current.comissao + (venda.comissao || 0),
+          comissao: current.comissao + venda.comissao,
         });
       });
 
@@ -103,9 +154,8 @@ export default function Relatorios() {
       // Calcular vendas por produto
       const vendaPorProd = new Map<string, number>();
       vendas.forEach((venda) => {
-        if (!venda.produtoId) return;
         const current = vendaPorProd.get(venda.produtoId) || 0;
-        vendaPorProd.set(venda.produtoId, current + (venda.valorContrato || 0));
+        vendaPorProd.set(venda.produtoId, current + venda.valorContrato);
       });
 
       const produtosData = Array.from(vendaPorProd.entries())
@@ -121,44 +171,68 @@ export default function Relatorios() {
 
       // Mock de fornecedores (pode ser melhorado com dados reais se disponível)
       const fornecedoresData = fornecedores.slice(0, 4).map((f) => ({
-        nome: f.razaoSocial || "Desconhecido",
+        nome: f.razaoSocial,
         valor: Math.random() * 300000 + 100000, // Valores simulados
       }));
 
-      setDadosRelatorio({
-        vendas: vendasPorMes,
-        funcionarios: funcionariosData.length > 0 ? funcionariosData : [{ nome: "Sem dados", vendas: 0, comissao: 0 }],
-        produtos: produtosData.length > 0 ? produtosData : [{ nome: "Sem dados", valor: 0 }],
-        fornecedores: fornecedoresData.length > 0 ? fornecedoresData : [{ nome: "Sem dados", valor: 0 }],
+      // Calcular vendas por cliente
+      const vendaPorCliente = new Map<string, { vendas: number; valor: number }>();
+      vendas.forEach((venda) => {
+        const current = vendaPorCliente.get(venda.clienteId) || { vendas: 0, valor: 0 };
+        vendaPorCliente.set(venda.clienteId, {
+          vendas: current.vendas + 1,
+          valor: current.valor + venda.valorContrato,
+        });
       });
+
+      const clientesData = Array.from(vendaPorCliente.entries())
+        .map(([id, stats]) => {
+          const cliente = clientes.find((c) => c.id === id);
+          return {
+            nome: cliente?.nome || "Desconhecido",
+            vendas: stats.vendas,
+            valor: stats.valor,
+          };
+        })
+        .sort((a, b) => b.valor - a.valor)
+        .slice(0, 10);
+
+      if (mounted) {
+        setDadosRelatorio({
+          vendas: vendasPorMes,
+          funcionarios: funcionariosData,
+          produtos: produtosData,
+          fornecedores: fornecedoresData,
+          clientes: clientesData,
+          despesas: despesasPorMes,
+          receitas: receitasPorMes,
+          lucros: lucrosPorMes,
+        });
+      }
     } catch (error) {
       console.error("Erro ao carregar dados do relatório:", error);
-      toast.error("Erro ao carregar dados do relatório");
-      // Definir dados vazios para evitar crashes
-      setDadosRelatorio({
-        vendas: [],
-        funcionarios: [{ nome: "Sem dados", vendas: 0, comissao: 0 }],
-        produtos: [{ nome: "Sem dados", valor: 0 }],
-        fornecedores: [{ nome: "Sem dados", valor: 0 }],
-      });
+      if (mounted) {
+        toast.error("Erro ao carregar dados do relatório");
+      }
     } finally {
-      setLoading(false);
+      if (mounted) {
+        setLoading(false);
+      }
     }
   };
 
   const estatisticas = useMemo(() => {
     if (!dadosRelatorio) return null;
     
-    const totalVendas = dadosRelatorio.vendas.reduce((sum, v) => sum + (v.valor || 0), 0);
-    const totalAnterior = dadosRelatorio.vendas.slice(0, -1).reduce((sum, v) => sum + (v.valor || 0), 0);
+    const totalVendas = dadosRelatorio.vendas.reduce((sum, v) => sum + v.valor, 0);
+    const totalAnterior = dadosRelatorio.vendas.slice(0, -1).reduce((sum, v) => sum + v.valor, 0);
     const crescimento = totalAnterior > 0 ? ((totalVendas - totalAnterior) / totalAnterior) * 100 : 0;
-    const totalQuantidade = dadosRelatorio.vendas.reduce((sum, v) => sum + (v.quantidade || 0), 0);
 
     return {
       totalVendas,
       crescimento,
-      ticketMedio: totalQuantidade > 0 ? totalVendas / totalQuantidade : 0,
-      totalFuncionarios: dadosRelatorio.funcionarios.filter(f => f.vendas > 0).length,
+      ticketMedio: totalVendas / dadosRelatorio.vendas.reduce((sum, v) => sum + v.quantidade, 0) || 0,
+      totalFuncionarios: dadosRelatorio.funcionarios.length,
       produtoMaisVendido: dadosRelatorio.produtos[0]?.nome || "N/A",
     };
   }, [dadosRelatorio]);
@@ -195,10 +269,6 @@ export default function Relatorios() {
     }
     
     setGerando(true);
-    
-    // Usar setTimeout para evitar conflitos com message channels
-    await new Promise(resolve => setTimeout(resolve, 100));
-    
     try {
       const doc = new jsPDF();
       const pageWidth = doc.internal.pageSize.getWidth();
@@ -235,47 +305,63 @@ export default function Relatorios() {
       });
 
       // Vendas por Funcionário
-      if (dadosRelatorio.funcionarios.length > 0 && dadosRelatorio.funcionarios[0].vendas > 0) {
-        doc.addPage();
-        y = 20;
-        doc.setFontSize(14);
-        doc.setFont("helvetica", "bold");
-        doc.text("Desempenho por Funcionário", 14, y);
+      doc.addPage();
+      y = 20;
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.text("Desempenho por Funcionário", 14, y);
 
-        y += 10;
-        autoTable(doc, {
-          startY: y,
-          head: [["Funcionário", "Vendas", "Comissão"]],
-          body: dadosRelatorio.funcionarios.map(f => [
-            f.nome,
-            f.vendas.toString(),
-            `R$ ${f.comissao.toLocaleString("pt-BR")}`,
-          ]),
-          theme: "striped",
-          headStyles: { fillColor: [59, 130, 246] },
-        });
-      }
+      y += 10;
+      autoTable(doc, {
+        startY: y,
+        head: [["Funcionário", "Vendas", "Comissão"]],
+        body: dadosRelatorio.funcionarios.map(f => [
+          f.nome,
+          f.vendas.toString(),
+          `R$ ${f.comissao.toLocaleString("pt-BR")}`,
+        ]),
+        theme: "striped",
+        headStyles: { fillColor: [59, 130, 246] },
+      });
 
       // Vendas por Produto
-      if (dadosRelatorio.produtos.length > 0 && dadosRelatorio.produtos[0].valor > 0) {
-        doc.addPage();
-        y = 20;
-        doc.setFontSize(14);
-        doc.setFont("helvetica", "bold");
-        doc.text("Vendas por Produto", 14, y);
+      doc.addPage();
+      y = 20;
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.text("Vendas por Produto", 14, y);
 
-        y += 10;
-        autoTable(doc, {
-          startY: y,
-          head: [["Produto", "Valor Total"]],
-          body: dadosRelatorio.produtos.map(p => [
-            p.nome,
-            `R$ ${p.valor.toLocaleString("pt-BR")}`,
-          ]),
-          theme: "striped",
-          headStyles: { fillColor: [59, 130, 246] },
-        });
-      }
+      y += 10;
+      autoTable(doc, {
+        startY: y,
+        head: [["Produto", "Valor Total"]],
+        body: dadosRelatorio.produtos.map(p => [
+          p.nome,
+          `R$ ${p.valor.toLocaleString("pt-BR")}`,
+        ]),
+        theme: "striped",
+        headStyles: { fillColor: [59, 130, 246] },
+      });
+
+      // Top 10 Clientes
+      doc.addPage();
+      y = 20;
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.text("Top 10 Clientes", 14, y);
+
+      y += 10;
+      autoTable(doc, {
+        startY: y,
+        head: [["Cliente", "Qtd. Vendas", "Valor Total"]],
+        body: dadosRelatorio.clientes.map(c => [
+          c.nome,
+          c.vendas.toString(),
+          `R$ ${c.valor.toLocaleString("pt-BR")}`,
+        ]),
+        theme: "striped",
+        headStyles: { fillColor: [59, 130, 246] },
+      });
 
       // Rodapé
       const pageCount = doc.getNumberOfPages();
@@ -292,9 +378,10 @@ export default function Relatorios() {
 
       doc.save(`relatorio_${format(new Date(), "yyyyMMdd_HHmmss")}.pdf`);
       toast.success("Relatório exportado com sucesso!");
-    } catch (error) {
-      console.error("Erro ao gerar PDF:", error);
-      toast.error("Erro ao gerar o relatório");
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Erro desconhecido";
+      console.error("Erro ao gerar PDF:", errorMessage, error);
+      toast.error("Erro ao gerar o relatório. Tente novamente.");
     } finally {
       setGerando(false);
     }
@@ -384,12 +471,24 @@ export default function Relatorios() {
         fornecedores={dadosRelatorio!.fornecedores.map(f => f.nome)}
         funcionarios={dadosRelatorio!.funcionarios.map(f => f.nome)}
         produtos={dadosRelatorio!.produtos.map(p => p.nome)}
+        clientes={dadosRelatorio!.clientes.map(c => c.nome)}
         onGerarRelatorio={handleGerarRelatorio}
       />
 
       {/* Ações */}
       <div className="flex gap-3 justify-end">
-        <Button variant="outline" className="gap-2" onClick={() => window.print()}>
+        <Button 
+          variant="outline" 
+          className="gap-2" 
+          onClick={() => {
+            try {
+              window.print();
+            } catch (error) {
+              console.error("Erro ao imprimir:", error);
+              toast.error("Erro ao abrir impressão");
+            }
+          }}
+        >
           <Printer className="w-4 h-4" />
           Imprimir
         </Button>
@@ -412,6 +511,47 @@ export default function Relatorios() {
         />
 
         <GraficoModerno
+          titulo="Vendas por Produto"
+          tipo="pizza"
+          dados={{
+            labels: dadosRelatorio!.produtos.map(p => p.nome),
+            valores: dadosRelatorio!.produtos.map(p => p.valor),
+          }}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <GraficoModerno
+          titulo="Receitas x Despesas"
+          tipo="barra"
+          dados={{
+            labels: dadosRelatorio!.receitas.map(r => r.mes),
+            valores: dadosRelatorio!.receitas.map(r => r.valor),
+            comparacao: dadosRelatorio!.despesas.map(d => d.valor),
+          }}
+        />
+
+        <GraficoModerno
+          titulo="Evolução de Lucros"
+          tipo="linha"
+          dados={{
+            labels: dadosRelatorio!.lucros.map(l => l.mes),
+            valores: dadosRelatorio!.lucros.map(l => l.valor),
+          }}
+        />
+
+        <GraficoModerno
+          titulo="Despesas por Período"
+          tipo="barra"
+          dados={{
+            labels: dadosRelatorio!.despesas.map(d => d.mes),
+            valores: dadosRelatorio!.despesas.map(d => d.valor),
+          }}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <GraficoModerno
           titulo="Desempenho por Funcionário"
           tipo="barra"
           dados={{
@@ -421,20 +561,20 @@ export default function Relatorios() {
         />
 
         <GraficoModerno
-          titulo="Vendas por Produto"
-          tipo="pizza"
-          dados={{
-            labels: dadosRelatorio!.produtos.map(p => p.nome),
-            valores: dadosRelatorio!.produtos.map(p => p.valor),
-          }}
-        />
-
-        <GraficoModerno
           titulo="Vendas por Fornecedor"
           tipo="barra"
           dados={{
             labels: dadosRelatorio!.fornecedores.map(f => f.nome.replace("Banco ", "")),
             valores: dadosRelatorio!.fornecedores.map(f => f.valor),
+          }}
+        />
+
+        <GraficoModerno
+          titulo="Top 10 Clientes"
+          tipo="barra"
+          dados={{
+            labels: dadosRelatorio!.clientes.map(c => c.nome.split(" ")[0]),
+            valores: dadosRelatorio!.clientes.map(c => c.valor),
           }}
         />
       </div>

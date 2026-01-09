@@ -16,6 +16,7 @@ import {
   Wallet,
   Shield,
   DollarSign,
+  Receipt,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -29,6 +30,7 @@ const menuItems = [
   { icon: Package, label: "Produtos", path: "/produtos", roles: ["admin", "gerente"] },
   { icon: UserCog, label: "Funcionários", path: "/funcionarios", roles: ["admin", "gerente", "agente", "atendente"] },
   { icon: DollarSign, label: "Folha de Pagamento", path: "/folha-pagamento", roles: ["admin", "gerente"] },
+  { icon: Receipt, label: "Despesas", path: "/despesas", roles: ["admin", "gerente"] },
   { icon: ShoppingCart, label: "PDV", path: "/pdv", roles: ["admin", "gerente", "agente", "atendente"] },
   { icon: FileBarChart, label: "Relatórios", path: "/relatorios", roles: ["admin", "gerente"] },
   { icon: Scale, label: "Conciliação", path: "/conciliacao", roles: ["admin", "gerente"] },

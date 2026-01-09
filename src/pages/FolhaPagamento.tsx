@@ -28,11 +28,20 @@ import {
 } from "@/components/ui/popover";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { CalendarIcon, DollarSign, Download, Plus, Eye } from "lucide-react";
+import { CalendarIcon, DollarSign, Download, Plus, Eye, Pencil, Trash2, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { collection, addDoc, query, where, getDocs, updateDoc, doc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { getFuncionarios, type Funcionario } from "@/lib/firestore";
+import { 
+  getFuncionarios, 
+  getSalariosVigentes,
+  getSalarioVigentePorFuncionario,
+  addSalarioVigente,
+  updateSalarioVigente,
+  deleteSalarioVigente,
+  type Funcionario,
+  type SalarioVigente
+} from "@/lib/firestore";
 import {
   FolhaPagamento as FolhaPagamentoType,
   Proventos,
@@ -40,17 +49,20 @@ import {
   calcularINSS,
   calcularIRRF,
   calcularValeTransporte,
+  calcularFGTS,
   calcularSalarioLiquido,
 } from "@/types/folhaPagamento";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
 import jsPDF from "jspdf";
 
 export default function FolhaPagamento() {
   const [funcionarios, setFuncionarios] = useState<Funcionario[]>([]);
   const [folhas, setFolhas] = useState<FolhaPagamentoType[]>([]);
+  const [salariosVigentes, setSalariosVigentes] = useState<SalarioVigente[]>([]);
   const [loading, setLoading] = useState(true);
   const [mesReferencia, setMesReferencia] = useState(new Date());
   const [processando, setProcessando] = useState(false);
@@ -58,6 +70,7 @@ export default function FolhaPagamento() {
   // Estados para nova folha
   const [novaFolhaDialog, setNovaFolhaDialog] = useState(false);
   const [funcionarioSelecionado, setFuncionarioSelecionado] = useState("");
+  const [salarioBaseAtual, setSalarioBaseAtual] = useState(0);
   const [horasExtras, setHorasExtras] = useState(0);
   const [comissoes, setComissoes] = useState(0);
   const [bonus, setBonus] = useState(0);
@@ -71,6 +84,13 @@ export default function FolhaPagamento() {
   const [optouVT, setOptouVT] = useState(true);
   const [custoVT, setCustoVT] = useState(0);
 
+  // Estados para gerenciar salário vigente
+  const [salarioDialog, setSalarioDialog] = useState(false);
+  const [novoSalarioFuncId, setNovoSalarioFuncId] = useState("");
+  const [novoSalarioValor, setNovoSalarioValor] = useState(0);
+  const [novoSalarioData, setNovoSalarioData] = useState<Date>(new Date());
+  const [novoSalarioObs, setNovoSalarioObs] = useState("");
+
   useEffect(() => {
     carregarDados();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -79,8 +99,13 @@ export default function FolhaPagamento() {
   const carregarDados = async () => {
     setLoading(true);
     try {
-      const funcs = await getFuncionarios();
+      const [funcs, salarios] = await Promise.all([
+        getFuncionarios(),
+        getSalariosVigentes()
+      ]);
+      
       setFuncionarios(funcs);
+      setSalariosVigentes(salarios);
 
       const mesInicio = format(startOfMonth(mesReferencia), "yyyy-MM");
       const mesFim = format(endOfMonth(mesReferencia), "yyyy-MM");
@@ -123,9 +148,13 @@ export default function FolhaPagamento() {
         return;
       }
 
+      // Buscar salário vigente do funcionário
+      const salarioVigente = await getSalarioVigentePorFuncionario(funcionarioSelecionado);
+      const salarioBase = salarioVigente?.salarioBase || funcionario.salario || 0;
+
       // Calcular proventos
       const proventos: Proventos = {
-        salarioBase: funcionario.salario || 0,
+        salarioBase,
         horasExtras,
         comissoes,
         bonus,
@@ -170,6 +199,7 @@ export default function FolhaPagamento() {
         descontos.outros;
 
       const salarioLiquido = calcularSalarioLiquido(proventos, descontos);
+      const fgts = calcularFGTS(proventos.total);
 
       const folha: Omit<FolhaPagamentoType, "id"> = {
         funcionarioId: funcionarioSelecionado,
@@ -178,6 +208,7 @@ export default function FolhaPagamento() {
         proventos,
         descontos,
         salarioLiquido,
+        fgts,
         status: "processada",
         criadoEm: new Date(),
         atualizadoEm: new Date(),
