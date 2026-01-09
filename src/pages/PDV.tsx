@@ -185,7 +185,7 @@ export default function PDV() {
     }
 
     const cliente = clientes.find((c) => c.id === selectedCliente);
-    const produtoInfo = produtos.find((p) => c.id === selectedProduto);
+    const produtoInfo = produtos.find((p) => p.id === selectedProduto);
     const funcionario = funcionarios.find((f) => f.id === selectedFuncionario);
 
     const doc = new jsPDF();
@@ -243,7 +243,7 @@ export default function PDV() {
     y += 7;
     doc.text(`Taxa de Juros: ${produtoInfo?.taxaJuros || ""}%`, 25, y);
     y += 7;
-    doc.text(`Comissão: ${comissao}%`, 25, y);
+    doc.text(`Comissão: ${comissaoPerc}%`, 25, y);
     
     // DADOS DA VENDA
     y += 15;
@@ -263,7 +263,7 @@ export default function PDV() {
     const valorParcela = parseFloat(valorContrato) / parseInt(prazo);
     doc.text(`Valor da Parcela: R$ ${valorParcela.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`, 25, y);
     y += 7;
-    const valorComissao = (parseFloat(valorContrato) * parseFloat(comissao)) / 100;
+    const valorComissao = (parseFloat(valorContrato) * comissaoPerc) / 100;
     doc.text(`Valor da Comissão: R$ ${valorComissao.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`, 25, y);
     y += 7;
     doc.text(`Data da Venda: ${new Date().toLocaleDateString("pt-BR")}`, 25, y);

@@ -28,11 +28,12 @@ export function LoginPage() {
     try {
       await signInWithEmailAndPassword(auth, email, password);
       toast.success("Login realizado com sucesso!");
-    } catch (error: any) {
+    } catch (error) {
       console.error("Erro no login:", error);
-      if (error.code === "auth/user-not-found" || error.code === "auth/wrong-password") {
+      const firebaseError = error as { code?: string };
+      if (firebaseError.code === "auth/user-not-found" || firebaseError.code === "auth/wrong-password") {
         toast.error("Email ou senha incorretos");
-      } else if (error.code === "auth/invalid-email") {
+      } else if (firebaseError.code === "auth/invalid-email") {
         toast.error("Email inválido");
       } else {
         toast.error("Erro ao fazer login");
