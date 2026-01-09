@@ -450,15 +450,14 @@ export async function getSalarioVigentePorFuncionario(funcionarioId: string): Pr
     const querySnapshot = await getDocs(
       query(
         collection(db, salariosVigentesCollection),
-        where("funcionarioId", "==", funcionarioId),
-        orderBy("dataVigencia", "desc")
+        where("funcionarioId", "==", funcionarioId)
       )
     );
     
     if (querySnapshot.empty) return null;
     
-    const doc = querySnapshot.docs[0];
-    return {
+    // Ordenar localmente por data de vigência (mais recente primeiro)
+    const salarios = querySnapshot.docs.map(doc => ({
       id: doc.id,
       funcionarioId: doc.data().funcionarioId,
       salarioBase: doc.data().salarioBase,
@@ -466,7 +465,11 @@ export async function getSalarioVigentePorFuncionario(funcionarioId: string): Pr
       observacao: doc.data().observacao,
       criadoEm: doc.data().criadoEm?.toDate() || new Date(),
       atualizadoEm: doc.data().atualizadoEm?.toDate() || new Date(),
-    };
+    }));
+    
+    salarios.sort((a, b) => b.dataVigencia.getTime() - a.dataVigencia.getTime());
+    
+    return salarios[0];
   } catch (error) {
     console.error("Erro ao buscar salário vigente do funcionário:", error);
     return null;

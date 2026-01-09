@@ -484,46 +484,60 @@ export default function FolhaPagamento() {
     // Código dos eventos (exemplo)
     const eventos: Array<{cod: string, nome: string, ref: string, venc: number, desc: number}> = [];
     
-    if (folha.proventos.salarioBase > 0) {
-      eventos.push({cod: "001", nome: "SALÁRIO", ref: "30", venc: folha.proventos.salarioBase, desc: 0});
+    const salarioBaseValor = Number(folha.proventos.salarioBase) || 0;
+    const bonusValor = Number(folha.proventos.bonus) || 0;
+    const horasExtrasValor = Number(folha.proventos.horasExtras) || 0;
+    const comissoesValor = Number(folha.proventos.comissoes) || 0;
+    const adicionalNoturnoValor = Number(folha.proventos.adicionalNoturno) || 0;
+    const insalubridadeValor = Number(folha.proventos.insalubridade) || 0;
+    const periculosidadeValor = Number(folha.proventos.periculosidade) || 0;
+    const inssValor = Number(folha.descontos.inss) || 0;
+    const valeTransporteValor = Number(folha.descontos.valeTransporte) || 0;
+    const valeRefeicaoValor = Number(folha.descontos.valeRefeicao) || 0;
+    const planoDeSaudeValor = Number(folha.descontos.planoDeSaude) || 0;
+    const irrfValor = Number(folha.descontos.irrf) || 0;
+    const outrosValor = Number(folha.descontos.outros) || 0;
+    
+    if (salarioBaseValor > 0) {
+      eventos.push({cod: "001", nome: "SALÁRIO", ref: "30", venc: salarioBaseValor, desc: 0});
     }
-    if (folha.proventos.bonus > 0) {
-      eventos.push({cod: "112", nome: "SALÁRIO FAMÍLIA", ref: "0", venc: folha.proventos.bonus, desc: 0});
+    if (bonusValor > 0) {
+      eventos.push({cod: "112", nome: "SALÁRIO FAMÍLIA", ref: "0", venc: bonusValor, desc: 0});
     }
-    if (folha.proventos.horasExtras > 0) {
-      eventos.push({cod: "", nome: "HORAS EXTRAS", ref: "", venc: folha.proventos.horasExtras, desc: 0});
+    if (horasExtrasValor > 0) {
+      eventos.push({cod: "", nome: "HORAS EXTRAS", ref: "", venc: horasExtrasValor, desc: 0});
     }
-    if (folha.proventos.comissoes > 0) {
-      eventos.push({cod: "", nome: "COMISSÕES", ref: "", venc: folha.proventos.comissoes, desc: 0});
+    if (comissoesValor > 0) {
+      eventos.push({cod: "", nome: "COMISSÕES", ref: "", venc: comissoesValor, desc: 0});
     }
-    if (folha.proventos.adicionalNoturno > 0) {
-      eventos.push({cod: "", nome: "ADICIONAL NOTURNO", ref: "", venc: folha.proventos.adicionalNoturno, desc: 0});
+    if (adicionalNoturnoValor > 0) {
+      eventos.push({cod: "", nome: "ADICIONAL NOTURNO", ref: "", venc: adicionalNoturnoValor, desc: 0});
     }
-    if (folha.proventos.insalubridade > 0) {
-      eventos.push({cod: "", nome: "INSALUBRIDADE", ref: "", venc: folha.proventos.insalubridade, desc: 0});
+    if (insalubridadeValor > 0) {
+      eventos.push({cod: "", nome: "INSALUBRIDADE", ref: "", venc: insalubridadeValor, desc: 0});
     }
-    if (folha.proventos.periculosidade > 0) {
-      eventos.push({cod: "", nome: "PERICULOSIDADE", ref: "", venc: folha.proventos.periculosidade, desc: 0});
+    if (periculosidadeValor > 0) {
+      eventos.push({cod: "", nome: "PERICULOSIDADE", ref: "", venc: periculosidadeValor, desc: 0});
     }
     
     // Descontos
-    if (folha.descontos.inss > 0) {
-      eventos.push({cod: "108", nome: "INSS", ref: "0", venc: 0, desc: folha.descontos.inss});
+    if (inssValor > 0) {
+      eventos.push({cod: "108", nome: "INSS", ref: "0", venc: 0, desc: inssValor});
     }
-    if (folha.descontos.valeTransporte > 0) {
-      eventos.push({cod: "107", nome: "VALE TRANSPORTE", ref: "0", venc: 0, desc: folha.descontos.valeTransporte});
+    if (valeTransporteValor > 0) {
+      eventos.push({cod: "107", nome: "VALE TRANSPORTE", ref: "0", venc: 0, desc: valeTransporteValor});
     }
-    if (folha.descontos.valeRefeicao > 0) {
-      eventos.push({cod: "187", nome: "ALIMENTAÇÃO", ref: "0", venc: 0, desc: folha.descontos.valeRefeicao});
+    if (valeRefeicaoValor > 0) {
+      eventos.push({cod: "187", nome: "ALIMENTAÇÃO", ref: "0", venc: 0, desc: valeRefeicaoValor});
     }
-    if (folha.descontos.planoDeSaude > 0) {
-      eventos.push({cod: "", nome: "PLANO DE SAÚDE", ref: "", venc: 0, desc: folha.descontos.planoDeSaude});
+    if (planoDeSaudeValor > 0) {
+      eventos.push({cod: "", nome: "PLANO DE SAÚDE", ref: "", venc: 0, desc: planoDeSaudeValor});
     }
-    if (folha.descontos.irrf > 0) {
-      eventos.push({cod: "", nome: "IRRF", ref: "", venc: 0, desc: folha.descontos.irrf});
+    if (irrfValor > 0) {
+      eventos.push({cod: "", nome: "IRRF", ref: "", venc: 0, desc: irrfValor});
     }
-    if (folha.descontos.outros > 0) {
-      eventos.push({cod: "106", nome: "DIFERENÇA SAL", ref: "", venc: 0, desc: folha.descontos.outros});
+    if (outrosValor > 0) {
+      eventos.push({cod: "106", nome: "DIFERENÇA SAL", ref: "", venc: 0, desc: outrosValor});
     }
 
     // Renderizar eventos
@@ -571,8 +585,10 @@ export default function FolhaPagamento() {
     pdf.text("Total de Descontos", 132, currentY);
     
     pdf.setFontSize(9);
-    pdf.text(folha.proventos.total.toFixed(2), 100, currentY + 5);
-    pdf.text(folha.descontos.total.toFixed(2), 132, currentY + 5);
+    const totalProventos = Number(folha.proventos.total) || 0;
+    const totalDescontos = Number(folha.descontos.total) || 0;
+    pdf.text(totalProventos.toFixed(2), 100, currentY + 5);
+    pdf.text(totalDescontos.toFixed(2), 132, currentY + 5);
 
     // Valor Líquido com seta
     currentY += 12;
@@ -587,21 +603,24 @@ export default function FolhaPagamento() {
     
     pdf.setFontSize(11);
     pdf.setFont(undefined, "bold");
-    pdf.text(folha.salarioLiquido.toFixed(2), 120, currentY);
+    const salarioLiquido = Number(folha.salarioLiquido) || 0;
+    pdf.text(salarioLiquido.toFixed(2), 120, currentY);
 
     // Rodapé com informações adicionais
     currentY += 10;
     pdf.setFontSize(8);
     pdf.setFont(undefined, "normal");
     
-    const baseFGTS = folha.proventos.total;
+    const baseFGTS = Number(folha.proventos.total) || 0;
     const fgtsMes = baseFGTS * 0.08;
+    const salarioBasePdf = Number(folha.proventos.salarioBase) || 0;
+    const inssDescontoPdf = Number(folha.descontos.inss) || 0;
     
-    pdf.text(`Salário Base: ${folha.proventos.salarioBase.toFixed(2)}`, 15, currentY);
-    pdf.text(`Salário Contr. INSS: ${(folha.proventos.total - folha.descontos.inss).toFixed(2)}`, 60, currentY);
+    pdf.text(`Salário Base: ${salarioBasePdf.toFixed(2)}`, 15, currentY);
+    pdf.text(`Salário Contr. INSS: ${(baseFGTS - inssDescontoPdf).toFixed(2)}`, 60, currentY);
     pdf.text(`Base FGTS: ${baseFGTS.toFixed(2)}`, 110, currentY);
     pdf.text(`FGTS do Mês: ${fgtsMes.toFixed(2)}`, 145, currentY);
-    pdf.text(`Base Calc.: ${folha.proventos.total.toFixed(2)}`, 175, currentY);
+    pdf.text(`Base Calc.: ${baseFGTS.toFixed(2)}`, 175, currentY);
 
     // Data de geração
     currentY += 10;
