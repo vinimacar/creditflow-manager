@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { Upload, FileSpreadsheet } from "lucide-react";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
@@ -23,9 +24,10 @@ interface ExcelRow {
 interface ImportarExcelProps {
   onImport: (dados: DadosExcel[]) => void;
   tipo: "interno" | "fornecedor";
+  apenasButton?: boolean;
 }
 
-export function ImportarExcel({ onImport, tipo }: ImportarExcelProps) {
+export function ImportarExcel({ onImport, tipo, apenasButton = false }: ImportarExcelProps) {
   const [uploading, setUploading] = useState(false);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -98,7 +100,7 @@ export function ImportarExcel({ onImport, tipo }: ImportarExcelProps) {
     }
   };
 
-  return (
+  const botaoUpload = (
     <div>
       <input
         type="file"
@@ -110,7 +112,7 @@ export function ImportarExcel({ onImport, tipo }: ImportarExcelProps) {
       <label htmlFor={`file-upload-${tipo}`}>
         <Button
           type="button"
-          variant={tipo === "interno" ? "default" : "outline"}
+          variant={tipo === "interno" ? "outline" : "outline"}
           className="gap-2 w-full"
           disabled={uploading}
           asChild
@@ -121,10 +123,35 @@ export function ImportarExcel({ onImport, tipo }: ImportarExcelProps) {
             ) : (
               <FileSpreadsheet className="w-4 h-4" />
             )}
-            {uploading ? "Importando..." : `Importar ${tipo === "interno" ? "Dados Internos" : "Relatório Fornecedor"}`}
+            {uploading ? "Importando..." : `Importar Excel`}
           </span>
         </Button>
       </label>
     </div>
+  );
+
+  if (apenasButton) {
+    return botaoUpload;
+  }
+
+  return (
+    <Card className="p-6">
+      <div className="space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-primary/10 rounded-lg">
+            <FileSpreadsheet className="w-5 h-5 text-primary" />
+          </div>
+          <div>
+            <h3 className="font-semibold">
+              {tipo === "interno" ? "Dados Internos" : "Relatório Fornecedor"}
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              Importe uma planilha Excel
+            </p>
+          </div>
+        </div>
+        {botaoUpload}
+      </div>
+    </Card>
   );
 }

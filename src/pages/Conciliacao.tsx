@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -30,10 +30,15 @@ import {
   AlertCircle,
   TrendingUp,
   TrendingDown,
+  Database,
+  RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { collection, getDocs, query, orderBy } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { getClientes, getProdutos, getFuncionarios } from "@/lib/firestore";
 
 export default function Conciliacao() {
   const { hasPermission } = useAuth();
@@ -41,6 +46,7 @@ export default function Conciliacao() {
   const [dadosFornecedor, setDadosFornecedor] = useState<DadosExcel[]>([]);
   const [filtros, setFiltros] = useState<FiltrosConciliacao>({});
   const [processando, setProcessando] = useState(false);
+  const [carregandoSistema, setCarregandoSistema] = useState(false);
 
   // Verificar permissão (apenas gerentes e admins)
   if (!hasPermission(["admin", "gerente"])) {
@@ -69,6 +75,52 @@ export default function Conciliacao() {
   const handleImportarFornecedor = (dados: DadosExcel[]) => {
     setDadosFornecedor(dados);
     toast.success(`${dados.length} registros do fornecedor importados`);
+  };
+
+  // Carregar dados do sistema (vendas do Firestore)
+  const handleCarregarDoSistema = async () => {
+    setCarregandoSistema(true);
+    try {
+      // Buscar vendas, clientes, produtos e funcionários
+      const [vendasSnapshot, clientes, produtos, funcionarios] = await Promise.all([
+        getDocs(query(collection(db, "vendas"), orderBy("createdAt", "desc"))),
+        getClientes(),
+        getProdutos(),
+        getFuncionarios(),
+      ]);
+
+      const vendas = vendasSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        createdAt: doc.data().createdAt?.toDate(),
+      }));
+
+      // Mapear para o formato DadosExcel
+      const dadosFormatados: DadosExcel[] = vendas.map((venda: any) => {
+        const cliente = clientes.find(c => c.id === venda.clienteId);
+        const produto = produtos.find(p => p.id === venda.produtoId);
+        const funcionario = funcionarios.find(f => f.id === venda.funcionarioId);
+
+        return {
+          contrato: venda.id || "",
+          cliente: cliente?.nome || "",
+          fornecedor: produto?.fornecedor || "",
+          funcionario: funcionario?.nome || "",
+          valorComissao: venda.comissao || 0,
+          valorProduto: venda.valorContrato || 0,
+          dataVenda: venda.createdAt || new Date(),
+          dataPagamento: undefined,
+        };
+      });
+
+      setDadosInternos(dadosFormatados);
+      toast.success(`${dadosFormatados.length} vendas carregadas do sistema`);
+    } catch (error) {
+      console.error("Erro ao carregar dados do sistema:", error);
+      toast.error("Erro ao carregar vendas do sistema");
+    } finally {
+      setCarregandoSistema(false);
+    }
   };
 
   // Analisar conciliação
@@ -193,7 +245,45 @@ export default function Conciliacao() {
 
       {/* Cards de Importação */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <ImportarExcel tipo="interno" onImport={handleImportarInterno} />
+        <Card className="p-6">
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-primary/10 rounded-lg">
+                <Database className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <h3 className="font-semibold">Dados Internos</h3>
+                <p className="text-sm text-muted-foreground">
+                  {dadosInternos.length > 0 
+                    ? `${dadosInternos.length} registros carregados`
+                    : "Carregue ou importe dados internos"
+                  }
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                onClick={handleCarregarDoSistema}
+                disabled={carregandoSistema}
+                className="flex-1 gap-2"
+                variant="default"
+              >
+                {carregandoSistema ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    Carregando...
+                  </>
+                ) : (
+                  <>
+                    <Database className="w-4 h-4" />
+                    Carregar do Sistema
+                  </>
+                )}
+              </Button>
+              <ImportarExcel tipo="interno" onImport={handleImportarInterno} apenasButton={true} />
+            </div>
+          </div>
+        </Card>
         <ImportarExcel tipo="fornecedor" onImport={handleImportarFornecedor} />
       </div>
 
