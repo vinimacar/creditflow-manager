@@ -60,10 +60,14 @@ export default function Dashboard() {
 
       // Calcular totais
       const vendasMes = vendasMesAtual.reduce((sum, v) => sum + v.valorContrato, 0);
-      const comissoesMes = vendasMesAtual.reduce((sum, v) => sum + v.comissao, 0);
+      const comissoesMes = vendasMesAtual.reduce((sum, v) => sum + (v.comissao || 0), 0);
       
       const vendasMesAnteriorTotal = vendasMesAnterior.reduce((sum, v) => sum + v.valorContrato, 0);
-      const comissoesMesAnteriorTotal = vendasMesAnterior.reduce((sum, v) => sum + v.comissao, 0);
+      const comissoesMesAnteriorTotal = vendasMesAnterior.reduce((sum, v) => sum + (v.comissao || 0), 0);
+
+      console.log("Vendas do mês atual:", vendasMesAtual);
+      console.log("Total de comissões do mês:", comissoesMes);
+      console.log("Vendas com comissão:", vendasMesAtual.filter(v => v.comissao > 0));
 
       // Calcular crescimento
       const crescimentoVendas = vendasMesAnteriorTotal > 0
