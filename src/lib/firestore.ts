@@ -269,10 +269,16 @@ export async function getFuncionarios(): Promise<Funcionario[]> {
 export interface Produto {
   id?: string;
   nome: string;
+  codigo?: string;
   descricao?: string;
-  preco: number;
+  preco?: number;
   categoria?: string;
   estoque?: number;
+  prazoMin?: number;
+  prazoMax?: number;
+  tipoTabela?: string;
+  comissao: number; // Percentual de comissão sobre o valor do contrato
+  taxaJuros?: number;
   status: "ativo" | "inativo";
   createdAt?: Date;
   updatedAt?: Date;
