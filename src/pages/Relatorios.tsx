@@ -153,10 +153,14 @@ export default function Relatorios() {
       // Calcular vendas por funcionário
       const vendaPorFunc = new Map<string, { vendas: number; comissao: number }>();
       vendas.forEach((venda) => {
+        const produto = produtos.find(p => p.id === venda.produtoId);
+        const comissaoPercentual = produto?.comissao || 0;
+        const comissaoCalculada = venda.comissao || (venda.valorContrato * comissaoPercentual / 100);
+        
         const current = vendaPorFunc.get(venda.funcionarioId) || { vendas: 0, comissao: 0 };
         vendaPorFunc.set(venda.funcionarioId, {
           vendas: current.vendas + 1,
-          comissao: current.comissao + venda.comissao,
+          comissao: current.comissao + comissaoCalculada,
         });
       });
 
@@ -289,6 +293,9 @@ export default function Relatorios() {
       const funcionario = funcionariosCompletos.find(f => f.id === v.funcionarioId);
       const produto = produtosCompletos.find(p => p.id === v.produtoId);
       
+      const comissaoPercentual = produto?.comissao || 0;
+      const comissaoCalculada = v.comissao || (v.valorContrato * comissaoPercentual / 100);
+      
       return {
         id: v.id,
         data: v.createdAt?.toDate?.() || new Date(v.createdAt),
@@ -298,8 +305,8 @@ export default function Relatorios() {
         produto: produto?.nome || "N/A",
         valorContrato: v.valorContrato,
         prazo: v.prazo,
-        comissao: v.comissao,
-        comissaoPercentual: v.comissaoPercentual || (produto?.comissao || 0),
+        comissao: comissaoCalculada,
+        comissaoPercentual: comissaoPercentual,
         status: v.status,
       };
     });
@@ -391,10 +398,14 @@ export default function Relatorios() {
     // Recalcular vendas por funcionário
     const vendaPorFunc = new Map<string, { vendas: number; comissao: number }>();
     vendasFiltradas.forEach((venda) => {
+      const produto = produtosCompletos.find(p => p.id === venda.produtoId);
+      const comissaoPercentual = produto?.comissao || 0;
+      const comissaoCalculada = venda.comissao || (venda.valorContrato * comissaoPercentual / 100);
+      
       const current = vendaPorFunc.get(venda.funcionarioId) || { vendas: 0, comissao: 0 };
       vendaPorFunc.set(venda.funcionarioId, {
         vendas: current.vendas + 1,
-        comissao: current.comissao + venda.comissao,
+        comissao: current.comissao + comissaoCalculada,
       });
     });
 
