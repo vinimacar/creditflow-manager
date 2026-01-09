@@ -16,6 +16,99 @@ export interface Divergencia {
   tiposDivergencia: string[];
   diferencaComissao: number;
   diferencaProduto: number;
+  validacaoInteligente?: {
+    taxaAplicadaInterno: number;
+    taxaAplicadaFornecedor: number;
+    taxaEsperada?: number;
+    taxaDivergente: boolean;
+    valorPagoCorreto: boolean;
+    observacoes: string[];
+  };
+}
+
+/**
+ * Valida\u00e7\u00e3o inteligente de taxas e valores pagos
+ * Verifica se as taxas aplicadas est\u00e3o consistentes e se os valores foram pagos corretamente
+ */
+export function validarTaxasEValoresPagos(
+  valorProduto: number,
+  valorComissao: number,
+  valorProdutoFornecedor?: number,
+  valorComissaoFornecedor?: number
+): Divergencia["validacaoInteligente"] {
+  const observacoes: string[] = [];
+  
+  // Calcular taxa aplicada internamente (percentual da comiss\u00e3o sobre o produto)
+  const taxaAplicadaInterno = valorProduto > 0 ? (valorComissao / valorProduto) * 100 : 0;
+  
+  // Calcular taxa aplicada pelo fornecedor
+  const taxaAplicadaFornecedor = valorProdutoFornecedor && valorProdutoFornecedor > 0 && valorComissaoFornecedor
+    ? (valorComissaoFornecedor / valorProdutoFornecedor) * 100
+    : 0;
+  
+  // Taxas comuns no mercado (cr\u00e9dito consignado geralmente entre 1% e 6%)
+  const taxaMinEsperada = 0.5; // 0.5%
+  const taxaMaxEsperada = 8; // 8%
+  const toleranciaTaxa = 0.1; // 0.1% de tolerância
+  
+  let taxaDivergente = false;
+  let valorPagoCorreto = true;
+  
+  // Verificar se a taxa interna está dentro do esperado
+  if (taxaAplicadaInterno < taxaMinEsperada) {
+    observacoes.push(`⚠️ Taxa muito baixa: ${taxaAplicadaInterno.toFixed(2)}% (esperado: ${taxaMinEsperada}% - ${taxaMaxEsperada}%)`);
+    taxaDivergente = true;
+  } else if (taxaAplicadaInterno > taxaMaxEsperada) {
+    observacoes.push(`⚠️ Taxa muito alta: ${taxaAplicadaInterno.toFixed(2)}% (esperado: ${taxaMinEsperada}% - ${taxaMaxEsperada}%)`);
+    taxaDivergente = true;
+  }
+  
+  // Comparar taxas entre interno e fornecedor
+  if (taxaAplicadaFornecedor > 0) {
+    const diferencaTaxa = Math.abs(taxaAplicadaInterno - taxaAplicadaFornecedor);
+    
+    if (diferencaTaxa > toleranciaTaxa) {
+      observacoes.push(
+        `⚠️ Divergência de taxa: Interno ${taxaAplicadaInterno.toFixed(2)}% vs Fornecedor ${taxaAplicadaFornecedor.toFixed(2)}%`
+      );
+      taxaDivergente = true;
+    }
+    
+    // Verificar se o valor pago está correto baseado na taxa do fornecedor
+    const valorEsperado = (valorProdutoFornecedor || 0) * (taxaAplicadaFornecedor / 100);
+    const diferencaValor = Math.abs(valorEsperado - (valorComissaoFornecedor || 0));
+    
+    if (diferencaValor > 0.50) { // Tolerância de R$ 0,50
+      observacoes.push(
+        `❌ Valor pago incorreto: R$ ${(valorComissaoFornecedor || 0).toFixed(2)} (esperado: R$ ${valorEsperado.toFixed(2)})`
+      );
+      valorPagoCorreto = false;
+    }
+  }
+  
+  // Verificar se o cálculo interno está correto
+  const valorComissaoEsperado = valorProduto * (taxaAplicadaInterno / 100);
+  const diferencaCalculo = Math.abs(valorComissaoEsperado - valorComissao);
+  
+  if (diferencaCalculo > 0.50) {
+    observacoes.push(
+      `❌ Cálculo interno incorreto: R$ ${valorComissao.toFixed(2)} (esperado: R$ ${valorComissaoEsperado.toFixed(2)} com taxa de ${taxaAplicadaInterno.toFixed(2)}%)`
+    );
+    valorPagoCorreto = false;
+  }
+  
+  // Adicionar observação positiva se tudo estiver OK
+  if (observacoes.length === 0) {
+    observacoes.push(`✓ Taxa e valores estão corretos (${taxaAplicadaInterno.toFixed(2)}%)`);
+  }
+  
+  return {
+    taxaAplicadaInterno,
+    taxaAplicadaFornecedor,
+    taxaDivergente,
+    valorPagoCorreto,
+    observacoes,
+  };
 }
 
 export function analisarConciliacao(
@@ -35,6 +128,20 @@ export function analisarConciliacao(
 
     const tiposDivergencia: string[] = [];
     let status: Divergencia["status"] = "ok";
+
+    // Executar validação inteligente
+    const validacaoInteligente = validarTaxasEValoresPagos(
+      interno.valorProduto,
+      interno.valorComissao,
+      fornecedor?.valorProduto,
+      fornecedor?.valorComissao
+    );
+
+    // Adicionar observações da validação inteligente aos tipos de divergência
+    if (validacaoInteligente.taxaDivergente || !validacaoInteligente.valorPagoCorreto) {
+      tiposDivergencia.push(...validacaoInteligente.observacoes.filter(obs => obs.includes('⚠️') || obs.includes('❌')));
+      status = "divergente";
+    }
 
     if (!fornecedor) {
       status = "nao_encontrado_fornecedor";
@@ -83,6 +190,7 @@ export function analisarConciliacao(
       tiposDivergencia,
       diferencaComissao: fornecedor ? Math.abs(interno.valorComissao - fornecedor.valorComissao) : interno.valorComissao,
       diferencaProduto: fornecedor ? Math.abs(interno.valorProduto - fornecedor.valorProduto) : interno.valorProduto,
+      validacaoInteligente,
     });
   });
 

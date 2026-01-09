@@ -3,6 +3,12 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Table,
   TableBody,
@@ -33,10 +39,12 @@ import {
   Database,
   RefreshCw,
   FileSpreadsheet,
+  CalendarIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 import { collection, getDocs, query, orderBy } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { getClientes, getProdutos, getFuncionarios } from "@/lib/firestore";
@@ -48,6 +56,7 @@ export default function Conciliacao() {
   const [filtros, setFiltros] = useState<FiltrosConciliacao>({});
   const [processando, setProcessando] = useState(false);
   const [carregandoSistema, setCarregandoSistema] = useState(false);
+  const [periodoImportacao, setPeriodoImportacao] = useState<{ inicio?: Date; fim?: Date }>({});
 
   // Verificar permissão (apenas gerentes e admins)
   if (!hasPermission(["admin", "gerente"])) {
@@ -90,11 +99,20 @@ export default function Conciliacao() {
         getFuncionarios(),
       ]);
 
-      const vendas = vendasSnapshot.docs.map(doc => ({
+      let vendas = vendasSnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
         createdAt: doc.data().createdAt?.toDate(),
       }));
+
+      // Aplicar filtro de período se definido
+      if (periodoImportacao.inicio && periodoImportacao.fim) {
+        vendas = vendas.filter((venda: any) => {
+          const dataVenda = venda.createdAt;
+          if (!dataVenda) return false;
+          return dataVenda >= periodoImportacao.inicio! && dataVenda <= periodoImportacao.fim!;
+        });
+      }
 
       // Mapear para o formato DadosExcel
       const dadosFormatados: DadosExcel[] = vendas.map((venda: any) => {
@@ -121,7 +139,10 @@ export default function Conciliacao() {
       });
 
       setDadosInternos(dadosFormatados);
-      toast.success(`${dadosFormatados.length} vendas carregadas do sistema`);
+      const mensagem = periodoImportacao.inicio && periodoImportacao.fim
+        ? `${dadosFormatados.length} vendas carregadas (${format(periodoImportacao.inicio, "dd/MM/yyyy")} - ${format(periodoImportacao.fim, "dd/MM/yyyy")})`
+        : `${dadosFormatados.length} vendas carregadas do sistema`;
+      toast.success(mensagem);
     } catch (error) {
       console.error("Erro ao carregar dados do sistema:", error);
       toast.error("Erro ao carregar vendas do sistema");
@@ -326,6 +347,61 @@ export default function Conciliacao() {
                 </p>
               </div>
             </div>
+            
+            {/* Filtro de período para importação */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Período (opcional)</label>
+              <div className="flex gap-2">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className={cn(
+                        "flex-1 justify-start text-left font-normal",
+                        !periodoImportacao.inicio && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {periodoImportacao.inicio ? format(periodoImportacao.inicio, "dd/MM/yyyy", { locale: ptBR }) : "Data inicial"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={periodoImportacao.inicio}
+                      onSelect={(date) => setPeriodoImportacao(prev => ({ ...prev, inicio: date }))}
+                      locale={ptBR}
+                    />
+                  </PopoverContent>
+                </Popover>
+
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className={cn(
+                        "flex-1 justify-start text-left font-normal",
+                        !periodoImportacao.fim && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {periodoImportacao.fim ? format(periodoImportacao.fim, "dd/MM/yyyy", { locale: ptBR }) : "Data final"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={periodoImportacao.fim}
+                      onSelect={(date) => setPeriodoImportacao(prev => ({ ...prev, fim: date }))}
+                      locale={ptBR}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
+            
             <div className="flex gap-2">
               <Button
                 onClick={handleCarregarDoSistema}
@@ -544,6 +620,7 @@ export default function Conciliacao() {
                     <TableHead>Funcionário</TableHead>
                     <TableHead className="text-right">Comissão Interna</TableHead>
                     <TableHead className="text-right">Comissão Fornecedor</TableHead>
+                    <TableHead className="text-right">Taxa</TableHead>
                     <TableHead className="text-right">Diferença</TableHead>
                     <TableHead>Status</TableHead>
                   </TableRow>
@@ -551,7 +628,7 @@ export default function Conciliacao() {
                 <TableBody>
                   {divergenciasFiltradas.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                         Nenhum registro encontrado com os filtros aplicados
                       </TableCell>
                     </TableRow>
@@ -571,13 +648,42 @@ export default function Conciliacao() {
                           R$ {div.valorComissaoFornecedor.toFixed(2)}
                         </TableCell>
                         <TableCell className="text-right">
+                          <div>
+                            <div className={cn(
+                              "font-medium",
+                              div.validacaoInteligente?.taxaDivergente && "text-orange-600"
+                            )}>
+                              {div.validacaoInteligente?.taxaAplicadaInterno.toFixed(2)}%
+                            </div>
+                            {div.validacaoInteligente?.taxaAplicadaFornecedor > 0 && 
+                             div.validacaoInteligente.taxaAplicadaFornecedor !== div.validacaoInteligente.taxaAplicadaInterno && (
+                              <div className="text-xs text-muted-foreground">
+                                Forn: {div.validacaoInteligente.taxaAplicadaFornecedor.toFixed(2)}%
+                              </div>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
                           <span className={div.diferencaComissao > 0.01 ? "text-red-600 font-semibold" : "text-green-600"}>
                             R$ {div.diferencaComissao.toFixed(2)}
                           </span>
                         </TableCell>
                         <TableCell>
                           {getStatusBadge(div.status)}
-                          {div.tiposDivergencia.length > 0 && (
+                          {div.validacaoInteligente?.observacoes && div.validacaoInteligente.observacoes.length > 0 && (
+                            <div className="text-xs mt-1 space-y-0.5">
+                              {div.validacaoInteligente.observacoes.slice(0, 2).map((obs, idx) => (
+                                <div key={idx} className={cn(
+                                  obs.includes('✓') ? "text-green-600" : 
+                                  obs.includes('⚠️') ? "text-orange-600" : 
+                                  "text-red-600"
+                                )}>
+                                  {obs}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {div.tiposDivergencia.length > 0 && !div.validacaoInteligente?.observacoes?.length && (
                             <div className="text-xs text-muted-foreground mt-1">
                               {div.tiposDivergencia[0]}
                             </div>
