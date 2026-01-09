@@ -43,12 +43,13 @@ export default function Relatorios() {
   }, []);
 
   const carregarDados = async () => {
+    setLoading(true);
     try {
       const [vendas, funcionarios, produtos, fornecedores] = await Promise.all([
-        getVendas(),
-        getFuncionarios(),
-        getProdutos(),
-        getFornecedores(),
+        getVendas().catch(() => []),
+        getFuncionarios().catch(() => []),
+        getProdutos().catch(() => []),
+        getFornecedores().catch(() => []),
       ]);
 
       // Gerar dados de vendas por mês (últimos 6 meses)
@@ -61,13 +62,17 @@ export default function Relatorios() {
         const fimMes = endOfMonth(mesData);
         
         const vendasDoMes = vendas.filter((v) => {
-          const dataVenda = v.createdAt?.toDate?.() || new Date(v.createdAt);
-          return dataVenda >= inicioMes && dataVenda <= fimMes;
+          try {
+            const dataVenda = v.createdAt?.toDate?.() || new Date(v.createdAt);
+            return dataVenda >= inicioMes && dataVenda <= fimMes;
+          } catch {
+            return false;
+          }
         });
         
         vendasPorMes.push({
           mes: format(mesData, "MMM", { locale: ptBR }),
-          valor: vendasDoMes.reduce((sum, v) => sum + v.valorContrato, 0),
+          valor: vendasDoMes.reduce((sum, v) => sum + (v.valorContrato || 0), 0),
           quantidade: vendasDoMes.length,
         });
       }
@@ -75,10 +80,11 @@ export default function Relatorios() {
       // Calcular vendas por funcionário
       const vendaPorFunc = new Map<string, { vendas: number; comissao: number }>();
       vendas.forEach((venda) => {
+        if (!venda.funcionarioId) return;
         const current = vendaPorFunc.get(venda.funcionarioId) || { vendas: 0, comissao: 0 };
         vendaPorFunc.set(venda.funcionarioId, {
           vendas: current.vendas + 1,
-          comissao: current.comissao + venda.comissao,
+          comissao: current.comissao + (venda.comissao || 0),
         });
       });
 
@@ -97,8 +103,9 @@ export default function Relatorios() {
       // Calcular vendas por produto
       const vendaPorProd = new Map<string, number>();
       vendas.forEach((venda) => {
+        if (!venda.produtoId) return;
         const current = vendaPorProd.get(venda.produtoId) || 0;
-        vendaPorProd.set(venda.produtoId, current + venda.valorContrato);
+        vendaPorProd.set(venda.produtoId, current + (venda.valorContrato || 0));
       });
 
       const produtosData = Array.from(vendaPorProd.entries())
@@ -114,18 +121,26 @@ export default function Relatorios() {
 
       // Mock de fornecedores (pode ser melhorado com dados reais se disponível)
       const fornecedoresData = fornecedores.slice(0, 4).map((f) => ({
-        nome: f.razaoSocial,
+        nome: f.razaoSocial || "Desconhecido",
         valor: Math.random() * 300000 + 100000, // Valores simulados
       }));
 
       setDadosRelatorio({
         vendas: vendasPorMes,
-        funcionarios: funcionariosData,
-        produtos: produtosData,
-        fornecedores: fornecedoresData,
+        funcionarios: funcionariosData.length > 0 ? funcionariosData : [{ nome: "Sem dados", vendas: 0, comissao: 0 }],
+        produtos: produtosData.length > 0 ? produtosData : [{ nome: "Sem dados", valor: 0 }],
+        fornecedores: fornecedoresData.length > 0 ? fornecedoresData : [{ nome: "Sem dados", valor: 0 }],
       });
     } catch (error) {
       console.error("Erro ao carregar dados do relatório:", error);
+      toast.error("Erro ao carregar dados do relatório");
+      // Definir dados vazios para evitar crashes
+      setDadosRelatorio({
+        vendas: [],
+        funcionarios: [{ nome: "Sem dados", vendas: 0, comissao: 0 }],
+        produtos: [{ nome: "Sem dados", valor: 0 }],
+        fornecedores: [{ nome: "Sem dados", valor: 0 }],
+      });
     } finally {
       setLoading(false);
     }
@@ -134,15 +149,16 @@ export default function Relatorios() {
   const estatisticas = useMemo(() => {
     if (!dadosRelatorio) return null;
     
-    const totalVendas = dadosRelatorio.vendas.reduce((sum, v) => sum + v.valor, 0);
-    const totalAnterior = dadosRelatorio.vendas.slice(0, -1).reduce((sum, v) => sum + v.valor, 0);
+    const totalVendas = dadosRelatorio.vendas.reduce((sum, v) => sum + (v.valor || 0), 0);
+    const totalAnterior = dadosRelatorio.vendas.slice(0, -1).reduce((sum, v) => sum + (v.valor || 0), 0);
     const crescimento = totalAnterior > 0 ? ((totalVendas - totalAnterior) / totalAnterior) * 100 : 0;
+    const totalQuantidade = dadosRelatorio.vendas.reduce((sum, v) => sum + (v.quantidade || 0), 0);
 
     return {
       totalVendas,
       crescimento,
-      ticketMedio: totalVendas / dadosRelatorio.vendas.reduce((sum, v) => sum + v.quantidade, 0) || 0,
-      totalFuncionarios: dadosRelatorio.funcionarios.length,
+      ticketMedio: totalQuantidade > 0 ? totalVendas / totalQuantidade : 0,
+      totalFuncionarios: dadosRelatorio.funcionarios.filter(f => f.vendas > 0).length,
       produtoMaisVendido: dadosRelatorio.produtos[0]?.nome || "N/A",
     };
   }, [dadosRelatorio]);
@@ -179,6 +195,10 @@ export default function Relatorios() {
     }
     
     setGerando(true);
+    
+    // Usar setTimeout para evitar conflitos com message channels
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
     try {
       const doc = new jsPDF();
       const pageWidth = doc.internal.pageSize.getWidth();
@@ -215,43 +235,47 @@ export default function Relatorios() {
       });
 
       // Vendas por Funcionário
-      doc.addPage();
-      y = 20;
-      doc.setFontSize(14);
-      doc.setFont("helvetica", "bold");
-      doc.text("Desempenho por Funcionário", 14, y);
+      if (dadosRelatorio.funcionarios.length > 0 && dadosRelatorio.funcionarios[0].vendas > 0) {
+        doc.addPage();
+        y = 20;
+        doc.setFontSize(14);
+        doc.setFont("helvetica", "bold");
+        doc.text("Desempenho por Funcionário", 14, y);
 
-      y += 10;
-      autoTable(doc, {
-        startY: y,
-        head: [["Funcionário", "Vendas", "Comissão"]],
-        body: dadosRelatorio.funcionarios.map(f => [
-          f.nome,
-          f.vendas.toString(),
-          `R$ ${f.comissao.toLocaleString("pt-BR")}`,
-        ]),
-        theme: "striped",
-        headStyles: { fillColor: [59, 130, 246] },
-      });
+        y += 10;
+        autoTable(doc, {
+          startY: y,
+          head: [["Funcionário", "Vendas", "Comissão"]],
+          body: dadosRelatorio.funcionarios.map(f => [
+            f.nome,
+            f.vendas.toString(),
+            `R$ ${f.comissao.toLocaleString("pt-BR")}`,
+          ]),
+          theme: "striped",
+          headStyles: { fillColor: [59, 130, 246] },
+        });
+      }
 
       // Vendas por Produto
-      doc.addPage();
-      y = 20;
-      doc.setFontSize(14);
-      doc.setFont("helvetica", "bold");
-      doc.text("Vendas por Produto", 14, y);
+      if (dadosRelatorio.produtos.length > 0 && dadosRelatorio.produtos[0].valor > 0) {
+        doc.addPage();
+        y = 20;
+        doc.setFontSize(14);
+        doc.setFont("helvetica", "bold");
+        doc.text("Vendas por Produto", 14, y);
 
-      y += 10;
-      autoTable(doc, {
-        startY: y,
-        head: [["Produto", "Valor Total"]],
-        body: dadosRelatorio.produtos.map(p => [
-          p.nome,
-          `R$ ${p.valor.toLocaleString("pt-BR")}`,
-        ]),
-        theme: "striped",
-        headStyles: { fillColor: [59, 130, 246] },
-      });
+        y += 10;
+        autoTable(doc, {
+          startY: y,
+          head: [["Produto", "Valor Total"]],
+          body: dadosRelatorio.produtos.map(p => [
+            p.nome,
+            `R$ ${p.valor.toLocaleString("pt-BR")}`,
+          ]),
+          theme: "striped",
+          headStyles: { fillColor: [59, 130, 246] },
+        });
+      }
 
       // Rodapé
       const pageCount = doc.getNumberOfPages();
