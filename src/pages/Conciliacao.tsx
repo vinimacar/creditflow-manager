@@ -335,6 +335,16 @@ export default function Conciliacao() {
               </Button>
               <ImportarExcel tipo="interno" onImport={handleImportarInterno} apenasButton={true} />
             </div>
+            {dadosInternos.length > 0 && (
+              <Button
+                onClick={handleExportarExcel}
+                variant="outline"
+                className="w-full gap-2"
+              >
+                <FileSpreadsheet className="w-4 h-4" />
+                Exportar Excel ({dadosInternos.length} vendas)
+              </Button>
+            )}
           </div>
         </Card>
         <ImportarExcel tipo="fornecedor" onImport={handleImportarFornecedor} />

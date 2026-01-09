@@ -13,7 +13,16 @@ import {
   Users,
   Package,
   Building2,
+  FileSpreadsheet,
 } from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -41,6 +50,11 @@ export default function Relatorios() {
   const [gerando, setGerando] = useState(false);
   const [loading, setLoading] = useState(true);
   const [dadosRelatorio, setDadosRelatorio] = useState<DadosRelatorio | null>(null);
+  const [vendasCompletas, setVendasCompletas] = useState<Venda[]>([]);
+  const [clientesCompletos, setClientesCompletos] = useState<Cliente[]>([]);
+  const [funcionariosCompletos, setFuncionariosCompletos] = useState<Funcionario[]>([]);
+  const [produtosCompletos, setProdutosCompletos] = useState<Produto[]>([]);
+  const [despesasCompletas, setDespesasCompletas] = useState<Despesa[]>([]);
 
   useEffect(() => {
     let mounted = true;
@@ -80,6 +94,13 @@ export default function Relatorios() {
       });
 
       if (!mounted) return;
+
+      // Armazenar dados completos para filtragem
+      setVendasCompletas(vendas);
+      setClientesCompletos(clientes);
+      setFuncionariosCompletos(funcionarios);
+      setProdutosCompletos(produtos);
+      setDespesasCompletas(despesas);
 
       // Gerar dados de vendas por mês (últimos 6 meses)
       const vendasPorMes: Array<{ mes: string; valor: number; quantidade: number }> = [];
@@ -221,21 +242,290 @@ export default function Relatorios() {
     }
   };
 
-  const estatisticas = useMemo(() => {
+  // Filtrar vendas com base nos filtros aplicados
+  const dadosFiltrados = useMemo(() => {
+    if (!filtros.periodo && !filtros.cliente && !filtros.funcionario && !filtros.produto) {
+      return null;
+    }
+
+    let vendas = vendasCompletas;
+
+    // Aplicar filtro de período
+    if (filtros.periodo?.from) {
+      vendas = vendas.filter(v => {
+        const dataVenda = v.createdAt?.toDate?.() || new Date(v.createdAt);
+        const from = filtros.periodo!.from!;
+        const to = filtros.periodo!.to || from;
+        return dataVenda >= from && dataVenda <= to;
+      });
+    }
+
+    // Aplicar filtro de cliente
+    if (filtros.cliente) {
+      const cliente = clientesCompletos.find(c => c.nome === filtros.cliente);
+      if (cliente) {
+        vendas = vendas.filter(v => v.clienteId === cliente.id);
+      }
+    }
+
+    // Aplicar filtro de funcionário
+    if (filtros.funcionario) {
+      const funcionario = funcionariosCompletos.find(f => f.nome === filtros.funcionario);
+      if (funcionario) {
+        vendas = vendas.filter(v => v.funcionarioId === funcionario.id);
+      }
+    }
+
+    // Aplicar filtro de produto
+    if (filtros.produto) {
+      const produto = produtosCompletos.find(p => p.nome === filtros.produto);
+      if (produto) {
+        vendas = vendas.filter(v => v.produtoId === produto.id);
+      }
+    }
+
+    return vendas.map(v => {
+      const cliente = clientesCompletos.find(c => c.id === v.clienteId);
+      const funcionario = funcionariosCompletos.find(f => f.id === v.funcionarioId);
+      const produto = produtosCompletos.find(p => p.id === v.produtoId);
+      
+      return {
+        id: v.id,
+        data: v.createdAt?.toDate?.() || new Date(v.createdAt),
+        cliente: cliente?.nome || "N/A",
+        cpf: cliente?.cpf || "N/A",
+        funcionario: funcionario?.nome || "N/A",
+        produto: produto?.nome || "N/A",
+        valorContrato: v.valorContrato,
+        prazo: v.prazo,
+        comissao: v.comissao,
+        status: v.status,
+      };
+    });
+  }, [filtros, vendasCompletas, clientesCompletos, funcionariosCompletos, produtosCompletos]);
+
+  // Recalcular dados dos gráficos baseado nos filtros
+  const dadosGraficos = useMemo(() => {
     if (!dadosRelatorio) return null;
+
+    // Se não há filtros, usar dados originais
+    if (!filtros.periodo && !filtros.cliente && !filtros.funcionario && !filtros.produto) {
+      return dadosRelatorio;
+    }
+
+    // Filtrar vendas
+    let vendasFiltradas = vendasCompletas;
+
+    if (filtros.periodo?.from) {
+      vendasFiltradas = vendasFiltradas.filter(v => {
+        const dataVenda = v.createdAt?.toDate?.() || new Date(v.createdAt);
+        const from = filtros.periodo!.from!;
+        const to = filtros.periodo!.to || from;
+        return dataVenda >= from && dataVenda <= to;
+      });
+    }
+
+    if (filtros.cliente) {
+      const cliente = clientesCompletos.find(c => c.nome === filtros.cliente);
+      if (cliente) {
+        vendasFiltradas = vendasFiltradas.filter(v => v.clienteId === cliente.id);
+      }
+    }
+
+    if (filtros.funcionario) {
+      const funcionario = funcionariosCompletos.find(f => f.nome === filtros.funcionario);
+      if (funcionario) {
+        vendasFiltradas = vendasFiltradas.filter(v => v.funcionarioId === funcionario.id);
+      }
+    }
+
+    if (filtros.produto) {
+      const produto = produtosCompletos.find(p => p.nome === filtros.produto);
+      if (produto) {
+        vendasFiltradas = vendasFiltradas.filter(v => v.produtoId === produto.id);
+      }
+    }
+
+    // Recalcular vendas por mês com dados filtrados
+    const vendasPorMes: Array<{ mes: string; valor: number; quantidade: number }> = [];
+    const receitasPorMes: Array<{ mes: string; valor: number }> = [];
+    const lucrosPorMes: Array<{ mes: string; valor: number }> = [];
+    const agora = new Date();
     
-    const totalVendas = dadosRelatorio.vendas.reduce((sum, v) => sum + v.valor, 0);
-    const totalAnterior = dadosRelatorio.vendas.slice(0, -1).reduce((sum, v) => sum + v.valor, 0);
+    for (let i = 5; i >= 0; i--) {
+      const mesData = subMonths(agora, i);
+      const inicioMes = startOfMonth(mesData);
+      const fimMes = endOfMonth(mesData);
+
+      const vendasDoMes = vendasFiltradas.filter((v) => {
+        const dataVenda = v.createdAt?.toDate?.() || new Date(v.createdAt);
+        return dataVenda >= inicioMes && dataVenda <= fimMes;
+      });
+
+      const despesasDoMes = despesasCompletas.filter((d) => {
+        const dataDespesa = new Date(d.dataVencimento);
+        return dataDespesa >= inicioMes && dataDespesa <= fimMes;
+      });
+
+      const valorVendas = vendasDoMes.reduce((sum, v) => sum + v.valorContrato, 0);
+      const valorDespesas = despesasDoMes.reduce((sum, d) => sum + d.valor, 0);
+      
+      vendasPorMes.push({
+        mes: format(mesData, "MMM", { locale: ptBR }),
+        valor: valorVendas,
+        quantidade: vendasDoMes.length,
+      });
+
+      receitasPorMes.push({
+        mes: format(mesData, "MMM", { locale: ptBR }),
+        valor: valorVendas,
+      });
+
+      lucrosPorMes.push({
+        mes: format(mesData, "MMM", { locale: ptBR }),
+        valor: valorVendas - valorDespesas,
+      });
+    }
+
+    // Recalcular vendas por funcionário
+    const vendaPorFunc = new Map<string, { vendas: number; comissao: number }>();
+    vendasFiltradas.forEach((venda) => {
+      const current = vendaPorFunc.get(venda.funcionarioId) || { vendas: 0, comissao: 0 };
+      vendaPorFunc.set(venda.funcionarioId, {
+        vendas: current.vendas + 1,
+        comissao: current.comissao + venda.comissao,
+      });
+    });
+
+    const funcionariosData = Array.from(vendaPorFunc.entries())
+      .map(([id, stats]) => {
+        const func = funcionariosCompletos.find((f) => f.id === id);
+        return {
+          nome: func?.nome || "Desconhecido",
+          vendas: stats.vendas,
+          comissao: stats.comissao,
+        };
+      })
+      .sort((a, b) => b.vendas - a.vendas)
+      .slice(0, 5);
+
+    // Recalcular vendas por produto
+    const vendaPorProd = new Map<string, number>();
+    vendasFiltradas.forEach((venda) => {
+      const current = vendaPorProd.get(venda.produtoId) || 0;
+      vendaPorProd.set(venda.produtoId, current + venda.valorContrato);
+    });
+
+    const produtosData = Array.from(vendaPorProd.entries())
+      .map(([id, valor]) => {
+        const prod = produtosCompletos.find((p) => p.id === id);
+        return {
+          nome: prod?.nome || "Desconhecido",
+          valor,
+        };
+      })
+      .sort((a, b) => b.valor - a.valor)
+      .slice(0, 4);
+
+    // Recalcular vendas por cliente
+    const vendaPorCliente = new Map<string, { vendas: number; valor: number }>();
+    vendasFiltradas.forEach((venda) => {
+      const current = vendaPorCliente.get(venda.clienteId) || { vendas: 0, valor: 0 };
+      vendaPorCliente.set(venda.clienteId, {
+        vendas: current.vendas + 1,
+        valor: current.valor + venda.valorContrato,
+      });
+    });
+
+    const clientesData = Array.from(vendaPorCliente.entries())
+      .map(([id, stats]) => {
+        const cliente = clientesCompletos.find((c) => c.id === id);
+        return {
+          nome: cliente?.nome || "Desconhecido",
+          vendas: stats.vendas,
+          valor: stats.valor,
+        };
+      })
+      .sort((a, b) => b.valor - a.valor)
+      .slice(0, 10);
+
+    return {
+      vendas: vendasPorMes,
+      funcionarios: funcionariosData,
+      produtos: produtosData,
+      fornecedores: dadosRelatorio.fornecedores,
+      clientes: clientesData,
+      despesas: dadosRelatorio.despesas,
+      receitas: receitasPorMes,
+      lucros: lucrosPorMes,
+    };
+  }, [filtros, dadosRelatorio, vendasCompletas, clientesCompletos, funcionariosCompletos, produtosCompletos, despesasCompletas]);
+
+  const handleExportarDados = () => {
+    if (!dadosFiltrados || dadosFiltrados.length === 0) {
+      toast.error("Nenhum dado filtrado para exportar");
+      return;
+    }
+
+    try {
+      const dadosExport = dadosFiltrados.map((venda) => ({
+        "Data": format(venda.data, "dd/MM/yyyy HH:mm", { locale: ptBR }),
+        "Cliente": venda.cliente,
+        "CPF": venda.cpf,
+        "Funcionário": venda.funcionario,
+        "Produto": venda.produto,
+        "Valor Contrato": venda.valorContrato.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }),
+        "Prazo": `${venda.prazo} meses`,
+        "Comissão": venda.comissao.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }),
+        "Status": venda.status,
+      }));
+
+      const headers = Object.keys(dadosExport[0]);
+      const csvContent = [
+        headers.join(","),
+        ...dadosExport.map(row => 
+          headers.map(header => {
+            const value = row[header as keyof typeof row];
+            return typeof value === 'string' && value.includes(',') ? `"${value}"` : value;
+          }).join(",")
+        )
+      ].join("\n");
+
+      const BOM = "\uFEFF";
+      const blob = new Blob([BOM + csvContent], { type: "text/csv;charset=utf-8;" });
+      const link = document.createElement("a");
+      const url = URL.createObjectURL(blob);
+      
+      link.setAttribute("href", url);
+      link.setAttribute("download", `relatorio_filtrado_${format(new Date(), "yyyyMMdd_HHmmss")}.csv`);
+      link.style.visibility = "hidden";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      toast.success(`${dadosFiltrados.length} registros exportados com sucesso!`);
+    } catch (error) {
+      console.error("Erro ao exportar dados:", error);
+      toast.error("Erro ao exportar dados");
+    }
+  };
+
+  const estatisticas = useMemo(() => {
+    const dados = dadosGraficos || dadosRelatorio;
+    if (!dados) return null;
+    
+    const totalVendas = dados.vendas.reduce((sum, v) => sum + v.valor, 0);
+    const totalAnterior = dados.vendas.slice(0, -1).reduce((sum, v) => sum + v.valor, 0);
     const crescimento = totalAnterior > 0 ? ((totalVendas - totalAnterior) / totalAnterior) * 100 : 0;
 
     return {
       totalVendas,
       crescimento,
-      ticketMedio: totalVendas / dadosRelatorio.vendas.reduce((sum, v) => sum + v.quantidade, 0) || 0,
-      totalFuncionarios: dadosRelatorio.funcionarios.length,
-      produtoMaisVendido: dadosRelatorio.produtos[0]?.nome || "N/A",
+      ticketMedio: totalVendas / dados.vendas.reduce((sum, v) => sum + v.quantidade, 0) || 0,
+      totalFuncionarios: dados.funcionarios.length,
+      produtoMaisVendido: dados.produtos[0]?.nome || "N/A",
     };
-  }, [dadosRelatorio]);
+  }, [dadosGraficos, dadosRelatorio]);
 
   const gerarFeedback = () => {
     if (!estatisticas) return { tipo: "neutro" as const, mensagem: "Carregando dados..." };
@@ -475,6 +765,65 @@ export default function Relatorios() {
         onGerarRelatorio={handleGerarRelatorio}
       />
 
+      {/* Tabela de Dados Filtrados */}
+      {dadosFiltrados && dadosFiltrados.length > 0 && (
+        <Card>
+          <div className="p-6 border-b flex justify-between items-center">
+            <div>
+              <h3 className="text-lg font-semibold">Registros Filtrados</h3>
+              <p className="text-sm text-muted-foreground">
+                {dadosFiltrados.length} {dadosFiltrados.length === 1 ? "registro encontrado" : "registros encontrados"}
+              </p>
+            </div>
+            <Button onClick={handleExportarDados} className="gap-2">
+              <FileSpreadsheet className="w-4 h-4" />
+              Exportar Excel
+            </Button>
+          </div>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Data</TableHead>
+                  <TableHead>Cliente</TableHead>
+                  <TableHead>CPF</TableHead>
+                  <TableHead>Funcionário</TableHead>
+                  <TableHead>Produto</TableHead>
+                  <TableHead className="text-right">Valor Contrato</TableHead>
+                  <TableHead className="text-right">Prazo</TableHead>
+                  <TableHead className="text-right">Comissão</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {dadosFiltrados.map((venda) => (
+                  <TableRow key={venda.id}>
+                    <TableCell className="whitespace-nowrap">{format(venda.data, "dd/MM/yyyy HH:mm", { locale: ptBR })}</TableCell>
+                    <TableCell className="font-medium">{venda.cliente}</TableCell>
+                    <TableCell>{venda.cpf}</TableCell>
+                    <TableCell>{venda.funcionario}</TableCell>
+                    <TableCell>{venda.produto}</TableCell>
+                    <TableCell className="text-right">R$ {venda.valorContrato.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</TableCell>
+                    <TableCell className="text-right">{venda.prazo} meses</TableCell>
+                    <TableCell className="text-right">R$ {venda.comissao.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</TableCell>
+                    <TableCell>
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${
+                        venda.status === "aprovada" ? "bg-green-100 text-green-800" :
+                        venda.status === "pendente" ? "bg-yellow-100 text-yellow-800" :
+                        venda.status === "em_analise" ? "bg-blue-100 text-blue-800" :
+                        "bg-red-100 text-red-800"
+                      }`}>
+                        {venda.status.replace("_", " ")}
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </Card>
+      )}
+
       {/* Ações */}
       <div className="flex gap-3 justify-end">
         <Button 
@@ -504,8 +853,8 @@ export default function Relatorios() {
           titulo="Evolução de Vendas"
           tipo="linha"
           dados={{
-            labels: dadosRelatorio!.vendas.map(v => v.mes),
-            valores: dadosRelatorio!.vendas.map(v => v.valor),
+            labels: (dadosGraficos || dadosRelatorio)!.vendas.map(v => v.mes),
+            valores: (dadosGraficos || dadosRelatorio)!.vendas.map(v => v.valor),
           }}
           feedback={feedback}
         />
@@ -514,8 +863,8 @@ export default function Relatorios() {
           titulo="Vendas por Produto"
           tipo="pizza"
           dados={{
-            labels: dadosRelatorio!.produtos.map(p => p.nome),
-            valores: dadosRelatorio!.produtos.map(p => p.valor),
+            labels: (dadosGraficos || dadosRelatorio)!.produtos.map(p => p.nome),
+            valores: (dadosGraficos || dadosRelatorio)!.produtos.map(p => p.valor),
           }}
         />
       </div>
@@ -525,9 +874,9 @@ export default function Relatorios() {
           titulo="Receitas x Despesas"
           tipo="barra"
           dados={{
-            labels: dadosRelatorio!.receitas.map(r => r.mes),
-            valores: dadosRelatorio!.receitas.map(r => r.valor),
-            comparacao: dadosRelatorio!.despesas.map(d => d.valor),
+            labels: (dadosGraficos || dadosRelatorio)!.receitas.map(r => r.mes),
+            valores: (dadosGraficos || dadosRelatorio)!.receitas.map(r => r.valor),
+            comparacao: (dadosGraficos || dadosRelatorio)!.despesas.map(d => d.valor),
           }}
         />
 
@@ -535,8 +884,8 @@ export default function Relatorios() {
           titulo="Evolução de Lucros"
           tipo="linha"
           dados={{
-            labels: dadosRelatorio!.lucros.map(l => l.mes),
-            valores: dadosRelatorio!.lucros.map(l => l.valor),
+            labels: (dadosGraficos || dadosRelatorio)!.lucros.map(l => l.mes),
+            valores: (dadosGraficos || dadosRelatorio)!.lucros.map(l => l.valor),
           }}
         />
 
@@ -544,8 +893,8 @@ export default function Relatorios() {
           titulo="Despesas por Período"
           tipo="barra"
           dados={{
-            labels: dadosRelatorio!.despesas.map(d => d.mes),
-            valores: dadosRelatorio!.despesas.map(d => d.valor),
+            labels: (dadosGraficos || dadosRelatorio)!.despesas.map(d => d.mes),
+            valores: (dadosGraficos || dadosRelatorio)!.despesas.map(d => d.valor),
           }}
         />
       </div>
@@ -555,8 +904,8 @@ export default function Relatorios() {
           titulo="Desempenho por Funcionário"
           tipo="barra"
           dados={{
-            labels: dadosRelatorio!.funcionarios.map(f => f.nome.split(" ")[0]),
-            valores: dadosRelatorio!.funcionarios.map(f => f.comissao),
+            labels: (dadosGraficos || dadosRelatorio)!.funcionarios.map(f => f.nome.split(" ")[0]),
+            valores: (dadosGraficos || dadosRelatorio)!.funcionarios.map(f => f.comissao),
           }}
         />
 
@@ -564,8 +913,8 @@ export default function Relatorios() {
           titulo="Vendas por Fornecedor"
           tipo="barra"
           dados={{
-            labels: dadosRelatorio!.fornecedores.map(f => f.nome.replace("Banco ", "")),
-            valores: dadosRelatorio!.fornecedores.map(f => f.valor),
+            labels: (dadosGraficos || dadosRelatorio)!.fornecedores.map(f => f.nome.replace("Banco ", "")),
+            valores: (dadosGraficos || dadosRelatorio)!.fornecedores.map(f => f.valor),
           }}
         />
 
@@ -573,8 +922,8 @@ export default function Relatorios() {
           titulo="Top 10 Clientes"
           tipo="barra"
           dados={{
-            labels: dadosRelatorio!.clientes.map(c => c.nome.split(" ")[0]),
-            valores: dadosRelatorio!.clientes.map(c => c.valor),
+            labels: (dadosGraficos || dadosRelatorio)!.clientes.map(c => c.nome.split(" ")[0]),
+            valores: (dadosGraficos || dadosRelatorio)!.clientes.map(c => c.valor),
           }}
         />
       </div>
