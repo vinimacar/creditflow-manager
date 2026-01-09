@@ -9,19 +9,32 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { NovoUsuarioForm } from "@/components/forms/NovoUsuarioForm";
 import { EditarUsuarioForm } from "@/components/forms/EditarUsuarioForm";
+import { PermissoesCargoEditor } from "@/components/configuracoes/PermissoesCargoEditor";
+import { PermissoesFuncionarioEditor } from "@/components/configuracoes/PermissoesFuncionarioEditor";
 import type { UserProfile } from "@/contexts/AuthTypes";
+import type { UserRole } from "@/contexts/AuthTypes";
+import type { Permissoes } from "@/types/permissions";
+import { PERMISSOES_PADRAO } from "@/types/permissions";
 import {
   Building2,
   Bell,
   Shield,
   Palette,
   Users,
+  Key,
 } from "lucide-react";
 import { toast } from "sonner";
 import { collection, getDocs, doc, setDoc, getDoc } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
 import { Skeleton } from "@/components/ui/skeleton";
 import { updatePassword } from "firebase/auth";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const roleLabels: Record<string, string> = {
   admin: "Administrador",
@@ -90,6 +103,11 @@ export default function Configuracoes() {
   const [senhaAtual, setSenhaAtual] = useState("");
   const [novaSenha, setNovaSenha] = useState("");
   const [salvando, setSalvando] = useState(false);
+  const [salvandoPermissoes, setSalvandoPermissoes] = useState(false);
+  
+  // Estados para permissões
+  const [cargoSelecionado, setCargoSelecionado] = useState<UserRole>("agente");
+  const [permissoesCargo, setPermissoesCargo] = useState<Record<UserRole, Permissoes>>(PERMISSOES_PADRAO);
 
   const carregarConfiguracoes = async () => {
     try {
@@ -98,6 +116,8 @@ export default function Configuracoes() {
         const data = configDoc.data();
         if (data.empresa) setEmpresa(data.empresa);
         if (data.notificacoes) setNotificacoes(data.notificacoes);
+        if (data.permissoesCargo) setPermissoesCargo(data.permissoesCargo);
+        if (data.permissoesCargo) setPermissoesCargo(data.permissoesCargo);
         if (data.seguranca) setSeguranca(data.seguranca);
         if (data.aparencia) setAparencia(data.aparencia);
       }
@@ -191,6 +211,48 @@ export default function Configuracoes() {
     }
   };
 
+  const handleSavePermissoesCargo = async (cargo: UserRole) => {
+    setSalvandoPermissoes(true);
+    try {
+      await setDoc(
+        doc(db, "configuracoes", "geral"),
+        { permissoesCargo },
+        { merge: true }
+      );
+      toast.success(`Permissões do cargo ${roleLabels[cargo]} atualizadas com sucesso!`);
+    } catch (error) {
+      console.error("Erro ao salvar permissões:", error);
+      toast.error("Erro ao salvar permissões");
+    } finally {
+      setSalvandoPermissoes(false);
+    }
+  };
+
+  const handleSavePermissoesFuncionario = async (
+    funcionarioId: string,
+    permissoes: Permissoes,
+    usarPadrao: boolean
+  ) => {
+    setSalvandoPermissoes(true);
+    try {
+      await setDoc(
+        doc(db, "users", funcionarioId),
+        {
+          permissoesCustomizadas: usarPadrao ? null : permissoes,
+          usarPermissoesCargo: usarPadrao,
+        },
+        { merge: true }
+      );
+      toast.success("Permissões do funcionário atualizadas com sucesso!");
+      await carregarUsuarios();
+    } catch (error) {
+      console.error("Erro ao salvar permissões do funcionário:", error);
+      toast.error("Erro ao salvar permissões");
+    } finally {
+      setSalvandoPermissoes(false);
+    }
+  };
+
   const carregarUsuarios = async () => {
     try {
       setLoadingUsers(true);
@@ -223,7 +285,7 @@ export default function Configuracoes() {
       />
 
       <Tabs defaultValue="empresa" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-5 h-auto p-1">
+        <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6 h-auto p-1">
           <TabsTrigger value="empresa" className="gap-2 py-2">
             <Building2 className="w-4 h-4" />
             <span className="hidden sm:inline">Empresa</span>
@@ -231,6 +293,10 @@ export default function Configuracoes() {
           <TabsTrigger value="usuarios" className="gap-2 py-2">
             <Users className="w-4 h-4" />
             <span className="hidden sm:inline">Usuários</span>
+          </TabsTrigger>
+          <TabsTrigger value="permissoes" className="gap-2 py-2">
+            <Key className="w-4 h-4" />
+            <span className="hidden sm:inline">Permissões</span>
           </TabsTrigger>
           <TabsTrigger value="notificacoes" className="gap-2 py-2">
             <Bell className="w-4 h-4" />
@@ -346,6 +412,69 @@ export default function Configuracoes() {
             <div className="flex justify-end mt-6">
               <NovoUsuarioForm onUserCreated={carregarUsuarios} />
             </div>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="permissoes">
+          <Card className="p-6">
+            <h3 className="text-lg font-semibold mb-4">Gerenciamento de Permissões</h3>
+            <p className="text-muted-foreground mb-6">
+              Defina os níveis de acesso por função ou customize permissões individuais por funcionário.
+            </p>
+
+            <Tabs defaultValue="porCargo" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="porCargo">Por Cargo</TabsTrigger>
+                <TabsTrigger value="porFuncionario">Por Funcionário</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="porCargo" className="space-y-4 mt-6">
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">
+                      Selecione o Cargo
+                    </label>
+                    <Select
+                      value={cargoSelecionado}
+                      onValueChange={setCargoSelecionado}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Escolha um cargo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="admin">Administrador</SelectItem>
+                        <SelectItem value="gerente">Gerente</SelectItem>
+                        <SelectItem value="agente">Agente</SelectItem>
+                        <SelectItem value="atendente">Atendente</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {cargoSelecionado && permissoesCargo[cargoSelecionado] && (
+                    <PermissoesCargoEditor
+                      cargo={cargoSelecionado}
+                      permissoes={permissoesCargo[cargoSelecionado]}
+                      onChange={(novasPermissoes) => {
+                        setPermissoesCargo({
+                          ...permissoesCargo,
+                          [cargoSelecionado]: novasPermissoes,
+                        });
+                      }}
+                      onSalvar={() => handleSavePermissoesCargo(cargoSelecionado)}
+                      salvando={salvandoPermissoes}
+                    />
+                  )}
+                </div>
+              </TabsContent>
+
+              <TabsContent value="porFuncionario" className="space-y-4 mt-6">
+                <PermissoesFuncionarioEditor
+                  usuarios={usuarios}
+                  onSalvar={handleSavePermissoesFuncionario}
+                  salvando={salvandoPermissoes}
+                />
+              </TabsContent>
+            </Tabs>
           </Card>
         </TabsContent>
 
