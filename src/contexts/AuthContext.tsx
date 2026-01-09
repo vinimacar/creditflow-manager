@@ -6,7 +6,7 @@ import {
   onAuthStateChanged,
   User
 } from "firebase/auth";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc, collection, getDocs } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import type { UserRole, UserProfile, AuthContextType } from "./AuthTypes";
 
@@ -43,6 +43,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (userDoc.exists()) {
       const data = userDoc.data();
+      
+      // Auto-aprovar se for admin e ainda não está aprovado
+      if (data.role === "admin" && !data.aprovado) {
+        await updateDoc(userDocRef, {
+          aprovado: true,
+        });
+        
+        return {
+          uid: firebaseUser.uid,
+          email: firebaseUser.email || "",
+          displayName: firebaseUser.displayName || "",
+          photoURL: firebaseUser.photoURL || undefined,
+          role: data.role,
+          aprovado: true,
+          createdAt: data.createdAt?.toDate() || new Date(),
+        };
+      }
+      
       return {
         uid: firebaseUser.uid,
         email: firebaseUser.email || "",
@@ -53,14 +71,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         createdAt: data.createdAt?.toDate() || new Date(),
       };
     } else {
-      // Novo usuário - precisa ser aprovado
+      // Verificar se é o primeiro usuário (admin inicial)
+      const usersSnapshot = await getDocs(collection(db, "users"));
+      const isFirstUser = usersSnapshot.empty;
+      
       const newUserProfile: UserProfile = {
         uid: firebaseUser.uid,
         email: firebaseUser.email || "",
         displayName: firebaseUser.displayName || "",
         photoURL: firebaseUser.photoURL || undefined,
-        role: "atendente",
-        aprovado: false,
+        role: isFirstUser ? "admin" : "atendente",
+        aprovado: isFirstUser, // Primeiro usuário é aprovado automaticamente
         createdAt: new Date(),
       };
 
