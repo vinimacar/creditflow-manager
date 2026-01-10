@@ -21,7 +21,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Plus, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { getFornecedores, getBancos, getCategorias, type Fornecedor, type Banco, type Categoria } from "@/lib/firestore";
+import { getFornecedores, getBancos, getCategoriasProdutos, type Fornecedor, type Banco, type CategoriaProduto } from "@/lib/firestore";
 
 interface ComissaoFaixa {
   id: string;
@@ -75,7 +75,7 @@ export function NovoProdutoForm({ open, onOpenChange, onSalvar }: NovoProdutoFor
   const [salvando, setSalvando] = useState(false);
   const [fornecedores, setFornecedores] = useState<Fornecedor[]>([]);
   const [bancos, setBancos] = useState<Banco[]>([]);
-  const [categorias, setCategorias] = useState<Categoria[]>([]);
+  const [categorias, setCategorias] = useState<CategoriaProduto[]>([]);
 
   useEffect(() => {
     const loadDados = async () => {
@@ -83,7 +83,7 @@ export function NovoProdutoForm({ open, onOpenChange, onSalvar }: NovoProdutoFor
         const [fornecedoresData, bancosData, categoriasData] = await Promise.all([
           getFornecedores(),
           getBancos(),
-          getCategorias(),
+          getCategoriasProdutos(),
         ]);
         setFornecedores(fornecedoresData);
         setBancos(bancosData);

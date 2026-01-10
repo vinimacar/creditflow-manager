@@ -69,7 +69,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { getClientes, getProdutos, getFuncionarios, getVendas, getFornecedores, getBancos, getCategorias, type Cliente, type Produto, type Funcionario, type Venda, type Fornecedor, type Banco, type Categoria } from "@/lib/firestore";
+import { getClientes, getProdutos, getFuncionarios, getVendas, getFornecedores, getBancos, getCategoriasProdutos, addBanco, addCategoriaProduto, type Cliente, type Produto, type Funcionario, type Venda, type Fornecedor, type Banco, type CategoriaProduto } from "@/lib/firestore";
 import { collection, addDoc, Timestamp, updateDoc, doc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -84,15 +84,24 @@ export default function PDV() {
   const [funcionarios, setFuncionarios] = useState<Funcionario[]>([]);
   const [fornecedores, setFornecedores] = useState<Fornecedor[]>([]);
   const [bancos, setBancos] = useState<Banco[]>([]);
-  const [categorias, setCategorias] = useState<Categoria[]>([]);
+  const [categorias, setCategorias] = useState<CategoriaProduto[]>([]);
   const [vendas, setVendas] = useState<Venda[]>([]);
   const [openClienteCombobox, setOpenClienteCombobox] = useState(false);
   const [selectedCliente, setSelectedCliente] = useState<string>("");
   const [selectedProduto, setSelectedProduto] = useState<string>("");
   const [selectedFuncionario, setSelectedFuncionario] = useState<string>("");
+  const [selectedFornecedor, setSelectedFornecedor] = useState<string>("");
+  const [selectedBanco, setSelectedBanco] = useState<string>("");
+  const [selectedCategoria, setSelectedCategoria] = useState<string>("");
   const [valorContrato, setValorContrato] = useState<string>("");
   const [prazo, setPrazo] = useState<string>("");
   const [processando, setProcessando] = useState(false);
+  
+  // Estados para diálogos de cadastro rápido
+  const [novoBancoDialog, setNovoBancoDialog] = useState(false);
+  const [novaCategoriaDialog, setNovaCategoriaDialog] = useState(false);
+  const [novoBancoNome, setNovoBancoNome] = useState<string>("");
+  const [novaCategoriaNome, setNovaCategoriaNome] = useState<string>("");
   
   // Estados para consulta de vendas
   const [consultarVendasOpen, setConsultarVendasOpen] = useState(false);
@@ -120,7 +129,7 @@ export default function PDV() {
         getVendas(),
         getFornecedores(),
         getBancos(),
-        getCategorias(),
+        getCategoriasProdutos(),
       ]);
       setClientes(clientesData);
       setProdutos(produtosData);
@@ -137,9 +146,6 @@ export default function PDV() {
 
   const clienteSelecionado = clientes.find((c) => c.id === selectedCliente);
   const produto = produtos.find((p) => p.id === selectedProduto);
-  const fornecedorDoProduto = produto?.fornecedorId ? fornecedores.find((f) => f.id === produto.fornecedorId) : null;
-  const bancoDoProduto = produto?.bancoId ? bancos.find((b) => b.id === produto.bancoId) : null;
-  const categoriaDoProduto = produto?.categoriaId ? categorias.find((c) => c.id === produto.categoriaId) : null;
   const comissaoPerc = produto?.comissao || 0;
   const comissaoValor = valorContrato
     ? (parseFloat(valorContrato) * (comissaoPerc / 100)).toFixed(2)
@@ -161,7 +167,9 @@ export default function PDV() {
         clienteId: selectedCliente,
         produtoId: selectedProduto,
         funcionarioId: selectedFuncionario,
-        fornecedorId: produtoSelecionado?.fornecedorId || "",
+        fornecedorId: selectedFornecedor || produtoSelecionado?.fornecedorId || "",
+        bancoId: selectedBanco || "",
+        categoriaId: selectedCategoria || "",
         valorContrato: parseFloat(valorContrato),
         prazo: parseInt(prazo),
         comissao: parseFloat(comissaoValor),
@@ -180,6 +188,9 @@ export default function PDV() {
       setSelectedCliente("");
       setSelectedProduto("");
       setSelectedFuncionario("");
+      setSelectedFornecedor("");
+      setSelectedBanco("");
+      setSelectedCategoria("");
       setValorContrato("");
       setPrazo("");
     } catch (error) {
@@ -271,6 +282,56 @@ export default function PDV() {
     } catch (error) {
       console.error("Erro ao estornar venda:", error);
       toast.error("Erro ao estornar venda");
+    }
+  };
+
+  const handleCadastrarBanco = async () => {
+    if (!novoBancoNome.trim()) {
+      toast.error("Digite o nome do banco");
+      return;
+    }
+
+    try {
+      const novoId = await addBanco({
+        nome: novoBancoNome,
+        status: "ativo",
+      });
+      
+      toast.success("Banco cadastrado com sucesso!");
+      setNovoBancoNome("");
+      setNovoBancoDialog(false);
+      
+      // Recarregar bancos e selecionar o novo
+      await carregarDados();
+      setSelectedBanco(novoId);
+    } catch (error) {
+      console.error("Erro ao cadastrar banco:", error);
+      toast.error("Erro ao cadastrar banco");
+    }
+  };
+
+  const handleCadastrarCategoria = async () => {
+    if (!novaCategoriaNome.trim()) {
+      toast.error("Digite o nome da categoria");
+      return;
+    }
+
+    try {
+      const novoId = await addCategoriaProduto({
+        nome: novaCategoriaNome,
+        status: "ativo",
+      });
+      
+      toast.success("Categoria cadastrada com sucesso!");
+      setNovaCategoriaNome("");
+      setNovaCategoriaDialog(false);
+      
+      // Recarregar categorias e selecionar a nova
+      await carregarDados();
+      setSelectedCategoria(novoId);
+    } catch (error) {
+      console.error("Erro ao cadastrar categoria:", error);
+      toast.error("Erro ao cadastrar categoria");
     }
   };
 
@@ -578,6 +639,73 @@ export default function PDV() {
                 </Select>
               </div>
               <div>
+                <Label>Fornecedor</Label>
+                <Select value={selectedFornecedor} onValueChange={setSelectedFornecedor}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o fornecedor" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {fornecedores.map((fornecedor) => (
+                      <SelectItem key={fornecedor.id} value={fornecedor.id!}>
+                        {fornecedor.nomeFantasia}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="flex items-center justify-between">
+                  Banco
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 text-xs"
+                    onClick={() => setNovoBancoDialog(true)}
+                  >
+                    + Cadastrar
+                  </Button>
+                </Label>
+                <Select value={selectedBanco} onValueChange={setSelectedBanco}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o banco" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {bancos.map((banco) => (
+                      <SelectItem key={banco.id} value={banco.id!}>
+                        {banco.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="flex items-center justify-between">
+                  Categoria
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 text-xs"
+                    onClick={() => setNovaCategoriaDialog(true)}
+                  >
+                    + Cadastrar
+                  </Button>
+                </Label>
+                <Select value={selectedCategoria} onValueChange={setSelectedCategoria}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione a categoria" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categorias.map((categoria) => (
+                      <SelectItem key={categoria.id} value={categoria.id!}>
+                        {categoria.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
                 <Label>Prazo (meses) *</Label>
                 <Select value={prazo} onValueChange={setPrazo}>
                   <SelectTrigger>
@@ -651,27 +779,6 @@ export default function PDV() {
                   {selectedProduto
                     ? produtos.find((p) => p.id === selectedProduto)?.nome
                     : "-"}
-                </span>
-              </div>
-              <Separator />
-              <div className="flex justify-between items-center py-2">
-                <span className="text-muted-foreground">Fornecedor</span>
-                <span className="font-medium text-sm">
-                  {fornecedorDoProduto?.nomeFantasia || "-"}
-                </span>
-              </div>
-              <Separator />
-              <div className="flex justify-between items-center py-2">
-                <span className="text-muted-foreground">Banco</span>
-                <span className="font-medium text-sm">
-                  {bancoDoProduto?.nome || "-"}
-                </span>
-              </div>
-              <Separator />
-              <div className="flex justify-between items-center py-2">
-                <span className="text-muted-foreground">Categoria</span>
-                <span className="font-medium text-sm">
-                  {categoriaDoProduto?.nome || "-"}
                 </span>
               </div>
               <Separator />
@@ -983,6 +1090,76 @@ export default function PDV() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Dialog Cadastrar Banco */}
+      <Dialog open={novoBancoDialog} onOpenChange={setNovoBancoDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cadastrar Novo Banco</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div>
+              <Label>Nome do Banco *</Label>
+              <Input
+                placeholder="Ex: Banco do Brasil, Caixa, Itaú..."
+                value={novoBancoNome}
+                onChange={(e) => setNovoBancoNome(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    handleCadastrarBanco();
+                  }
+                }}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setNovoBancoDialog(false);
+              setNovoBancoNome("");
+            }}>
+              Cancelar
+            </Button>
+            <Button onClick={handleCadastrarBanco}>
+              Cadastrar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Cadastrar Categoria */}
+      <Dialog open={novaCategoriaDialog} onOpenChange={setNovaCategoriaDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cadastrar Nova Categoria</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div>
+              <Label>Nome da Categoria *</Label>
+              <Input
+                placeholder="Ex: Empréstimo Pessoal, Consignado, Cartão..."
+                value={novaCategoriaNome}
+                onChange={(e) => setNovaCategoriaNome(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    handleCadastrarCategoria();
+                  }
+                }}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setNovaCategoriaDialog(false);
+              setNovaCategoriaNome("");
+            }}>
+              Cancelar
+            </Button>
+            <Button onClick={handleCadastrarCategoria}>
+              Cadastrar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

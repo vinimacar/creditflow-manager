@@ -299,8 +299,7 @@ export interface Produto {
   codigo?: string;
   descricao?: string;
   preco?: number;
-  categoria?: string; // Mantido para compatibilidade (deprecated)
-  categoriaId?: string; // ID da categoria do produto
+  categoria?: string;
   estoque?: number;
   prazoMin?: number;
   prazoMax?: number;
@@ -308,8 +307,7 @@ export interface Produto {
   comissao: number; // Percentual de comissão para o agente vendedor
   comissaoFornecedor?: number; // Percentual de comissão paga pelo fornecedor
   taxaJuros?: number;
-  fornecedorId?: string; // ID do fornecedor vinculado ao produto
-  bancoId?: string; // ID do banco vinculado ao produto
+  fornecedorId?: string; // ID do fornecedor (Banco) vinculado ao produto
   status: "ativo" | "inativo";
   createdAt?: Date;
   updatedAt?: Date;
@@ -609,7 +607,7 @@ export async function getDespesas(): Promise<Despesa[]> {
 export interface Banco {
   id?: string;
   nome: string;
-  codigo?: string; // Código do banco (ex: 001, 104, 237)
+  codigo?: string;
   status: "ativo" | "inativo";
   createdAt?: Date;
   updatedAt?: Date;
@@ -656,7 +654,7 @@ export async function getBancos(): Promise<Banco[]> {
 
 // ===== CATEGORIAS DE PRODUTOS =====
 
-export interface Categoria {
+export interface CategoriaProduto {
   id?: string;
   nome: string;
   descricao?: string;
@@ -665,10 +663,10 @@ export interface Categoria {
   updatedAt?: Date;
 }
 
-export const categoriasCollection = "categorias";
+export const categoriasProdutosCollection = "categoriasProdutos";
 
-export async function addCategoria(categoria: Omit<Categoria, "id">) {
-  const docRef = await addDoc(collection(db, categoriasCollection), {
+export async function addCategoriaProduto(categoria: Omit<CategoriaProduto, "id">) {
+  const docRef = await addDoc(collection(db, categoriasProdutosCollection), {
     ...categoria,
     status: categoria.status || "ativo",
     createdAt: Timestamp.now(),
@@ -677,29 +675,29 @@ export async function addCategoria(categoria: Omit<Categoria, "id">) {
   return docRef.id;
 }
 
-export async function updateCategoria(id: string, categoria: Partial<Categoria>) {
-  const docRef = doc(db, categoriasCollection, id);
+export async function updateCategoriaProduto(id: string, categoria: Partial<CategoriaProduto>) {
+  const docRef = doc(db, categoriasProdutosCollection, id);
   await updateDoc(docRef, {
     ...categoria,
     updatedAt: Timestamp.now(),
   });
 }
 
-export async function deleteCategoria(id: string) {
-  await deleteDoc(doc(db, categoriasCollection, id));
+export async function deleteCategoriaProduto(id: string) {
+  await deleteDoc(doc(db, categoriasProdutosCollection, id));
 }
 
-export async function getCategorias(): Promise<Categoria[]> {
+export async function getCategoriasProdutos(): Promise<CategoriaProduto[]> {
   try {
     const querySnapshot = await getDocs(
-      query(collection(db, categoriasCollection), orderBy("nome", "asc"))
+      query(collection(db, categoriasProdutosCollection), orderBy("nome", "asc"))
     );
     return querySnapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
-    })) as Categoria[];
+    })) as CategoriaProduto[];
   } catch (error) {
-    console.error("Erro ao buscar categorias:", error);
+    console.error("Erro ao buscar categorias de produtos:", error);
     return [];
   }
 }
