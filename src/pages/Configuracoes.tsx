@@ -22,9 +22,12 @@ import {
   Palette,
   Users,
   Key,
+  Database,
+  Download,
+  Upload,
 } from "lucide-react";
 import { toast } from "sonner";
-import { collection, getDocs, doc, setDoc, getDoc } from "firebase/firestore";
+import { collection, getDocs, doc, setDoc, getDoc, addDoc, Timestamp } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
 import { Skeleton } from "@/components/ui/skeleton";
 import { updatePassword } from "firebase/auth";
@@ -104,6 +107,8 @@ export default function Configuracoes() {
   const [novaSenha, setNovaSenha] = useState("");
   const [salvando, setSalvando] = useState(false);
   const [salvandoPermissoes, setSalvandoPermissoes] = useState(false);
+  const [importando, setImportando] = useState(false);
+  const [exportando, setExportando] = useState(false);
   
   // Estados para permissões
   const [cargoSelecionado, setCargoSelecionado] = useState<UserRole>("agente");
@@ -277,6 +282,144 @@ export default function Configuracoes() {
     carregarConfiguracoes();
   }, []);
 
+  const handleBackupDados = async () => {
+    setExportando(true);
+    try {
+      // Coleções para fazer backup
+      const colecoes = [
+        "clientes",
+        "vendas",
+        "produtos",
+        "funcionarios",
+        "fornecedores",
+        "bancos",
+        "categoriasProdutos",
+        "despesas",
+        "users",
+      ];
+
+      const backup: Record<string, any[]> = {};
+
+      // Buscar dados de cada coleção
+      for (const colecao of colecoes) {
+        const snapshot = await getDocs(collection(db, colecao));
+        backup[colecao] = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+      }
+
+      // Adicionar metadados do backup
+      const backupCompleto = {
+        metadata: {
+          dataExportacao: new Date().toISOString(),
+          versao: "1.0",
+          sistema: "CréditoGestor",
+        },
+        dados: backup,
+      };
+
+      // Criar arquivo JSON para download
+      const dataStr = JSON.stringify(backupCompleto, null, 2);
+      const dataBlob = new Blob([dataStr], { type: "application/json" });
+      const url = URL.createObjectURL(dataBlob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `backup_creditogestor_${new Date().toISOString().split("T")[0]}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      toast.success("Backup realizado com sucesso!");
+    } catch (error) {
+      console.error("Erro ao fazer backup:", error);
+      toast.error("Erro ao fazer backup dos dados");
+    } finally {
+      setExportando(false);
+    }
+  };
+
+  const handleImportarVendas = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setImportando(true);
+    try {
+      const texto = await file.text();
+      let dados: any;
+
+      // Tentar parsear JSON ou CSV
+      try {
+        dados = JSON.parse(texto);
+      } catch {
+        // Se falhar, tentar como CSV
+        dados = parseCSV(texto);
+      }
+
+      let vendasImportadas = 0;
+      const vendas = Array.isArray(dados) ? dados : dados.vendas || dados.dados?.vendas || [];
+
+      if (!Array.isArray(vendas) || vendas.length === 0) {
+        toast.error("Nenhuma venda encontrada no arquivo");
+        return;
+      }
+
+      // Importar cada venda
+      for (const venda of vendas) {
+        try {
+          const vendaData: any = {
+            clienteId: venda.clienteId || venda.cliente_id || "",
+            produtoId: venda.produtoId || venda.produto_id || "",
+            funcionarioId: venda.funcionarioId || venda.funcionario_id || "",
+            fornecedorId: venda.fornecedorId || venda.fornecedor_id || "",
+            valorContrato: parseFloat(venda.valorContrato || venda.valor_contrato || venda.valor || 0),
+            prazo: parseInt(venda.prazo || 0),
+            comissao: parseFloat(venda.comissao || 0),
+            comissaoPercentual: parseFloat(venda.comissaoPercentual || venda.comissao_percentual || 0),
+            status: venda.status || "aprovada",
+            criadoPor: venda.criadoPor || venda.criado_por || auth.currentUser?.uid || "",
+            createdAt: venda.createdAt ? Timestamp.fromDate(new Date(venda.createdAt)) : Timestamp.now(),
+          };
+
+          await addDoc(collection(db, "vendas"), vendaData);
+          vendasImportadas++;
+        } catch (error) {
+          console.error("Erro ao importar venda:", error);
+        }
+      }
+
+      toast.success(`${vendasImportadas} vendas importadas com sucesso!`);
+      
+      // Limpar input
+      event.target.value = "";
+    } catch (error) {
+      console.error("Erro ao importar vendas:", error);
+      toast.error("Erro ao importar vendas. Verifique o formato do arquivo.");
+    } finally {
+      setImportando(false);
+    }
+  };
+
+  const parseCSV = (texto: string) => {
+    const linhas = texto.split("\n").filter((l) => l.trim());
+    if (linhas.length < 2) return [];
+
+    const headers = linhas[0].split(",").map((h) => h.trim());
+    const vendas = [];
+
+    for (let i = 1; i < linhas.length; i++) {
+      const valores = linhas[i].split(",");
+      const venda: any = {};
+      headers.forEach((header, index) => {
+        venda[header] = valores[index]?.trim() || "";
+      });
+      vendas.push(venda);
+    }
+
+    return vendas;
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -285,7 +428,7 @@ export default function Configuracoes() {
       />
 
       <Tabs defaultValue="empresa" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6 h-auto p-1">
+        <TabsList className="grid w-full grid-cols-4 lg:grid-cols-7 h-auto p-1">
           <TabsTrigger value="empresa" className="gap-2 py-2">
             <Building2 className="w-4 h-4" />
             <span className="hidden sm:inline">Empresa</span>
@@ -309,6 +452,10 @@ export default function Configuracoes() {
           <TabsTrigger value="aparencia" className="gap-2 py-2">
             <Palette className="w-4 h-4" />
             <span className="hidden sm:inline">Aparência</span>
+          </TabsTrigger>
+          <TabsTrigger value="dados" className="gap-2 py-2">
+            <Database className="w-4 h-4" />
+            <span className="hidden sm:inline">Dados</span>
           </TabsTrigger>
         </TabsList>
 
@@ -630,6 +777,112 @@ export default function Configuracoes() {
               </Button>
             </div>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="dados">
+          <div className="grid gap-6 md:grid-cols-2">
+            <Card className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 rounded-lg bg-primary/10">
+                  <Download className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold">Backup de Dados</h3>
+                  <p className="text-sm text-muted-foreground">Exportar todos os dados do sistema</p>
+                </div>
+              </div>
+              
+              <div className="space-y-4">
+                <div className="bg-muted/50 rounded-lg p-4">
+                  <p className="text-sm mb-2">O backup incluirá:</p>
+                  <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                    <li>Clientes</li>
+                    <li>Vendas</li>
+                    <li>Produtos</li>
+                    <li>Funcionários</li>
+                    <li>Fornecedores</li>
+                    <li>Bancos e Categorias</li>
+                    <li>Despesas</li>
+                    <li>Usuários</li>
+                  </ul>
+                </div>
+
+                <Button 
+                  onClick={handleBackupDados} 
+                  disabled={exportando}
+                  className="w-full gap-2"
+                >
+                  {exportando ? (
+                    <>
+                      <span className="animate-spin">⏳</span>
+                      Exportando...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="w-4 h-4" />
+                      Exportar Backup (JSON)
+                    </>
+                  )}
+                </Button>
+
+                <p className="text-xs text-muted-foreground text-center">
+                  O arquivo será baixado no formato JSON
+                </p>
+              </div>
+            </Card>
+
+            <Card className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 rounded-lg bg-green-500/10">
+                  <Upload className="w-5 h-5 text-green-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold">Importar Vendas</h3>
+                  <p className="text-sm text-muted-foreground">Importar vendas de arquivo externo</p>
+                </div>
+              </div>
+              
+              <div className="space-y-4">
+                <div className="bg-muted/50 rounded-lg p-4">
+                  <p className="text-sm mb-2 font-medium">Formatos aceitos:</p>
+                  <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                    <li>JSON (backup completo ou vendas)</li>
+                    <li>CSV (planilha de vendas)</li>
+                  </ul>
+                  
+                  <div className="mt-3 pt-3 border-t">
+                    <p className="text-sm mb-2 font-medium">Campos necessários (CSV):</p>
+                    <p className="text-xs text-muted-foreground">
+                      clienteId, produtoId, funcionarioId, valorContrato, prazo, comissao, status
+                    </p>
+                  </div>
+                </div>
+
+                <div className="relative">
+                  <Input
+                    type="file"
+                    accept=".json,.csv"
+                    onChange={handleImportarVendas}
+                    disabled={importando}
+                    className="cursor-pointer"
+                  />
+                </div>
+
+                {importando && (
+                  <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                    <span className="animate-spin">⏳</span>
+                    Importando vendas...
+                  </div>
+                )}
+
+                <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3">
+                  <p className="text-xs text-yellow-700 dark:text-yellow-500">
+                    ⚠️ As vendas serão adicionadas ao sistema. Certifique-se de que os IDs de clientes, produtos e funcionários existem no banco de dados.
+                  </p>
+                </div>
+              </div>
+            </Card>
+          </div>
         </TabsContent>
       </Tabs>
     </div>
