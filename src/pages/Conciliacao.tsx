@@ -3,6 +3,14 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import {
   Popover,
@@ -40,6 +48,8 @@ import {
   RefreshCw,
   FileSpreadsheet,
   CalendarIcon,
+  X,
+  DollarSign,
 } from "lucide-react";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
@@ -48,7 +58,7 @@ import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { collection, getDocs, query, orderBy } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { getClientes, getProdutos, getFuncionarios } from "@/lib/firestore";
+import { getClientes, getProdutos, getFuncionarios, getFornecedores, type Fornecedor } from "@/lib/firestore";
 
 export default function Conciliacao() {
   const { hasPermission } = useAuth();
@@ -58,6 +68,21 @@ export default function Conciliacao() {
   const [processando, setProcessando] = useState(false);
   const [carregandoSistema, setCarregandoSistema] = useState(false);
   const [periodoImportacao, setPeriodoImportacao] = useState<{ inicio?: Date; fim?: Date }>({});
+  const [fornecedores, setFornecedores] = useState<Fornecedor[]>([]);
+  const [fornecedorFiltro, setFornecedorFiltro] = useState<string>("todos");
+
+  // Carregar fornecedores
+  useEffect(() => {
+    const carregarFornecedores = async () => {
+      try {
+        const data = await getFornecedores();
+        setFornecedores(data);
+      } catch (error) {
+        console.error("Erro ao carregar fornecedores:", error);
+      }
+    };
+    carregarFornecedores();
+  }, []);
 
   // Verificar permissão (apenas gerentes e admins)
   if (!hasPermission(["admin", "gerente"])) {
@@ -448,11 +473,42 @@ export default function Conciliacao() {
       {/* Tabela de Dados Internos Carregados */}
       {dadosInternos.length > 0 && divergencias.length === 0 && (
         <Card>
-          <div className="p-6 border-b">
-            <h3 className="text-lg font-semibold">Dados Internos Carregados</h3>
-            <p className="text-sm text-muted-foreground">
-              {dadosInternos.length} {dadosInternos.length === 1 ? "venda carregada" : "vendas carregadas"}
-            </p>
+          <div className="p-6 border-b space-y-4">
+            <div>
+              <h3 className="text-lg font-semibold">Dados Internos Carregados</h3>
+              <p className="text-sm text-muted-foreground">
+                {dadosInternos.length} {dadosInternos.length === 1 ? "venda carregada" : "vendas carregadas"}
+              </p>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="w-64">
+                <Label>Filtrar por Fornecedor</Label>
+                <Select value={fornecedorFiltro} onValueChange={setFornecedorFiltro}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todos os fornecedores" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos os fornecedores</SelectItem>
+                    {fornecedores.map((fornecedor) => (
+                      <SelectItem key={fornecedor.id} value={fornecedor.nomeFantasia}>
+                        {fornecedor.nomeFantasia}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {fornecedorFiltro !== "todos" && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setFornecedorFiltro("todos")}
+                  className="gap-2 mt-6"
+                >
+                  <X className="w-4 h-4" />
+                  Limpar Filtro
+                </Button>
+              )}
+            </div>
           </div>
           <div className="overflow-x-auto">
             <Table>
@@ -472,7 +528,10 @@ export default function Conciliacao() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {dadosInternos.slice(0, 50).map((venda, index) => (
+                {dadosInternos
+                  .filter(venda => fornecedorFiltro === "todos" || venda.fornecedor === fornecedorFiltro)
+                  .slice(0, 50)
+                  .map((venda, index) => (
                   <TableRow key={index}>
                     <TableCell className="font-mono text-xs">{venda.contrato}</TableCell>
                     <TableCell className="font-medium">{venda.cliente}</TableCell>
@@ -500,11 +559,20 @@ export default function Conciliacao() {
               </TableBody>
             </Table>
           </div>
-          {dadosInternos.length > 50 && (
-            <div className="p-4 border-t text-center text-sm text-muted-foreground">
-              Mostrando 50 de {dadosInternos.length} vendas. Exporte para ver todos os dados.
-            </div>
-          )}
+          {(() => {
+            const vendasFiltradas = dadosInternos.filter(venda => 
+              fornecedorFiltro === "todos" || venda.fornecedor === fornecedorFiltro
+            );
+            return vendasFiltradas.length > 50 ? (
+              <div className="p-4 border-t text-center text-sm text-muted-foreground">
+                Mostrando 50 de {vendasFiltradas.length} vendas {fornecedorFiltro !== "todos" && `(${fornecedorFiltro})`}. Exporte para ver todos os dados.
+              </div>
+            ) : vendasFiltradas.length > 0 && vendasFiltradas.length !== dadosInternos.length ? (
+              <div className="p-4 border-t text-center text-sm text-muted-foreground">
+                Mostrando {vendasFiltradas.length} {vendasFiltradas.length === 1 ? "venda" : "vendas"} de {fornecedorFiltro}
+              </div>
+            ) : null;
+          })()}
         </Card>
       )}
 
