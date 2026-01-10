@@ -43,6 +43,19 @@ interface Cliente {
   status: string;
 }
 
+// Função para calcular idade
+const calcularIdade = (dataNasc: string): number => {
+  if (!dataNasc) return 0;
+  const hoje = new Date();
+  const nascimento = new Date(dataNasc);
+  let idade = hoje.getFullYear() - nascimento.getFullYear();
+  const mes = hoje.getMonth() - nascimento.getMonth();
+  if (mes < 0 || (mes === 0 && hoje.getDate() < nascimento.getDate())) {
+    idade--;
+  }
+  return idade;
+};
+
 const columns = [
   {
     key: "nome",
@@ -83,6 +96,14 @@ const columns = [
   {
     key: "dataNascimento",
     header: "Data de Nasc.",
+    render: (cliente: Cliente) => (
+      <div>
+        <p className="text-sm">{cliente.dataNascimento}</p>
+        <p className="text-xs text-muted-foreground">
+          {calcularIdade(cliente.dataNascimento)} anos
+        </p>
+      </div>
+    ),
   },
   {
     key: "status",
