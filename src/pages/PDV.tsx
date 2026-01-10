@@ -69,7 +69,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { getClientes, getProdutos, getFuncionarios, getVendas, type Cliente, type Produto, type Funcionario, type Venda } from "@/lib/firestore";
+import { getClientes, getProdutos, getFuncionarios, getVendas, getFornecedores, type Cliente, type Produto, type Funcionario, type Venda, type Fornecedor } from "@/lib/firestore";
 import { collection, addDoc, Timestamp, updateDoc, doc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -82,6 +82,7 @@ export default function PDV() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [funcionarios, setFuncionarios] = useState<Funcionario[]>([]);
+  const [fornecedores, setFornecedores] = useState<Fornecedor[]>([]);
   const [vendas, setVendas] = useState<Venda[]>([]);
   const [openClienteCombobox, setOpenClienteCombobox] = useState(false);
   const [selectedCliente, setSelectedCliente] = useState<string>("");
@@ -110,16 +111,18 @@ export default function PDV() {
 
   const carregarDados = async () => {
     try {
-      const [clientesData, produtosData, funcionariosData, vendasData] = await Promise.all([
+      const [clientesData, produtosData, funcionariosData, vendasData, fornecedoresData] = await Promise.all([
         getClientes(),
         getProdutos(),
         getFuncionarios(),
         getVendas(),
+        getFornecedores(),
       ]);
       setClientes(clientesData);
       setProdutos(produtosData);
       setFuncionarios(funcionariosData);
       setVendas(vendasData);
+      setFornecedores(fornecedoresData);
     } catch (error) {
       console.error("Erro ao carregar dados:", error);
       toast.error("Erro ao carregar dados");
@@ -142,12 +145,14 @@ export default function PDV() {
     setProcessando(true);
     try {
       const vendaId = `VND-${Date.now().toString().slice(-6)}`;
+      const produtoSelecionado = produtos.find(p => p.id === selectedProduto);
       
       await addDoc(collection(db, "vendas"), {
         id: vendaId,
         clienteId: selectedCliente,
         produtoId: selectedProduto,
         funcionarioId: selectedFuncionario,
+        fornecedorId: produtoSelecionado?.fornecedorId || "",
         valorContrato: parseFloat(valorContrato),
         prazo: parseInt(prazo),
         comissao: parseFloat(comissaoValor),
@@ -212,6 +217,7 @@ export default function PDV() {
         clienteId: editClienteId,
         produtoId: editProdutoId,
         funcionarioId: editFuncionarioId,
+        fornecedorId: produtoSelecionado?.fornecedorId || "",
         valorContrato: valorContratoNum,
         prazo: parseInt(editPrazo),
         comissao: comissaoValor,
@@ -331,6 +337,7 @@ export default function PDV() {
     const cliente = clientes.find((c) => c.id === selectedCliente);
     const produtoInfo = produtos.find((p) => p.id === selectedProduto);
     const funcionario = funcionarios.find((f) => f.id === selectedFuncionario);
+    const fornecedor = fornecedores.find((f) => f.id === produtoInfo?.fornecedorId);
 
     const doc = new jsPDF();
     
@@ -383,7 +390,7 @@ export default function PDV() {
     doc.setFont("helvetica", "normal");
     doc.text(`Produto: ${produtoInfo?.nome || ""}`, 25, y);
     y += 7;
-    doc.text(`Fornecedor: ${produtoInfo?.fornecedor || ""}`, 25, y);
+    doc.text(`Fornecedor (Banco): ${fornecedor?.nomeFantasia || fornecedor?.razaoSocial || "Não informado"}`, 25, y);
     y += 7;
     doc.text(`Taxa de Juros: ${produtoInfo?.taxaJuros || ""}%`, 25, y);
     y += 7;

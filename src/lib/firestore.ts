@@ -92,6 +92,7 @@ export interface Venda {
   clienteId: string;
   produtoId: string;
   funcionarioId: string;
+  fornecedorId?: string; // ID do fornecedor (Banco) do produto no momento da venda
   valorContrato: number;
   prazo: number;
   comissao: number;
@@ -305,6 +306,7 @@ export interface Produto {
   tipoTabela?: string;
   comissao: number; // Percentual de comissão sobre o valor do contrato
   taxaJuros?: number;
+  fornecedorId?: string; // ID do fornecedor (Banco) vinculado ao produto
   status: "ativo" | "inativo";
   createdAt?: Date;
   updatedAt?: Date;
