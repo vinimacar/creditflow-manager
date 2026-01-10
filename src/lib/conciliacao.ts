@@ -247,5 +247,9 @@ export function calcularEstatisticas(divergencias: Divergencia[]) {
     totalComissaoInterno,
     totalComissaoFornecedor,
     diferencaTotalComissao: totalComissaoInterno - totalComissaoFornecedor,
+    // Aliases para compatibilidade com a interface Estatisticas
+    totalDivergencias: divergentes,
+    totalDiferencas: totalDiferencaComissao,
+    totalContratos: total,
   };
 }

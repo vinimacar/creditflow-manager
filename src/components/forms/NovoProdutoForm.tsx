@@ -21,7 +21,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Plus, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { getFornecedores, type Fornecedor } from "@/lib/firestore";
+import { getFornecedores, getBancos, getCategorias, type Fornecedor, type Banco, type Categoria } from "@/lib/firestore";
 
 interface ComissaoFaixa {
   id: string;
@@ -38,7 +38,8 @@ interface NovoProdutoFormProps {
 
 export interface ProdutoNovo {
   nome: string;
-  categoria: string;
+  categoria: string; // Mantido para compatibilidade (deprecated - usar categoriaId)
+  categoriaId?: string; // ID da categoria do produto
   descricao: string;
   valorMinimo: number;
   valorMaximo: number;
@@ -47,7 +48,8 @@ export interface ProdutoNovo {
   taxaJuros: number;
   comissaoFornecedor: number; // Comissão paga pelo fornecedor (%)
   comissaoAgente: number; // Comissão para o agente vendedor (%)
-  fornecedorId?: string; // ID do fornecedor (Banco)
+  fornecedorId?: string; // ID do fornecedor
+  bancoId?: string; // ID do banco
   status: "ativo" | "inativo";
   comissoes: ComissaoFaixa[];
 }
@@ -72,18 +74,26 @@ export function NovoProdutoForm({ open, onOpenChange, onSalvar }: NovoProdutoFor
 
   const [salvando, setSalvando] = useState(false);
   const [fornecedores, setFornecedores] = useState<Fornecedor[]>([]);
+  const [bancos, setBancos] = useState<Banco[]>([]);
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
 
   useEffect(() => {
-    const loadFornecedores = async () => {
+    const loadDados = async () => {
       try {
-        const data = await getFornecedores();
-        setFornecedores(data);
+        const [fornecedoresData, bancosData, categoriasData] = await Promise.all([
+          getFornecedores(),
+          getBancos(),
+          getCategorias(),
+        ]);
+        setFornecedores(fornecedoresData);
+        setBancos(bancosData);
+        setCategorias(categoriasData);
       } catch (error) {
-        console.error("Erro ao carregar fornecedores:", error);
+        console.error("Erro ao carregar dados:", error);
       }
     };
     if (open) {
-      loadFornecedores();
+      loadDados();
     }
   }, [open]);
 
@@ -203,19 +213,27 @@ export function NovoProdutoForm({ open, onOpenChange, onSalvar }: NovoProdutoFor
 
             <div className="space-y-2">
               <Label htmlFor="categoria">Categoria *</Label>
-              <Select value={formData.categoria} onValueChange={(v) => handleChange("categoria", v)}>
+              <Select value={formData.categoriaId} onValueChange={(v) => handleChange("categoriaId", v)}>
                 <SelectTrigger id="categoria">
-                  <SelectValue placeholder="Selecione" />
+                  <SelectValue placeholder="Selecione a categoria" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="consignado">Consignado</SelectItem>
-                  <SelectItem value="refinanciamento">Refinanciamento</SelectItem>
-                  <SelectItem value="portabilidade">Portabilidade</SelectItem>
-                  <SelectItem value="cartao">Cartão Consignado</SelectItem>
-                  <SelectItem value="pessoal">Empréstimo Pessoal</SelectItem>
-                  <SelectItem value="outro">Outro</SelectItem>
+                  {categorias.length === 0 ? (
+                    <SelectItem value="sem-categoria" disabled>
+                      Nenhuma categoria cadastrada
+                    </SelectItem>
+                  ) : (
+                    categorias.map((categoria) => (
+                      <SelectItem key={categoria.id} value={categoria.id!}>
+                        {categoria.nome}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground">
+                Tipo/categoria do produto
+              </p>
             </div>
           </div>
 
@@ -293,10 +311,10 @@ export function NovoProdutoForm({ open, onOpenChange, onSalvar }: NovoProdutoFor
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="fornecedor">Fornecedor (Banco)</Label>
+              <Label htmlFor="fornecedor">Fornecedor</Label>
               <Select value={formData.fornecedorId} onValueChange={(v) => handleChange("fornecedorId", v)}>
                 <SelectTrigger id="fornecedor">
-                  <SelectValue placeholder="Selecione o banco" />
+                  <SelectValue placeholder="Selecione o fornecedor" />
                 </SelectTrigger>
                 <SelectContent>
                   {fornecedores.map((fornecedor) => (
@@ -306,6 +324,33 @@ export function NovoProdutoForm({ open, onOpenChange, onSalvar }: NovoProdutoFor
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="banco">Banco</Label>
+              <Select value={formData.bancoId} onValueChange={(v) => handleChange("bancoId", v)}>
+                <SelectTrigger id="banco">
+                  <SelectValue placeholder="Selecione o banco" />
+                </SelectTrigger>
+                <SelectContent>
+                  {bancos.length === 0 ? (
+                    <SelectItem value="sem-banco" disabled>
+                      Nenhum banco cadastrado
+                    </SelectItem>
+                  ) : (
+                    bancos.map((banco) => (
+                      <SelectItem key={banco.id} value={banco.id!}>
+                        {banco.codigo ? `${banco.codigo} - ${banco.nome}` : banco.nome}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Banco responsável pelo produto
+              </p>
             </div>
           </div>
 

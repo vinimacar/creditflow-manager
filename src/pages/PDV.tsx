@@ -69,7 +69,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { getClientes, getProdutos, getFuncionarios, getVendas, getFornecedores, type Cliente, type Produto, type Funcionario, type Venda, type Fornecedor } from "@/lib/firestore";
+import { getClientes, getProdutos, getFuncionarios, getVendas, getFornecedores, getBancos, getCategorias, type Cliente, type Produto, type Funcionario, type Venda, type Fornecedor, type Banco, type Categoria } from "@/lib/firestore";
 import { collection, addDoc, Timestamp, updateDoc, doc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -83,6 +83,8 @@ export default function PDV() {
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [funcionarios, setFuncionarios] = useState<Funcionario[]>([]);
   const [fornecedores, setFornecedores] = useState<Fornecedor[]>([]);
+  const [bancos, setBancos] = useState<Banco[]>([]);
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [vendas, setVendas] = useState<Venda[]>([]);
   const [openClienteCombobox, setOpenClienteCombobox] = useState(false);
   const [selectedCliente, setSelectedCliente] = useState<string>("");
@@ -111,18 +113,22 @@ export default function PDV() {
 
   const carregarDados = async () => {
     try {
-      const [clientesData, produtosData, funcionariosData, vendasData, fornecedoresData] = await Promise.all([
+      const [clientesData, produtosData, funcionariosData, vendasData, fornecedoresData, bancosData, categoriasData] = await Promise.all([
         getClientes(),
         getProdutos(),
         getFuncionarios(),
         getVendas(),
         getFornecedores(),
+        getBancos(),
+        getCategorias(),
       ]);
       setClientes(clientesData);
       setProdutos(produtosData);
       setFuncionarios(funcionariosData);
       setVendas(vendasData);
       setFornecedores(fornecedoresData);
+      setBancos(bancosData);
+      setCategorias(categoriasData);
     } catch (error) {
       console.error("Erro ao carregar dados:", error);
       toast.error("Erro ao carregar dados");
@@ -131,6 +137,9 @@ export default function PDV() {
 
   const clienteSelecionado = clientes.find((c) => c.id === selectedCliente);
   const produto = produtos.find((p) => p.id === selectedProduto);
+  const fornecedorDoProduto = produto?.fornecedorId ? fornecedores.find((f) => f.id === produto.fornecedorId) : null;
+  const bancoDoProduto = produto?.bancoId ? bancos.find((b) => b.id === produto.bancoId) : null;
+  const categoriaDoProduto = produto?.categoriaId ? categorias.find((c) => c.id === produto.categoriaId) : null;
   const comissaoPerc = produto?.comissao || 0;
   const comissaoValor = valorContrato
     ? (parseFloat(valorContrato) * (comissaoPerc / 100)).toFixed(2)
@@ -642,6 +651,27 @@ export default function PDV() {
                   {selectedProduto
                     ? produtos.find((p) => p.id === selectedProduto)?.nome
                     : "-"}
+                </span>
+              </div>
+              <Separator />
+              <div className="flex justify-between items-center py-2">
+                <span className="text-muted-foreground">Fornecedor</span>
+                <span className="font-medium text-sm">
+                  {fornecedorDoProduto?.nomeFantasia || "-"}
+                </span>
+              </div>
+              <Separator />
+              <div className="flex justify-between items-center py-2">
+                <span className="text-muted-foreground">Banco</span>
+                <span className="font-medium text-sm">
+                  {bancoDoProduto?.nome || "-"}
+                </span>
+              </div>
+              <Separator />
+              <div className="flex justify-between items-center py-2">
+                <span className="text-muted-foreground">Categoria</span>
+                <span className="font-medium text-sm">
+                  {categoriaDoProduto?.nome || "-"}
                 </span>
               </div>
               <Separator />

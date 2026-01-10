@@ -299,7 +299,8 @@ export interface Produto {
   codigo?: string;
   descricao?: string;
   preco?: number;
-  categoria?: string;
+  categoria?: string; // Mantido para compatibilidade (deprecated)
+  categoriaId?: string; // ID da categoria do produto
   estoque?: number;
   prazoMin?: number;
   prazoMax?: number;
@@ -307,7 +308,8 @@ export interface Produto {
   comissao: number; // Percentual de comissão para o agente vendedor
   comissaoFornecedor?: number; // Percentual de comissão paga pelo fornecedor
   taxaJuros?: number;
-  fornecedorId?: string; // ID do fornecedor (Banco) vinculado ao produto
+  fornecedorId?: string; // ID do fornecedor vinculado ao produto
+  bancoId?: string; // ID do banco vinculado ao produto
   status: "ativo" | "inativo";
   createdAt?: Date;
   updatedAt?: Date;
@@ -598,6 +600,106 @@ export async function getDespesas(): Promise<Despesa[]> {
     })) as Despesa[];
   } catch (error) {
     console.error("Erro ao buscar despesas:", error);
+    return [];
+  }
+}
+
+// ===== BANCOS =====
+
+export interface Banco {
+  id?: string;
+  nome: string;
+  codigo?: string; // Código do banco (ex: 001, 104, 237)
+  status: "ativo" | "inativo";
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export const bancosCollection = "bancos";
+
+export async function addBanco(banco: Omit<Banco, "id">) {
+  const docRef = await addDoc(collection(db, bancosCollection), {
+    ...banco,
+    status: banco.status || "ativo",
+    createdAt: Timestamp.now(),
+    updatedAt: Timestamp.now(),
+  });
+  return docRef.id;
+}
+
+export async function updateBanco(id: string, banco: Partial<Banco>) {
+  const docRef = doc(db, bancosCollection, id);
+  await updateDoc(docRef, {
+    ...banco,
+    updatedAt: Timestamp.now(),
+  });
+}
+
+export async function deleteBanco(id: string) {
+  await deleteDoc(doc(db, bancosCollection, id));
+}
+
+export async function getBancos(): Promise<Banco[]> {
+  try {
+    const querySnapshot = await getDocs(
+      query(collection(db, bancosCollection), orderBy("nome", "asc"))
+    );
+    return querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as Banco[];
+  } catch (error) {
+    console.error("Erro ao buscar bancos:", error);
+    return [];
+  }
+}
+
+// ===== CATEGORIAS DE PRODUTOS =====
+
+export interface Categoria {
+  id?: string;
+  nome: string;
+  descricao?: string;
+  status: "ativo" | "inativo";
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export const categoriasCollection = "categorias";
+
+export async function addCategoria(categoria: Omit<Categoria, "id">) {
+  const docRef = await addDoc(collection(db, categoriasCollection), {
+    ...categoria,
+    status: categoria.status || "ativo",
+    createdAt: Timestamp.now(),
+    updatedAt: Timestamp.now(),
+  });
+  return docRef.id;
+}
+
+export async function updateCategoria(id: string, categoria: Partial<Categoria>) {
+  const docRef = doc(db, categoriasCollection, id);
+  await updateDoc(docRef, {
+    ...categoria,
+    updatedAt: Timestamp.now(),
+  });
+}
+
+export async function deleteCategoria(id: string) {
+  await deleteDoc(doc(db, categoriasCollection, id));
+}
+
+export async function getCategorias(): Promise<Categoria[]> {
+  try {
+    const querySnapshot = await getDocs(
+      query(collection(db, categoriasCollection), orderBy("nome", "asc"))
+    );
+    return querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as Categoria[];
+  } catch (error) {
+    console.error("Erro ao buscar categorias:", error);
     return [];
   }
 }

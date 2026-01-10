@@ -17,6 +17,8 @@ import {
   Shield,
   DollarSign,
   Receipt,
+  Building,
+  FolderOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -27,6 +29,8 @@ const menuItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/", roles: ["admin", "gerente"] },
   { icon: Users, label: "Clientes", path: "/clientes", roles: ["admin", "gerente", "agente", "atendente"] },
   { icon: Building2, label: "Fornecedores", path: "/fornecedores", roles: ["admin", "gerente", "agente", "atendente"] },
+  { icon: Building, label: "Bancos", path: "/bancos", roles: ["admin", "gerente"] },
+  { icon: FolderOpen, label: "Categorias", path: "/categorias", roles: ["admin", "gerente"] },
   { icon: Package, label: "Produtos", path: "/produtos", roles: ["admin", "gerente"] },
   { icon: UserCog, label: "Funcionários", path: "/funcionarios", roles: ["admin", "gerente", "agente", "atendente"] },
   { icon: DollarSign, label: "Folha de Pagamento", path: "/folha-pagamento", roles: ["admin", "gerente"] },

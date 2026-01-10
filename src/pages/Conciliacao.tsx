@@ -84,25 +84,6 @@ export default function Conciliacao() {
     carregarFornecedores();
   }, []);
 
-  // Verificar permissão (apenas gerentes e admins)
-  if (!hasPermission(["admin", "gerente"])) {
-    return (
-      <div className="space-y-6">
-        <PageHeader
-          title="Conciliação"
-          description="Acesso restrito"
-        />
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Acesso Negado</AlertTitle>
-          <AlertDescription>
-            Apenas gerentes e administradores podem acessar a ferramenta de conciliação.
-          </AlertDescription>
-        </Alert>
-      </div>
-    );
-  }
-
   const handleImportarInterno = (dados: DadosExcel[]) => {
     setDadosInternos(dados);
     toast.success(`${dados.length} registros internos importados`);
@@ -117,34 +98,50 @@ export default function Conciliacao() {
   const handleCarregarDoSistema = async () => {
     setCarregandoSistema(true);
     try {
-      // Buscar vendas, clientes, produtos e funcionários
-      const [vendasSnapshot, clientes, produtos, funcionarios] = await Promise.all([
+      // Buscar vendas, clientes, produtos, funcionários e fornecedores
+      const [vendasSnapshot, clientes, produtos, funcionarios, fornecedoresData] = await Promise.all([
         getDocs(query(collection(db, "vendas"), orderBy("createdAt", "desc"))),
         getClientes(),
         getProdutos(),
         getFuncionarios(),
+        getFornecedores(),
       ]);
 
       let vendas = vendasSnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
         createdAt: doc.data().createdAt?.toDate(),
-      }));
+      })) as VendaFirestore[];
 
       // Aplicar filtro de período se definido
       if (periodoImportacao.inicio && periodoImportacao.fim) {
-        vendas = vendas.filter((venda: any) => {
-          const dataVenda = venda.createdAt;
+        vendas = vendas.filter((venda) => {
+          const dataVenda = venda.createdAt as Date | undefined;
           if (!dataVenda) return false;
           return dataVenda >= periodoImportacao.inicio! && dataVenda <= periodoImportacao.fim!;
         });
       }
 
       // Mapear para o formato DadosExcel
-      const dadosFormatados: DadosExcel[] = vendas.map((venda: any) => {
+      interface VendaFirestore {
+        id: string;
+        clienteId: string;
+        produtoId: string;
+        funcionarioId: string;
+        valorContrato: number;
+        comissao?: number;
+        comissaoPercentual?: number;
+        prazo?: number;
+        status?: string;
+        observacoes?: string;
+        createdAt?: Date;
+      }
+
+      const dadosFormatados: DadosExcel[] = vendas.map((venda: VendaFirestore) => {
         const cliente = clientes.find(c => c.id === venda.clienteId);
         const produto = produtos.find(p => p.id === venda.produtoId);
         const funcionario = funcionarios.find(f => f.id === venda.funcionarioId);
+        const fornecedor = fornecedoresData.find(f => f.id === produto?.fornecedorId);
 
         // Calcular comissão usando o percentual do produto se disponível
         const comissaoPercentual = produto?.comissao || venda.comissaoPercentual || 0;
@@ -154,7 +151,7 @@ export default function Conciliacao() {
           contrato: venda.id || "",
           cliente: cliente?.nome || "",
           cpfCliente: cliente?.cpf || "",
-          fornecedor: produto?.fornecedor || "",
+          fornecedor: fornecedor?.nomeFantasia || "",
           funcionario: funcionario?.nome || "",
           cpfFuncionario: funcionario?.cpf || "",
           produto: produto?.nome || "",
@@ -248,6 +245,25 @@ export default function Conciliacao() {
   const funcionariosUnicos = useMemo(() => {
     return Array.from(new Set(divergencias.map(d => d.funcionario))).filter(Boolean).sort();
   }, [divergencias]);
+
+  // Verificar permissão (apenas gerentes e admins)
+  if (!hasPermission(["admin", "gerente"])) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          title="Conciliação"
+          description="Acesso restrito"
+        />
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Acesso Negado</AlertTitle>
+          <AlertDescription>
+            Apenas gerentes e administradores podem acessar a ferramenta de conciliação.
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
 
   const handleGerarPDF = async () => {
     if (divergenciasFiltradas.length === 0) {

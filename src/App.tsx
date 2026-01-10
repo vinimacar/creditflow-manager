@@ -11,6 +11,8 @@ import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import Dashboard from "./pages/Dashboard";
 import Clientes from "./pages/Clientes";
 import Fornecedores from "./pages/Fornecedores";
+import Bancos from "./pages/Bancos";
+import Categorias from "./pages/Categorias";
 import Produtos from "./pages/Produtos";
 import Funcionarios from "./pages/Funcionarios";
 import PDV from "./pages/PDV";
@@ -70,6 +72,26 @@ function AppRoutes() {
         element={
           <AppLayout>
             <Fornecedores />
+          </AppLayout>
+        }
+      />
+      <Route
+        path="/bancos"
+        element={
+          <AppLayout>
+            <ProtectedRoute allowedRoles={["admin", "gerente"]}>
+              <Bancos />
+            </ProtectedRoute>
+          </AppLayout>
+        }
+      />
+      <Route
+        path="/categorias"
+        element={
+          <AppLayout>
+            <ProtectedRoute allowedRoles={["admin", "gerente"]}>
+              <Categorias />
+            </ProtectedRoute>
           </AppLayout>
         }
       />

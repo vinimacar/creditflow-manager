@@ -31,6 +31,7 @@ export interface FiltrosConciliacao {
   statusDivergencia?: "todos" | "ok" | "divergente" | "nao_encontrado";
   valorMinimo?: number;
   valorMaximo?: number;
+  [key: string]: unknown;
 }
 
 interface FiltrosInteligentesConciliacaoProps {
