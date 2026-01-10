@@ -58,6 +58,29 @@ import {
   calcularFolhaPagamentoCompleta,
   CalculoFolhaParams,
 } from "@/types/folhaPagamento";
+
+// Tipo estendido de Proventos com campos adicionais
+interface ProventosExtendido extends Proventos {
+  horasExtras50: number;
+  horasExtras100: number;
+  dsr: number;
+}
+
+// Tipo estendido de Descontos com campos adicionais
+interface DescontosExtendido extends Descontos {
+  faltas: number;
+}
+
+// Tipo estendido de FolhaPagamento com campos adicionais
+interface FolhaPagamentoExtendido extends Omit<FolhaPagamentoType, 'encargos'> {
+  encargos?: {
+    fgts: number;
+    total: number;
+    provisaoFerias?: number;
+    provisao13Salario?: number;
+  };
+  informacoesAdicionais?: Record<string, unknown>;
+}
 import { exportarParaESocialJSON, FolhaPagamentoDetalhada } from "@/types/esocial";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -92,10 +115,10 @@ export default function FolhaPagamento() {
   const [horasMensais, setHorasMensais] = useState(220); // Padrão 220 horas
   
   // Estados mantidos para compatibilidade
-  const [horasExtras] = useState(0);
+  const [horasExtras, setHorasExtras] = useState(0);
   const [comissoes, setComissoes] = useState(0);
   const [bonus, setBonus] = useState(0);
-  const [adicionalNoturno] = useState(0);
+  const [adicionalNoturno, setAdicionalNoturno] = useState(0);
   const [insalubridade, setInsalubridade] = useState(0);
   const [periculosidade, setPericulosidade] = useState(0);
   const [outrosProventos, setOutrosProventos] = useState(0);
@@ -181,6 +204,8 @@ export default function FolhaPagamento() {
 
       // Usar a nova função de cálculo completo
       const params: CalculoFolhaParams = {
+        funcionarioId: funcionarioSelecionado,
+        mesReferencia: format(mesReferencia, "yyyy-MM"),
         salarioBase,
         horasExtras50,
         horasExtras100,
@@ -212,6 +237,7 @@ export default function FolhaPagamento() {
         descontos: resultado.descontos,
         salarioLiquido: resultado.salarioLiquido,
         fgts: resultado.fgts,
+        encargos: resultado.encargos,
         status: "processada",
         criadoEm: new Date(),
         atualizadoEm: new Date(),
@@ -266,8 +292,9 @@ export default function FolhaPagamento() {
     setSalarioBaseAtual(salarioBase);
     
     // Carregar horas detalhadas (se disponíveis) ou usar valores antigos
-    setHorasExtras50((folha.proventos as any).horasExtras50 || 0);
-    setHorasExtras100((folha.proventos as any).horasExtras100 || 0);
+    const proventosExtendido = folha.proventos as ProventosExtendido;
+    setHorasExtras50(proventosExtendido.horasExtras50 || 0);
+    setHorasExtras100(proventosExtendido.horasExtras100 || 0);
     setHorasAdicionalNoturno(folha.proventos.adicionalNoturno || 0);
     
     setNumeroDependentes(folha.numeroDependentes || funcionario?.dependentes || 0);
@@ -302,6 +329,8 @@ export default function FolhaPagamento() {
 
       // Usar a nova função de cálculo completo
       const params: CalculoFolhaParams = {
+        funcionarioId: funcionarioSelecionado,
+        mesReferencia: format(mesReferencia, "yyyy-MM"),
         salarioBase: salarioBaseAtual,
         horasExtras50,
         horasExtras100,
@@ -395,10 +424,10 @@ export default function FolhaPagamento() {
           funcionarioCPF: funcionario?.cpf || "",
           mesReferencia: folha.mesReferencia,
           salarioBase: folha.proventos.salarioBase,
-          horasExtras50: (folha.proventos as any).horasExtras50 || 0,
-          horasExtras100: (folha.proventos as any).horasExtras100 || 0,
+          horasExtras50: (folha.proventos as ProventosExtendido).horasExtras50 || 0,
+          horasExtras100: (folha.proventos as ProventosExtendido).horasExtras100 || 0,
           adicionalNoturno: folha.proventos.adicionalNoturno || 0,
-          dsr: (folha.proventos as any).dsr || 0,
+          dsr: (folha.proventos as ProventosExtendido).dsr || 0,
           comissoes: folha.proventos.comissoes || 0,
           bonus: folha.proventos.bonus || 0,
           insalubridade: folha.proventos.insalubridade || 0,
@@ -409,14 +438,19 @@ export default function FolhaPagamento() {
           valeTransporte: folha.descontos.valeTransporte,
           valeRefeicao: folha.descontos.valeRefeicao,
           planoDeSaude: folha.descontos.planoDeSaude,
-          faltas: (folha.descontos as any).faltas || 0,
+          faltas: (folha.descontos as DescontosExtendido).faltas || 0,
           outrosDescontos: folha.descontos.outros || 0,
           fgts: folha.fgts,
-          provisaoFerias: (folha as any).encargos?.provisaoFerias || 0,
-          provisao13Salario: (folha as any).encargos?.provisao13Salario || 0,
+          provisaoFerias: (folha as FolhaPagamentoExtendido).encargos?.provisaoFerias || 0,
+          provisao13Salario: (folha as FolhaPagamentoExtendido).encargos?.provisao13Salario || 0,
           totalProventos: folha.proventos.total,
           totalDescontos: folha.descontos.total,
           salarioLiquido: folha.salarioLiquido,
+          proventos: folha.proventos,
+          descontos: folha.descontos,
+          encargos: folha.encargos,
+          informacoesAdicionais: (folha as FolhaPagamentoExtendido).informacoesAdicionais || {},
+          status: folha.status,
         };
       });
 
@@ -540,7 +574,8 @@ export default function FolhaPagamento() {
     
     const salarioBaseValor = Number(folha.proventos.salarioBase) || 0;
     const bonusValor = Number(folha.proventos.bonus) || 0;
-    const horasExtrasValor = Number(folha.proventos.horasExtras) || 0;
+    const proventosExt = folha.proventos as ProventosExtendido;
+    const horasExtrasValor = (Number(proventosExt.horasExtras50) || 0) + (Number(proventosExt.horasExtras100) || 0);
     const comissoesValor = Number(folha.proventos.comissoes) || 0;
     const adicionalNoturnoValor = Number(folha.proventos.adicionalNoturno) || 0;
     const insalubridadeValor = Number(folha.proventos.insalubridade) || 0;
