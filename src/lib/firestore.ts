@@ -153,14 +153,20 @@ export async function getVendasPorCliente(clienteId: string): Promise<Venda[]> {
     const querySnapshot = await getDocs(
       query(
         collection(db, vendasCollection),
-        where("clienteId", "==", clienteId),
-        orderBy("createdAt", "desc")
+        where("clienteId", "==", clienteId)
       )
     );
-    return querySnapshot.docs.map((doc) => ({
+    const vendas = querySnapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
     })) as Venda[];
+    
+    // Ordenar manualmente por createdAt em ordem decrescente
+    return vendas.sort((a, b) => {
+      const dateA = a.createdAt instanceof Date ? a.createdAt : new Date(a.createdAt);
+      const dateB = b.createdAt instanceof Date ? b.createdAt : new Date(b.createdAt);
+      return dateB.getTime() - dateA.getTime();
+    });
   } catch (error) {
     console.error("Erro ao buscar vendas do cliente:", error);
     return [];
