@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,6 +21,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Plus, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { getFornecedores, type Fornecedor } from "@/lib/firestore";
 
 interface ComissaoFaixa {
   id: string;
@@ -44,6 +45,9 @@ export interface ProdutoNovo {
   prazoMinimo: number;
   prazoMaximo: number;
   taxaJuros: number;
+  comissaoFornecedor: number; // Comissão paga pelo fornecedor (%)
+  comissaoAgente: number; // Comissão para o agente vendedor (%)
+  fornecedorId?: string; // ID do fornecedor (Banco)
   status: "ativo" | "inativo";
   comissoes: ComissaoFaixa[];
 }
@@ -58,6 +62,8 @@ export function NovoProdutoForm({ open, onOpenChange, onSalvar }: NovoProdutoFor
     prazoMinimo: 12,
     prazoMaximo: 84,
     taxaJuros: 0,
+    comissaoFornecedor: 0,
+    comissaoAgente: 0,
     status: "ativo",
     comissoes: [
       { id: "1", valorMin: 0, valorMax: 10000, percentual: 3.5 },
@@ -65,6 +71,21 @@ export function NovoProdutoForm({ open, onOpenChange, onSalvar }: NovoProdutoFor
   });
 
   const [salvando, setSalvando] = useState(false);
+  const [fornecedores, setFornecedores] = useState<Fornecedor[]>([]);
+
+  useEffect(() => {
+    const loadFornecedores = async () => {
+      try {
+        const data = await getFornecedores();
+        setFornecedores(data);
+      } catch (error) {
+        console.error("Erro ao carregar fornecedores:", error);
+      }
+    };
+    if (open) {
+      loadFornecedores();
+    }
+  }, [open]);
 
   const handleChange = <K extends keyof ProdutoNovo>(field: K, value: ProdutoNovo[K]) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -144,6 +165,8 @@ export function NovoProdutoForm({ open, onOpenChange, onSalvar }: NovoProdutoFor
         prazoMinimo: 12,
         prazoMaximo: 84,
         taxaJuros: 0,
+        comissaoFornecedor: 0,
+        comissaoAgente: 0,
         status: "ativo",
         comissoes: [{ id: "1", valorMin: 0, valorMax: 10000, percentual: 3.5 }],
       });
@@ -269,6 +292,61 @@ export function NovoProdutoForm({ open, onOpenChange, onSalvar }: NovoProdutoFor
               />
             </div>
 
+            <div className="space-y-2">
+              <Label htmlFor="fornecedor">Fornecedor (Banco)</Label>
+              <Select value={formData.fornecedorId} onValueChange={(v) => handleChange("fornecedorId", v)}>
+                <SelectTrigger id="fornecedor">
+                  <SelectValue placeholder="Selecione o banco" />
+                </SelectTrigger>
+                <SelectContent>
+                  {fornecedores.map((fornecedor) => (
+                    <SelectItem key={fornecedor.id} value={fornecedor.id!}>
+                      {fornecedor.nomeFantasia || fornecedor.razaoSocial}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Comissões */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="comissaoFornecedor">Comissão Paga pelo Fornecedor (%)</Label>
+              <Input
+                id="comissaoFornecedor"
+                type="number"
+                value={formData.comissaoFornecedor}
+                onChange={(e) => handleChange("comissaoFornecedor", parseFloat(e.target.value) || 0)}
+                min="0"
+                max="100"
+                step="0.01"
+                placeholder="Ex: 3.5"
+              />
+              <p className="text-xs text-muted-foreground">
+                Percentual que o banco paga sobre o valor do contrato
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="comissaoAgente">Comissão do Agente Vendedor (%)</Label>
+              <Input
+                id="comissaoAgente"
+                type="number"
+                value={formData.comissaoAgente}
+                onChange={(e) => handleChange("comissaoAgente", parseFloat(e.target.value) || 0)}
+                min="0"
+                max="100"
+                step="0.01"
+                placeholder="Ex: 2.5"
+              />
+              <p className="text-xs text-muted-foreground">
+                Percentual de comissão para o agente vendedor
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="status">Status</Label>
               <Select value={formData.status} onValueChange={(v: "ativo" | "inativo") => handleChange("status", v)}>

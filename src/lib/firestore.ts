@@ -304,7 +304,8 @@ export interface Produto {
   prazoMin?: number;
   prazoMax?: number;
   tipoTabela?: string;
-  comissao: number; // Percentual de comissão sobre o valor do contrato
+  comissao: number; // Percentual de comissão para o agente vendedor
+  comissaoFornecedor?: number; // Percentual de comissão paga pelo fornecedor
   taxaJuros?: number;
   fornecedorId?: string; // ID do fornecedor (Banco) vinculado ao produto
   status: "ativo" | "inativo";

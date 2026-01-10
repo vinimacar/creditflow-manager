@@ -27,6 +27,7 @@ interface ProdutoDisplay {
   prazoMax: number;
   tipoTabela: string;
   comissao: number;
+  comissaoFornecedor?: number;
   status: "ativo" | "inativo";
 }
 
@@ -58,8 +59,17 @@ const columns = [
     header: "Tipo de Tabela",
   },
   {
+    key: "comissaoFornecedor",
+    header: "Comissão Fornecedor",
+    render: (produto: ProdutoDisplay) => (
+      <span className="font-medium text-blue-600">
+        {produto.comissaoFornecedor ? `${produto.comissaoFornecedor}%` : "-"}
+      </span>
+    ),
+  },
+  {
     key: "comissao",
-    header: "Comissão",
+    header: "Comissão Agente",
     render: (produto: ProdutoDisplay) => (
       <span className="font-medium text-success">{produto.comissao}%</span>
     ),
@@ -107,6 +117,7 @@ export default function Produtos() {
         prazoMax: p.prazoMax,
         tipoTabela: p.tipoTabela,
         comissao: p.comissao,
+        comissaoFornecedor: p.comissaoFornecedor,
         status: p.status as "ativo" | "inativo"
       }));
       setProdutos(displayData);
