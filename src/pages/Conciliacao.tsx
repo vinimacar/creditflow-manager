@@ -42,6 +42,7 @@ import {
   CalendarIcon,
 } from "lucide-react";
 import { toast } from "sonner";
+import * as XLSX from "xlsx";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -258,39 +259,41 @@ export default function Conciliacao() {
         "Fornecedor": venda.fornecedor,
         "Funcionário": venda.funcionario,
         "CPF Funcionário": venda.cpfFuncionario || "-",
-        "Valor do Produto": venda.valorProduto.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }),
-        "Comissão": venda.valorComissao.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }),
+        "Valor do Produto": venda.valorProduto,
+        "Comissão": venda.valorComissao,
         "Data da Venda": venda.dataVenda ? format(new Date(venda.dataVenda), "dd/MM/yyyy HH:mm", { locale: ptBR }) : "-",
         "Data de Pagamento": venda.dataPagamento ? format(new Date(venda.dataPagamento), "dd/MM/yyyy", { locale: ptBR }) : "-",
         "Status": venda.status || "-",
         "Observações": venda.observacoes || "-",
       }));
 
-      // Criar CSV
-      const headers = Object.keys(dadosExport[0]);
-      const csvContent = [
-        headers.join(","),
-        ...dadosExport.map(row => 
-          headers.map(header => {
-            const value = row[header as keyof typeof row];
-            // Envolver em aspas se contiver vírgula
-            return typeof value === 'string' && value.includes(',') ? `"${value}"` : value;
-          }).join(",")
-        )
-      ].join("\n");
+      // Criar workbook e worksheet
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(dadosExport);
 
-      // Criar BOM para UTF-8
-      const BOM = "\uFEFF";
-      const blob = new Blob([BOM + csvContent], { type: "text/csv;charset=utf-8;" });
-      const link = document.createElement("a");
-      const url = URL.createObjectURL(blob);
-      
-      link.setAttribute("href", url);
-      link.setAttribute("download", `vendas_${format(new Date(), "yyyyMMdd_HHmmss")}.csv`);
-      link.style.visibility = "hidden";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      // Definir largura das colunas
+      ws['!cols'] = [
+        { wch: 15 },  // Contrato
+        { wch: 25 },  // Cliente
+        { wch: 15 },  // CPF Cliente
+        { wch: 30 },  // Produto
+        { wch: 12 },  // Prazo
+        { wch: 25 },  // Fornecedor
+        { wch: 25 },  // Funcionário
+        { wch: 15 },  // CPF Funcionário
+        { wch: 15 },  // Valor do Produto
+        { wch: 15 },  // Comissão
+        { wch: 18 },  // Data da Venda
+        { wch: 18 },  // Data de Pagamento
+        { wch: 12 },  // Status
+        { wch: 30 },  // Observações
+      ];
+
+      // Adicionar worksheet ao workbook
+      XLSX.utils.book_append_sheet(wb, ws, "Vendas");
+
+      // Exportar arquivo
+      XLSX.writeFile(wb, `vendas_${format(new Date(), "yyyyMMdd_HHmmss")}.xlsx`);
 
       toast.success(`${dadosInternos.length} vendas exportadas com sucesso!`);
     } catch (error) {

@@ -24,6 +24,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { toast } from "sonner";
+import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
@@ -487,34 +488,34 @@ export default function Relatorios() {
         "CPF": venda.cpf,
         "Funcionário": venda.funcionario,
         "Produto": venda.produto,
-        "Valor Contrato": venda.valorContrato.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }),
-        "Prazo": `${venda.prazo} meses`,
-        "Comissão": venda.comissao.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }),
+        "Valor Contrato": venda.valorContrato,
+        "Prazo (meses)": venda.prazo,
+        "Comissão": venda.comissao,
         "Status": venda.status,
       }));
 
-      const headers = Object.keys(dadosExport[0]);
-      const csvContent = [
-        headers.join(","),
-        ...dadosExport.map(row => 
-          headers.map(header => {
-            const value = row[header as keyof typeof row];
-            return typeof value === 'string' && value.includes(',') ? `"${value}"` : value;
-          }).join(",")
-        )
-      ].join("\n");
+      // Criar workbook e worksheet
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(dadosExport);
 
-      const BOM = "\uFEFF";
-      const blob = new Blob([BOM + csvContent], { type: "text/csv;charset=utf-8;" });
-      const link = document.createElement("a");
-      const url = URL.createObjectURL(blob);
-      
-      link.setAttribute("href", url);
-      link.setAttribute("download", `relatorio_filtrado_${format(new Date(), "yyyyMMdd_HHmmss")}.csv`);
-      link.style.visibility = "hidden";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      // Definir largura das colunas
+      ws['!cols'] = [
+        { wch: 18 },  // Data
+        { wch: 25 },  // Cliente
+        { wch: 15 },  // CPF
+        { wch: 25 },  // Funcionário
+        { wch: 30 },  // Produto
+        { wch: 15 },  // Valor Contrato
+        { wch: 15 },  // Prazo
+        { wch: 15 },  // Comissão
+        { wch: 12 },  // Status
+      ];
+
+      // Adicionar worksheet ao workbook
+      XLSX.utils.book_append_sheet(wb, ws, "Relatório");
+
+      // Exportar arquivo
+      XLSX.writeFile(wb, `relatorio_filtrado_${format(new Date(), "yyyyMMdd_HHmmss")}.xlsx`);
 
       toast.success(`${dadosFiltrados.length} registros exportados com sucesso!`);
     } catch (error) {
