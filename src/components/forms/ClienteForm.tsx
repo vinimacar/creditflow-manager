@@ -248,7 +248,7 @@ export function ClienteForm({ onSuccess, initialData }: ClienteFormProps) {
                 <Eye className="h-4 w-4 text-muted-foreground" />
               )}
             </Button>
-          </div
+          </div>
           <Input id="senhaINSS" type="password" {...register("senhaINSS")} placeholder="••••••" />
         </div>
       </div>
