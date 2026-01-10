@@ -56,6 +56,12 @@ const calcularIdade = (dataNasc: string): number => {
   return idade;
 };
 
+const formatarDataBR = (data: string): string => {
+  if (!data) return "";
+  const [ano, mes, dia] = data.split("-");
+  return `${dia}/${mes}/${ano}`;
+};
+
 const columns = [
   {
     key: "nome",
@@ -98,7 +104,7 @@ const columns = [
     header: "Data de Nasc.",
     render: (cliente: Cliente) => (
       <div>
-        <p className="text-sm">{cliente.dataNascimento}</p>
+        <p className="text-sm">{formatarDataBR(cliente.dataNascimento)}</p>
         <p className="text-xs text-muted-foreground">
           {calcularIdade(cliente.dataNascimento)} anos
         </p>
