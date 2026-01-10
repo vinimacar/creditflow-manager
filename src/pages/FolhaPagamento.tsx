@@ -50,7 +50,15 @@ import {
   calcularValeTransporte,
   calcularFGTS,
   calcularSalarioLiquido,
+  calcularHorasExtras50,
+  calcularHorasExtras100,
+  calcularAdicionalNoturno,
+  calcularDSR,
+  calcularDescontoFaltas,
+  calcularFolhaPagamentoCompleta,
+  CalculoFolhaParams,
 } from "@/types/folhaPagamento";
+import { exportarParaESocialJSON, FolhaPagamentoDetalhada } from "@/types/esocial";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -70,10 +78,24 @@ export default function FolhaPagamento() {
   const [novaFolhaDialog, setNovaFolhaDialog] = useState(false);
   const [funcionarioSelecionado, setFuncionarioSelecionado] = useState("");
   const [salarioBaseAtual, setSalarioBaseAtual] = useState(0);
-  const [horasExtras, setHorasExtras] = useState(0);
+  
+  // Estados para horas extras detalhadas
+  const [horasExtras50, setHorasExtras50] = useState(0); // HE 50% (dias úteis)
+  const [horasExtras100, setHorasExtras100] = useState(0); // HE 100% (domingos/feriados)
+  const [horasAdicionalNoturno, setHorasAdicionalNoturno] = useState(0); // Horas noturnas
+  
+  // Estados para cálculos adicionais
+  const [numeroDependentes, setNumeroDependentes] = useState(0);
+  const [diasFaltas, setDiasFaltas] = useState(0);
+  const [diasUteis, setDiasUteis] = useState(22); // Padrão 22 dias úteis
+  const [diasDSR, setDiasDSR] = useState(8); // Padrão ~8 domingos/feriados
+  const [horasMensais, setHorasMensais] = useState(220); // Padrão 220 horas
+  
+  // Estados mantidos para compatibilidade
+  const [horasExtras] = useState(0);
   const [comissoes, setComissoes] = useState(0);
   const [bonus, setBonus] = useState(0);
-  const [adicionalNoturno, setAdicionalNoturno] = useState(0);
+  const [adicionalNoturno] = useState(0);
   const [insalubridade, setInsalubridade] = useState(0);
   const [periculosidade, setPericulosidade] = useState(0);
   const [outrosProventos, setOutrosProventos] = useState(0);
@@ -157,63 +179,39 @@ export default function FolhaPagamento() {
       
       setSalarioBaseAtual(salarioBase);
 
-      // Calcular proventos
-      const proventos: Proventos = {
+      // Usar a nova função de cálculo completo
+      const params: CalculoFolhaParams = {
         salarioBase,
-        horasExtras,
+        horasExtras50,
+        horasExtras100,
+        horasAdicionalNoturno,
         comissoes,
         bonus,
-        adicionalNoturno,
         insalubridade,
         periculosidade,
-        outros: outrosProventos,
-        total: 0,
-      };
-
-      proventos.total =
-        proventos.salarioBase +
-        proventos.horasExtras +
-        proventos.comissoes +
-        proventos.bonus +
-        proventos.adicionalNoturno +
-        proventos.insalubridade +
-        proventos.periculosidade +
-        proventos.outros;
-
-      // Calcular descontos
-      const inss = calcularINSS(proventos.total);
-      const irrf = calcularIRRF(proventos.total, inss, funcionario.dependentes || 0);
-      const vt = calcularValeTransporte(proventos.total, custoVT, optouVT);
-
-      const descontos: Descontos = {
-        inss,
-        irrf,
-        valeTransporte: vt,
+        outrosProventos,
         valeRefeicao,
         planoDeSaude,
-        outros: outrosDescontos,
-        total: 0,
+        outrosDescontos,
+        numeroDependentes: numeroDependentes || funcionario.dependentes || 0,
+        diasFaltas,
+        diasUteis,
+        diasDSR,
+        horasMensais,
+        optouVT,
+        custoVT,
       };
 
-      descontos.total =
-        descontos.inss +
-        descontos.irrf +
-        descontos.valeTransporte +
-        descontos.valeRefeicao +
-        descontos.planoDeSaude +
-        descontos.outros;
-
-      const salarioLiquido = calcularSalarioLiquido(proventos, descontos);
-      const fgts = calcularFGTS(proventos.total);
+      const resultado = calcularFolhaPagamentoCompleta(params);
 
       const folha: Omit<FolhaPagamentoType, "id"> = {
         funcionarioId: funcionarioSelecionado,
         mesReferencia: format(mesReferencia, "yyyy-MM"),
-        salarioBruto: proventos.total,
-        proventos,
-        descontos,
-        salarioLiquido,
-        fgts,
+        salarioBruto: resultado.salarioBruto,
+        proventos: resultado.proventos,
+        descontos: resultado.descontos,
+        salarioLiquido: resultado.salarioLiquido,
+        fgts: resultado.fgts,
         status: "processada",
         criadoEm: new Date(),
         atualizadoEm: new Date(),
@@ -236,10 +234,16 @@ export default function FolhaPagamento() {
   const limparFormulario = () => {
     setFuncionarioSelecionado("");
     setSalarioBaseAtual(0);
-    setHorasExtras(0);
+    setHorasExtras50(0);
+    setHorasExtras100(0);
+    setHorasAdicionalNoturno(0);
+    setNumeroDependentes(0);
+    setDiasFaltas(0);
+    setDiasUteis(22);
+    setDiasDSR(8);
+    setHorasMensais(220);
     setComissoes(0);
     setBonus(0);
-    setAdicionalNoturno(0);
     setInsalubridade(0);
     setPericulosidade(0);
     setOutrosProventos(0);
@@ -260,10 +264,20 @@ export default function FolhaPagamento() {
     const salarioBase = salarioVigente?.salarioBase || funcionario?.salarioBruto || funcionario?.salario || 0;
     
     setSalarioBaseAtual(salarioBase);
-    setHorasExtras(folha.proventos.horasExtras || 0);
+    
+    // Carregar horas detalhadas (se disponíveis) ou usar valores antigos
+    setHorasExtras50((folha.proventos as any).horasExtras50 || 0);
+    setHorasExtras100((folha.proventos as any).horasExtras100 || 0);
+    setHorasAdicionalNoturno(folha.proventos.adicionalNoturno || 0);
+    
+    setNumeroDependentes(folha.numeroDependentes || funcionario?.dependentes || 0);
+    setDiasFaltas(folha.diasFaltas || 0);
+    setDiasUteis(22);
+    setDiasDSR(8);
+    setHorasMensais(220);
+    
     setComissoes(folha.proventos.comissoes || 0);
     setBonus(folha.proventos.bonus || 0);
-    setAdicionalNoturno(folha.proventos.adicionalNoturno || 0);
     setInsalubridade(folha.proventos.insalubridade || 0);
     setPericulosidade(folha.proventos.periculosidade || 0);
     setOutrosProventos(folha.proventos.outros || 0);
@@ -286,61 +300,37 @@ export default function FolhaPagamento() {
         return;
       }
 
-      // Calcular proventos
-      const proventos: Proventos = {
+      // Usar a nova função de cálculo completo
+      const params: CalculoFolhaParams = {
         salarioBase: salarioBaseAtual,
-        horasExtras,
+        horasExtras50,
+        horasExtras100,
+        horasAdicionalNoturno,
         comissoes,
         bonus,
-        adicionalNoturno,
         insalubridade,
         periculosidade,
-        outros: outrosProventos,
-        total: 0,
-      };
-
-      proventos.total =
-        proventos.salarioBase +
-        proventos.horasExtras +
-        proventos.comissoes +
-        proventos.bonus +
-        proventos.adicionalNoturno +
-        proventos.insalubridade +
-        proventos.periculosidade +
-        proventos.outros;
-
-      // Calcular descontos
-      const inss = calcularINSS(proventos.total);
-      const irrf = calcularIRRF(proventos.total, inss, funcionario.dependentes || 0);
-      const vt = calcularValeTransporte(proventos.total, custoVT, optouVT);
-
-      const descontos: Descontos = {
-        inss,
-        irrf,
-        valeTransporte: vt,
+        outrosProventos,
         valeRefeicao,
         planoDeSaude,
-        outros: outrosDescontos,
-        total: 0,
+        outrosDescontos,
+        numeroDependentes: numeroDependentes || funcionario.dependentes || 0,
+        diasFaltas,
+        diasUteis,
+        diasDSR,
+        horasMensais,
+        optouVT,
+        custoVT,
       };
 
-      descontos.total =
-        descontos.inss +
-        descontos.irrf +
-        descontos.valeTransporte +
-        descontos.valeRefeicao +
-        descontos.planoDeSaude +
-        descontos.outros;
-
-      const salarioLiquido = calcularSalarioLiquido(proventos, descontos);
-      const fgts = calcularFGTS(proventos.total);
+      const resultado = calcularFolhaPagamentoCompleta(params);
 
       await updateDoc(doc(db, "folhaPagamento", folhaEmEdicao.id), {
-        salarioBruto: proventos.total,
-        proventos,
-        descontos,
-        salarioLiquido,
-        fgts,
+        salarioBruto: resultado.salarioBruto,
+        proventos: resultado.proventos,
+        descontos: resultado.descontos,
+        salarioLiquido: resultado.salarioLiquido,
+        fgts: resultado.fgts,
         atualizadoEm: new Date(),
       });
 
@@ -384,6 +374,70 @@ export default function FolhaPagamento() {
     } catch (error) {
       console.error("Erro ao marcar como paga:", error);
       toast.error("Erro ao atualizar status");
+    }
+  };
+
+  const exportarESocial = () => {
+    if (folhas.length === 0) {
+      toast.error("Nenhuma folha disponível para exportar");
+      return;
+    }
+
+    try {
+      // Converter folhas para o formato detalhado do eSocial
+      const folhasDetalhadas: FolhaPagamentoDetalhada[] = folhas.map(folha => {
+        const funcionario = funcionarios.find(f => f.id === folha.funcionarioId);
+        
+        return {
+          id: folha.id,
+          funcionarioId: folha.funcionarioId,
+          funcionarioNome: funcionario?.nome || "",
+          funcionarioCPF: funcionario?.cpf || "",
+          mesReferencia: folha.mesReferencia,
+          salarioBase: folha.proventos.salarioBase,
+          horasExtras50: (folha.proventos as any).horasExtras50 || 0,
+          horasExtras100: (folha.proventos as any).horasExtras100 || 0,
+          adicionalNoturno: folha.proventos.adicionalNoturno || 0,
+          dsr: (folha.proventos as any).dsr || 0,
+          comissoes: folha.proventos.comissoes || 0,
+          bonus: folha.proventos.bonus || 0,
+          insalubridade: folha.proventos.insalubridade || 0,
+          periculosidade: folha.proventos.periculosidade || 0,
+          outrosProventos: folha.proventos.outros || 0,
+          inss: folha.descontos.inss,
+          irrf: folha.descontos.irrf,
+          valeTransporte: folha.descontos.valeTransporte,
+          valeRefeicao: folha.descontos.valeRefeicao,
+          planoDeSaude: folha.descontos.planoDeSaude,
+          faltas: (folha.descontos as any).faltas || 0,
+          outrosDescontos: folha.descontos.outros || 0,
+          fgts: folha.fgts,
+          provisaoFerias: (folha as any).encargos?.provisaoFerias || 0,
+          provisao13Salario: (folha as any).encargos?.provisao13Salario || 0,
+          totalProventos: folha.proventos.total,
+          totalDescontos: folha.descontos.total,
+          salarioLiquido: folha.salarioLiquido,
+        };
+      });
+
+      // Gerar JSON do eSocial
+      const jsonESocial = exportarParaESocialJSON(folhasDetalhadas, "00000000000000");
+      
+      // Criar blob e fazer download
+      const blob = new Blob([jsonESocial], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `esocial_${format(mesReferencia, "yyyy-MM")}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast.success("Arquivo eSocial exportado com sucesso!");
+    } catch (error) {
+      console.error("Erro ao exportar eSocial:", error);
+      toast.error("Erro ao exportar arquivo eSocial");
     }
   };
 
@@ -695,13 +749,18 @@ export default function FolhaPagamento() {
       <Card className="p-6">
         <div className="flex justify-between items-center mb-6">
           <h3 className="text-lg font-semibold">Folhas do Mês</h3>
-          <Dialog open={novaFolhaDialog} onOpenChange={setNovaFolhaDialog}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="mr-2 h-4 w-4" />
-                Processar Folha
-              </Button>
-            </DialogTrigger>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={exportarESocial} disabled={folhas.length === 0}>
+              <Download className="mr-2 h-4 w-4" />
+              Exportar eSocial
+            </Button>
+            <Dialog open={novaFolhaDialog} onOpenChange={setNovaFolhaDialog}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Processar Folha
+                </Button>
+              </DialogTrigger>
             <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Processar Nova Folha de Pagamento</DialogTitle>
@@ -743,17 +802,73 @@ export default function FolhaPagamento() {
                     </div>
 
                     <Separator />
-                    <h4 className="font-semibold text-sm">Proventos Adicionais</h4>
-                    <div className="grid grid-cols-2 gap-4">
+                    <h4 className="font-semibold text-sm">Horas Trabalhadas e Extras (2026)</h4>
+                    <div className="grid grid-cols-3 gap-4">
                       <div>
-                        <Label>Horas Extras</Label>
+                        <Label>HE 50% (horas)</Label>
                         <Input
                           type="number"
                           step="0.01"
-                          value={horasExtras}
-                          onChange={(e) => setHorasExtras(Number(e.target.value))}
+                          value={horasExtras50}
+                          onChange={(e) => setHorasExtras50(Number(e.target.value))}
+                          placeholder="Ex: 10"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">Dias úteis</p>
+                      </div>
+                      <div>
+                        <Label>HE 100% (horas)</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={horasExtras100}
+                          onChange={(e) => setHorasExtras100(Number(e.target.value))}
+                          placeholder="Ex: 5"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">Domingos/feriados</p>
+                      </div>
+                      <div>
+                        <Label>Adicional Noturno (horas)</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={horasAdicionalNoturno}
+                          onChange={(e) => setHorasAdicionalNoturno(Number(e.target.value))}
+                          placeholder="Ex: 20"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">22h-5h (20%+redução)</p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <Label>Dias Úteis</Label>
+                        <Input
+                          type="number"
+                          value={diasUteis}
+                          onChange={(e) => setDiasUteis(Number(e.target.value))}
                         />
                       </div>
+                      <div>
+                        <Label>Dias DSR</Label>
+                        <Input
+                          type="number"
+                          value={diasDSR}
+                          onChange={(e) => setDiasDSR(Number(e.target.value))}
+                        />
+                      </div>
+                      <div>
+                        <Label>Horas Mensais</Label>
+                        <Input
+                          type="number"
+                          value={horasMensais}
+                          onChange={(e) => setHorasMensais(Number(e.target.value))}
+                        />
+                      </div>
+                    </div>
+
+                    <Separator />
+                    <h4 className="font-semibold text-sm">Outros Proventos</h4>
+                    <div className="grid grid-cols-2 gap-4">
                       <div>
                         <Label>Comissões</Label>
                         <Input
@@ -770,15 +885,6 @@ export default function FolhaPagamento() {
                           step="0.01"
                           value={bonus}
                           onChange={(e) => setBonus(Number(e.target.value))}
-                        />
-                      </div>
-                      <div>
-                        <Label>Adicional Noturno</Label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={adicionalNoturno}
-                          onChange={(e) => setAdicionalNoturno(Number(e.target.value))}
                         />
                       </div>
                       <div>
@@ -811,8 +917,29 @@ export default function FolhaPagamento() {
                     </div>
 
                     <Separator />
-                    <h4 className="font-semibold text-sm">Descontos Adicionais</h4>
+                    <h4 className="font-semibold text-sm">Descontos e Dependentes</h4>
                     <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label>Número de Dependentes (IRRF)</Label>
+                        <Input
+                          type="number"
+                          value={numeroDependentes}
+                          onChange={(e) => setNumeroDependentes(Number(e.target.value))}
+                          placeholder="0"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">R$ 189,59 por dependente</p>
+                      </div>
+                      <div>
+                        <Label>Dias de Faltas</Label>
+                        <Input
+                          type="number"
+                          step="0.5"
+                          value={diasFaltas}
+                          onChange={(e) => setDiasFaltas(Number(e.target.value))}
+                          placeholder="0"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">Desconto proporcional</p>
+                      </div>
                       <div>
                         <Label>Vale Refeição</Label>
                         <Input
@@ -838,7 +965,9 @@ export default function FolhaPagamento() {
                           step="0.01"
                           value={custoVT}
                           onChange={(e) => setCustoVT(Number(e.target.value))}
+                          placeholder="Ex: 250.00"
                         />
+                        <p className="text-xs text-muted-foreground mt-1">Desconto automático 6%</p>
                       </div>
                       <div>
                         <Label>Outros Descontos</Label>
@@ -864,6 +993,7 @@ export default function FolhaPagamento() {
               </div>
             </DialogContent>
           </Dialog>
+          </div>
         </div>
 
         {/* Dialog de Edição de Folha */}

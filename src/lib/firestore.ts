@@ -147,6 +147,25 @@ export async function getVendasPorFuncionario(funcionarioId: string): Promise<Ve
     ...doc.data(),
   })) as Venda[];
 }
+
+export async function getVendasPorCliente(clienteId: string): Promise<Venda[]> {
+  try {
+    const querySnapshot = await getDocs(
+      query(
+        collection(db, vendasCollection),
+        where("clienteId", "==", clienteId),
+        orderBy("createdAt", "desc")
+      )
+    );
+    return querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as Venda[];
+  } catch (error) {
+    console.error("Erro ao buscar vendas do cliente:", error);
+    return [];
+  }
+}
 // ===== FORNECEDORES =====
 
 export interface Fornecedor {

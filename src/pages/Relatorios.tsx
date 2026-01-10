@@ -527,24 +527,26 @@ export default function Relatorios() {
     const dados = dadosGraficos || dadosRelatorio;
     if (!dados) return null;
     
-    const totalVendas = dados.vendas.reduce((sum, v) => sum + v.valor, 0);
+    const totalVendas = dados.vendas.reduce((sum, v) => sum + v.valor, 0); // Valor total negociado pelos agentes
     const totalAnterior = dados.vendas.slice(0, -1).reduce((sum, v) => sum + v.valor, 0);
     const crescimento = totalAnterior > 0 ? ((totalVendas - totalAnterior) / totalAnterior) * 100 : 0;
-    const totalComissoes = dados.funcionarios.reduce((sum, f) => sum + f.comissao, 0);
+    const totalComissoes = dados.funcionarios.reduce((sum, f) => sum + f.comissao, 0); // Receita real (comissões recebidas dos fornecedores)
     const totalDespesas = dados.despesas.reduce((sum, d) => sum + d.valor, 0);
     const totalReceitas = dados.receitas.reduce((sum, r) => sum + r.valor, 0);
+    const receitaLiquida = totalComissoes - totalDespesas; // Receita líquida = comissões - despesas
     const lucroTotal = totalReceitas - totalDespesas;
-    const margemLucro = totalReceitas > 0 ? (lucroTotal / totalReceitas) * 100 : 0;
+    const margemLucro = totalComissoes > 0 ? (receitaLiquida / totalComissoes) * 100 : 0;
 
     return {
-      totalVendas,
+      totalVendas, // Valor movimentado (negociado)
       crescimento,
       ticketMedio: totalVendas / dados.vendas.reduce((sum, v) => sum + v.quantidade, 0) || 0,
       totalFuncionarios: dados.funcionarios.length,
       produtoMaisVendido: dados.produtos[0]?.nome || "N/A",
-      totalComissoes,
+      totalComissoes, // Receita bruta (comissões recebidas)
       totalDespesas,
       totalReceitas,
+      receitaLiquida, // Receita líquida
       lucroTotal,
       margemLucro,
     };
@@ -728,61 +730,60 @@ export default function Relatorios() {
 
       {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Total de Receitas</p>
-              <h3 className="text-2xl font-bold mt-2 text-green-700">
-                R$ {estatisticas!.totalReceitas.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-              </h3>
-              <p className={`text-sm mt-1 flex items-center gap-1 ${estatisticas!.crescimento >= 0 ? "text-green-600" : "text-red-600"}`}>
-                {estatisticas!.crescimento >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
-                {estatisticas!.crescimento > 0 ? "+" : ""}{estatisticas!.crescimento.toFixed(1)}% vs período anterior
-              </p>
-            </div>
-            <DollarSign className="w-8 h-8 text-green-600" />
-          </div>
-        </Card>
-
-        <Card className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Total de Despesas</p>
-              <h3 className="text-2xl font-bold mt-2 text-red-700">
-                R$ {estatisticas!.totalDespesas.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-              </h3>
-              <p className="text-xs text-muted-foreground mt-1">Despesas lançadas no período</p>
-            </div>
-            <DollarSign className="w-8 h-8 text-red-600" />
-          </div>
-        </Card>
-
         <Card className="p-6 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900">
           <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-blue-900 dark:text-blue-100">Lucro Total</p>
-              <h3 className={`text-2xl font-bold mt-2 ${estatisticas!.lucroTotal >= 0 ? 'text-blue-700 dark:text-blue-300' : 'text-red-700 dark:text-red-300'}`}>
-                R$ {estatisticas!.lucroTotal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+            <div className="flex-1">
+              <p className="text-sm font-medium text-blue-900 dark:text-blue-100">Movimentado</p>
+              <h3 className="text-2xl font-bold mt-2 text-blue-700 dark:text-blue-300">
+                R$ {estatisticas!.totalVendas.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
               </h3>
-              <p className={`text-sm mt-1 flex items-center gap-1 font-semibold ${estatisticas!.lucroTotal >= 0 ? "text-blue-700 dark:text-blue-300" : "text-red-700 dark:text-red-300"}`}>
-                {estatisticas!.lucroTotal >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+              <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">Valor negociado pelos agentes</p>
+            </div>
+            <DollarSign className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+          </div>
+        </Card>
+
+        <Card className="p-6 bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950 dark:to-green-900">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <p className="text-sm font-medium text-green-900 dark:text-green-100">Receita Bruta</p>
+              <h3 className="text-2xl font-bold mt-2 text-green-700 dark:text-green-300">
+                R$ {estatisticas!.totalComissoes.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+              </h3>
+              <p className="text-xs text-green-700 dark:text-green-300 mt-1">Comissões recebidas dos fornecedores</p>
+            </div>
+            <DollarSign className="w-8 h-8 text-green-600 dark:text-green-400" />
+          </div>
+        </Card>
+
+        <Card className="p-6 bg-gradient-to-br from-red-50 to-red-100 dark:from-red-950 dark:to-red-900">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <p className="text-sm font-medium text-red-900 dark:text-red-100">Total de Despesas</p>
+              <h3 className="text-2xl font-bold mt-2 text-red-700 dark:text-red-300">
+                R$ {estatisticas!.totalDespesas.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+              </h3>
+              <p className="text-xs text-red-700 dark:text-red-300 mt-1">Despesas lançadas no sistema</p>
+            </div>
+            <DollarSign className="w-8 h-8 text-red-600 dark:text-red-400" />
+          </div>
+        </Card>
+
+        <Card className={`p-6 bg-gradient-to-br ${estatisticas!.receitaLiquida >= 0 ? 'from-emerald-50 to-emerald-100 dark:from-emerald-950 dark:to-emerald-900' : 'from-orange-50 to-orange-100 dark:from-orange-950 dark:to-orange-900'}`}>
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <p className={`text-sm font-medium ${estatisticas!.receitaLiquida >= 0 ? 'text-emerald-900 dark:text-emerald-100' : 'text-orange-900 dark:text-orange-100'}`}>
+                Receita Líquida
+              </p>
+              <h3 className={`text-2xl font-bold mt-2 ${estatisticas!.receitaLiquida >= 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-orange-700 dark:text-orange-300'}`}>
+                R$ {estatisticas!.receitaLiquida.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+              </h3>
+              <p className={`text-xs mt-1 flex items-center gap-1 font-semibold ${estatisticas!.receitaLiquida >= 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-orange-700 dark:text-orange-300'}`}>
+                {estatisticas!.receitaLiquida >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
                 Margem: {estatisticas!.margemLucro.toFixed(1)}%
               </p>
             </div>
-            <DollarSign className={`w-8 h-8 ${estatisticas!.lucroTotal >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-red-600 dark:text-red-400'}`} />
-          </div>
-        </Card>
-
-        <Card className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Total Comissões</p>
-              <h3 className="text-2xl font-bold mt-2 text-purple-700">
-                R$ {estatisticas!.totalComissoes.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-              </h3>
-              <p className="text-xs text-muted-foreground mt-1">Conforme cadastro de produtos</p>
-            </div>
-            <DollarSign className="w-8 h-8 text-purple-600" />
+            <DollarSign className={`w-8 h-8 ${estatisticas!.receitaLiquida >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-orange-600 dark:text-orange-400'}`} />
           </div>
         </Card>
       </div>

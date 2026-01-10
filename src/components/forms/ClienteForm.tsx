@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { Eye, EyeOff } from "lucide-react";
 import { cpfValidation, telefoneValidation, cepValidation } from "@/lib/zod-validations";
 import { mascaraCPF, mascaraTelefone, mascaraCEP, buscarCEP } from "@/lib/validations";
 import { addCliente, updateCliente } from "@/lib/firestore";
@@ -45,6 +46,7 @@ const estados = [
 
 export function ClienteForm({ onSuccess, initialData }: ClienteFormProps) {
   const [buscandoCEP, setBuscandoCEP] = useState(false);
+  const [mostrarSenhaINSS, setMostrarSenhaINSS] = useState(false);
   
   const {
     register,
@@ -56,6 +58,26 @@ export function ClienteForm({ onSuccess, initialData }: ClienteFormProps) {
     resolver: zodResolver(clienteSchema),
     defaultValues: initialData,
   });
+
+  const dataNascimento = watch("dataNascimento");
+
+  // Função para calcular a idade atualizada
+  const calcularIdade = (dataNasc: string): number | null => {
+    if (!dataNasc) return null;
+    
+    const hoje = new Date();
+    const nascimento = new Date(dataNasc);
+    let idade = hoje.getFullYear() - nascimento.getFullYear();
+    const mes = hoje.getMonth() - nascimento.getMonth();
+    
+    if (mes < 0 || (mes === 0 && hoje.getDate() < nascimento.getDate())) {
+      idade--;
+    }
+    
+    return idade;
+  };
+
+  const idadeAtual = calcularIdade(dataNascimento);
 
   const handleCPFChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const valorMascarado = mascaraCPF(e.target.value);
@@ -138,6 +160,11 @@ export function ClienteForm({ onSuccess, initialData }: ClienteFormProps) {
         <div>
           <Label htmlFor="dataNascimento">Data de Nascimento *</Label>
           <Input id="dataNascimento" type="date" {...register("dataNascimento")} />
+          {idadeAtual !== null && (
+            <p className="text-sm text-muted-foreground mt-1">
+              Idade: {idadeAtual} ano{idadeAtual !== 1 ? 's' : ''}
+            </p>
+          )}
           {errors.dataNascimento && <p className="text-sm text-destructive mt-1">{errors.dataNascimento.message}</p>}
         </div>
 
@@ -200,7 +227,28 @@ export function ClienteForm({ onSuccess, initialData }: ClienteFormProps) {
         </div>
 
         <div>
-          <Label htmlFor="senhaINSS">Senha do INSS</Label>
+          <div className="relative">
+            <Input 
+              id="senhaINSS" 
+              type={mostrarSenhaINSS ? "text" : "password"} 
+              {...register("senhaINSS")} 
+              placeholder="Digite a senha do INSS"
+              className="pr-10"
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+              onClick={() => setMostrarSenhaINSS(!mostrarSenhaINSS)}
+            >
+              {mostrarSenhaINSS ? (
+                <EyeOff className="h-4 w-4 text-muted-foreground" />
+              ) : (
+                <Eye className="h-4 w-4 text-muted-foreground" />
+              )}
+            </Button>
+          </div
           <Input id="senhaINSS" type="password" {...register("senhaINSS")} placeholder="••••••" />
         </div>
       </div>
