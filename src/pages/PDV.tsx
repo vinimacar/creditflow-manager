@@ -236,13 +236,6 @@ export default function PDV() {
         criadoPor: userProfile?.uid || "",
         createdAt: Timestamp.now(),
       });
-        comissaoFornecedorPercentual: comissaoFornecedorPerc,
-        comissaoAgente: comissaoAgenteValor,
-        comissaoAgentePercentual: comissaoAgentePerc,
-        status: "aprovada",
-        criadoPor: userProfile?.uid || "",
-        createdAt: Timestamp.now(),
-      });
 
       toast.success(`Venda registrada com sucesso! ID: ${vendaId}`);
       
