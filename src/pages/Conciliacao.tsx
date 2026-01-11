@@ -31,6 +31,7 @@ import {
   AlertTitle,
 } from "@/components/ui/alert";
 import { ImportarExcel, type DadosExcel } from "@/components/conciliacao/ImportarExcel";
+import { ImportarPDF } from "@/components/conciliacao/ImportarPDF";
 import { FiltrosInteligentesConciliacao, type FiltrosConciliacao } from "@/components/conciliacao/FiltrosInteligentesConciliacao";
 import { analisarConciliacao, calcularEstatisticas, type Divergencia } from "@/lib/conciliacao";
 import { gerarRelatorioPDF } from "@/lib/gerarPDFConciliacao";
@@ -491,6 +492,7 @@ export default function Conciliacao() {
                 )}
               </Button>
               <ImportarExcel tipo="interno" onImport={handleImportarInterno} apenasButton={true} />
+              <ImportarPDF tipo="interno" onImport={handleImportarInterno} apenasButton={true} />
             </div>
             {dadosInternos.length > 0 && (
               <Button
@@ -504,7 +506,11 @@ export default function Conciliacao() {
             )}
           </div>
         </Card>
-        <ImportarExcel tipo="fornecedor" onImport={handleImportarFornecedor} />
+        
+        <div className="space-y-4">
+          <ImportarExcel tipo="fornecedor" onImport={handleImportarFornecedor} />
+          <ImportarPDF tipo="fornecedor" onImport={handleImportarFornecedor} />
+        </div>
       </div>
 
       {/* Tabela de Dados Internos Carregados */}
