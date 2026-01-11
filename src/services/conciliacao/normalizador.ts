@@ -147,7 +147,7 @@ export function normalizarValor(valor: string | number | null | undefined): numb
   // Se é string
   if (typeof valor === "string") {
     // Remove símbolos de moeda, espaços e pontos de milhar
-    let valorLimpo = valor
+    const valorLimpo = valor
       .replace(/[R$\s]/g, "")
       .replace(/\./g, "")
       .replace(/,/g, ".");

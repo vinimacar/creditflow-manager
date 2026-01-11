@@ -103,7 +103,10 @@ export async function processarConciliacao(
     
     logs.push("\n=== ETAPA 2: Matching Inteligente ===");
     
-    const matchings = processarMatchingLote(contratos, pagamentos, config);
+    const matchings = processarMatchingLote(contratos, pagamentos, {
+      toleranciaValor: config.toleranciaValor,
+      janelaDias: config.janelaDiasPagamento,
+    });
     const estatisticasMatching = calcularEstatisticasMatching(matchings);
     
     logs.push(`Total de contratos processados: ${estatisticasMatching.total}`);

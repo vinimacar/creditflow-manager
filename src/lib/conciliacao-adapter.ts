@@ -11,6 +11,7 @@ import type {
   ContratoConciliado,
   StatusConciliacao,
   RelatorioConciliacao,
+  ProdutoBancario,
 } from "@/types/conciliacao";
 import { processarConciliacao } from "@/services/conciliacao";
 
@@ -140,7 +141,7 @@ export async function processarConciliacaoComNovoMotor(
 /**
  * Mapeia nome do produto para o enum ProdutoBancario
  */
-function mapearProduto(produto: string): string {
+function mapearProduto(produto: string): ProdutoBancario {
   const produtoUpper = produto.toUpperCase();
   
   if (produtoUpper.includes("CONSIGNADO")) return "CONSIGNADO";
@@ -149,7 +150,7 @@ function mapearProduto(produto: string): string {
   if (produtoUpper.includes("CARTAO") || produtoUpper.includes("CARTÃO")) return "CARTAO";
   if (produtoUpper.includes("PESSOAL")) return "PESSOAL";
   
-  return produto;
+  return produto as ProdutoBancario;
 }
 
 /**
