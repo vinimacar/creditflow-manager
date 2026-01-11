@@ -130,7 +130,8 @@ export default function Produtos() {
   };
 
   const handleEdit = (produto: ProdutoDisplay) => {
-    const fullData: Produto = {
+    const fullData: Produto = produtos.find(p => p.id === produto.id) as any as Produto;
+    setSelectedProduto(fullData || {
       id: produto.id,
       nome: produto.nome,
       codigo: produto.codigo,
@@ -139,9 +140,9 @@ export default function Produtos() {
       prazoMax: produto.prazoMax,
       tipoTabela: produto.tipoTabela,
       comissao: produto.comissao,
+      comissaoFornecedor: produto.comissaoFornecedor,
       status: produto.status
-    };
-    setSelectedProduto(fullData);
+    });
     setIsFormOpen(true);
   };
 
@@ -215,7 +216,7 @@ export default function Produtos() {
         setIsFormOpen(open);
         if (!open) setSelectedProduto(null);
       }}>
-        <DialogContent className="max-w-xl">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden">
           <DialogHeader>
             <DialogTitle>{selectedProduto ? "Editar Produto" : "Produto"}</DialogTitle>
           </DialogHeader>

@@ -303,16 +303,28 @@ export interface Produto {
   descricao?: string;
   preco?: number;
   categoria?: string;
+  categoriaId?: string;
   estoque?: number;
   prazoMin?: number;
   prazoMax?: number;
+  prazoMinimo?: number;
+  prazoMaximo?: number;
+  valorMinimo?: number;
+  valorMaximo?: number;
   tipoTabela?: string;
-  taxaNegociada: number; // Taxa negociada com o fornecedor/banco (%)
-  comissaoFornecedor: number; // Comissão que o fornecedor paga (%)
-  comissaoAgente: number; // Comissão que o agente receberá (%)
-  comissao: number; // Mantido para compatibilidade (usar comissaoAgente)
+  taxaNegociada?: number; // Taxa negociada com o fornecedor/banco (%)
+  comissaoFornecedor?: number; // Comissão que o fornecedor paga (%)
+  comissaoAgente?: number; // Comissão que o agente receberá (%)
+  comissao?: number; // Mantido para compatibilidade (usar comissaoAgente)
   taxaJuros?: number;
   fornecedorId?: string; // ID do fornecedor (Banco) vinculado ao produto
+  bancoId?: string; // ID do banco vinculado ao produto
+  comissoes?: Array<{
+    id: string;
+    valorMin: number;
+    valorMax: number;
+    percentual: number;
+  }>;
   status: "ativo" | "inativo";
   createdAt?: Date;
   updatedAt?: Date;

@@ -175,7 +175,7 @@ export function NovoProdutoForm({ open, onOpenChange, onSalvar }: NovoProdutoFor
       return;
     }
 
-    if (!formData.categoria) {
+    if (!formData.categoriaId && !formData.categoria) {
       toast.error("Selecione uma categoria");
       return;
     }
@@ -267,7 +267,16 @@ export function NovoProdutoForm({ open, onOpenChange, onSalvar }: NovoProdutoFor
                   + Nova Categoria
                 </Button>
               </Label>
-              <Select value={formData.categoriaId} onValueChange={(v) => handleChange("categoriaId", v)}>
+              <Select 
+                value={formData.categoriaId} 
+                onValueChange={(v) => {
+                  const categoriaSelecionada = categorias.find(c => c.id === v);
+                  handleChange("categoriaId", v);
+                  if (categoriaSelecionada) {
+                    handleChange("categoria", categoriaSelecionada.nome);
+                  }
+                }}
+              >
                 <SelectTrigger id="categoria">
                   <SelectValue placeholder="Selecione a categoria" />
                 </SelectTrigger>
