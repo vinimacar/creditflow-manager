@@ -25,12 +25,14 @@ import {
   Database,
   Download,
   Upload,
+  RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { collection, getDocs, doc, setDoc, getDoc, addDoc, Timestamp } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
 import { Skeleton } from "@/components/ui/skeleton";
 import { updatePassword } from "firebase/auth";
+import { popularCategoriasInicial } from "@/lib/seed-categorias";
 import {
   Select,
   SelectContent,
@@ -109,10 +111,28 @@ export default function Configuracoes() {
   const [salvandoPermissoes, setSalvandoPermissoes] = useState(false);
   const [importando, setImportando] = useState(false);
   const [exportando, setExportando] = useState(false);
+  const [populandoCategorias, setPopulandoCategorias] = useState(false);
   
   // Estados para permissões
   const [cargoSelecionado, setCargoSelecionado] = useState<UserRole>("agente");
   const [permissoesCargo, setPermissoesCargo] = useState<Record<UserRole, Permissoes>>(PERMISSOES_PADRAO);
+
+  const handlePopularCategorias = async () => {
+    setPopulandoCategorias(true);
+    try {
+      const resultado = await popularCategoriasInicial();
+      if (resultado.success) {
+        toast.success("Categorias padrão criadas com sucesso!");
+      } else {
+        toast.error(resultado.message || "Erro ao criar categorias");
+      }
+    } catch (error) {
+      console.error("Erro ao popular categorias:", error);
+      toast.error("Erro ao criar categorias");
+    } finally {
+      setPopulandoCategorias(false);
+    }
+  };
 
   const carregarConfiguracoes = async () => {
     try {
@@ -781,6 +801,58 @@ export default function Configuracoes() {
 
         <TabsContent value="dados">
           <div className="grid gap-6 md:grid-cols-2">
+            <Card className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 rounded-lg bg-blue-500/10">
+                  <RefreshCw className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold">Categorias de Produtos</h3>
+                  <p className="text-sm text-muted-foreground">Inicializar categorias padrão</p>
+                </div>
+              </div>
+              
+              <div className="space-y-4">
+                <div className="bg-muted/50 rounded-lg p-4">
+                  <p className="text-sm mb-2 font-medium">Serão criadas as categorias:</p>
+                  <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                    <li>Empréstimo Pessoal</li>
+                    <li>Empréstimo Consignado</li>
+                    <li>Portabilidade</li>
+                    <li>FGTS</li>
+                    <li>Troca Cartão</li>
+                    <li>Venda Digital</li>
+                    <li>Refin da Portabilidade</li>
+                    <li>REFIN</li>
+                    <li>Saque Digital</li>
+                  </ul>
+                </div>
+
+                <Button 
+                  onClick={handlePopularCategorias} 
+                  disabled={populandoCategorias}
+                  className="w-full gap-2"
+                  variant="outline"
+                >
+                  {populandoCategorias ? (
+                    <>
+                      <span className="animate-spin">⏳</span>
+                      Criando Categorias...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="w-4 h-4" />
+                      Popular Categorias Padrão
+                    </>
+                  )}
+                </Button>
+
+                <p className="text-xs text-muted-foreground text-center">
+                  Categorias já existentes não serão duplicadas
+                </p>
+              </div>
+            </Card>
+            
             <Card className="p-6">
               <div className="flex items-center gap-3 mb-4">
                 <div className="p-2 rounded-lg bg-primary/10">

@@ -21,7 +21,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Plus, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { getFornecedores, getBancos, getCategoriasProdutos, type Fornecedor, type Banco, type CategoriaProduto } from "@/lib/firestore";
+import { getFornecedores, getBancos, getCategoriasProdutos, addCategoriaProduto, type Fornecedor, type Banco, type CategoriaProduto } from "@/lib/firestore";
 
 interface ComissaoFaixa {
   id: string;
@@ -78,6 +78,21 @@ export function NovoProdutoForm({ open, onOpenChange, onSalvar }: NovoProdutoFor
   const [fornecedores, setFornecedores] = useState<Fornecedor[]>([]);
   const [bancos, setBancos] = useState<Banco[]>([]);
   const [categorias, setCategorias] = useState<CategoriaProduto[]>([]);
+  const [novaCategoriaDialog, setNovaCategoriaDialog] = useState(false);
+  const [novaCategoriaNome, setNovaCategoriaNome] = useState("");
+  
+  // Categorias padrão do sistema
+  const CATEGORIAS_PADRAO = [
+    "Empréstimo Pessoal",
+    "Empréstimo Consignado",
+    "Portabilidade",
+    "FGTS",
+    "Troca Cartão",
+    "Venda Digital",
+    "Refin da Portabilidade",
+    "REFIN",
+    "Saque Digital",
+  ];
 
   useEffect(() => {
     const loadDados = async () => {
@@ -98,6 +113,31 @@ export function NovoProdutoForm({ open, onOpenChange, onSalvar }: NovoProdutoFor
       loadDados();
     }
   }, [open]);
+
+  const handleCriarCategoria = async () => {
+    if (!novaCategoriaNome.trim()) {
+      toast.error("Digite o nome da categoria");
+      return;
+    }
+
+    try {
+      await addCategoriaProduto({
+        nome: novaCategoriaNome.trim(),
+        ativo: true,
+      });
+      
+      toast.success("Categoria cadastrada com sucesso!");
+      setNovaCategoriaDialog(false);
+      setNovaCategoriaNome("");
+      
+      // Recarregar categorias
+      const categoriasData = await getCategoriasProdutos();
+      setCategorias(categoriasData);
+    } catch (error) {
+      console.error("Erro ao criar categoria:", error);
+      toast.error("Erro ao cadastrar categoria");
+    }
+  };
 
   const handleChange = <K extends keyof ProdutoNovo>(field: K, value: ProdutoNovo[K]) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -215,27 +255,50 @@ export function NovoProdutoForm({ open, onOpenChange, onSalvar }: NovoProdutoFor
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="categoria">Categoria *</Label>
+              <Label htmlFor="categoria" className="flex items-center justify-between">
+                Categoria *
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 text-xs"
+                  onClick={() => setNovaCategoriaDialog(true)}
+                >
+                  + Nova Categoria
+                </Button>
+              </Label>
               <Select value={formData.categoriaId} onValueChange={(v) => handleChange("categoriaId", v)}>
                 <SelectTrigger id="categoria">
                   <SelectValue placeholder="Selecione a categoria" />
                 </SelectTrigger>
-                <SelectContent>
-                  {categorias.length === 0 ? (
-                    <SelectItem value="sem-categoria" disabled>
-                      Nenhuma categoria cadastrada
+                <SelectContent className="max-h-[300px]">
+                  {CATEGORIAS_PADRAO.map((catNome) => {
+                    const categoriaExistente = categorias.find(
+                      (c) => c.nome.toLowerCase() === catNome.toLowerCase()
+                    );
+                    if (categoriaExistente) {
+                      return (
+                        <SelectItem key={categoriaExistente.id} value={categoriaExistente.id!}>
+                          {categoriaExistente.nome}
+                        </SelectItem>
+                      );
+                    }
+                    return null;
+                  })}
+                  
+                  {categorias.filter(
+                    (c) => !CATEGORIAS_PADRAO.some(
+                      (cp) => cp.toLowerCase() === c.nome.toLowerCase()
+                    )
+                  ).map((categoria) => (
+                    <SelectItem key={categoria.id} value={categoria.id!}>
+                      {categoria.nome}
                     </SelectItem>
-                  ) : (
-                    categorias.map((categoria) => (
-                      <SelectItem key={categoria.id} value={categoria.id!}>
-                        {categoria.nome}
-                      </SelectItem>
-                    ))
-                  )}
+                  ))}
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                Tipo/categoria do produto
+                {CATEGORIAS_PADRAO.length} categorias padrão disponíveis
               </p>
             </div>
           </div>
@@ -531,6 +594,51 @@ export function NovoProdutoForm({ open, onOpenChange, onSalvar }: NovoProdutoFor
           </Button>
           <Button onClick={handleSalvar} disabled={salvando}>
             {salvando ? "Salvando..." : "Cadastrar Produto"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    {/* Dialog Nova Categoria */}
+    <Dialog open={novaCategoriaDialog} onOpenChange={setNovaCategoriaDialog}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Nova Categoria</DialogTitle>
+          <DialogDescription>
+            Cadastre uma nova categoria de produto
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label htmlFor="nomeCategoria">Nome da Categoria *</Label>
+            <Input
+              id="nomeCategoria"
+              value={novaCategoriaNome}
+              onChange={(e) => setNovaCategoriaNome(e.target.value)}
+              placeholder="Ex: Saque Aniversário FGTS"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleCriarCategoria();
+                }
+              }}
+            />
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button 
+            variant="outline" 
+            onClick={() => {
+              setNovaCategoriaDialog(false);
+              setNovaCategoriaNome("");
+            }}
+          >
+            Cancelar
+          </Button>
+          <Button onClick={handleCriarCategoria}>
+            Cadastrar
           </Button>
         </DialogFooter>
       </DialogContent>
