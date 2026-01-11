@@ -3,7 +3,7 @@
  * Execute este arquivo uma vez para criar as categorias iniciais
  */
 
-import { collection, addDoc, getDocs, query, where } from "firebase/firestore";
+import { collection, addDoc, getDocs, query, where, deleteDoc } from "firebase/firestore";
 import { db } from "./firebase";
 
 const CATEGORIAS_PADRAO = [
@@ -61,7 +61,7 @@ export async function popularCategoriasInicial() {
 export async function limparCategorias() {
   try {
     const snapshot = await getDocs(collection(db, "categoriasProdutos"));
-    const deletePromises = snapshot.docs.map((doc) => doc.ref.delete());
+    const deletePromises = snapshot.docs.map((doc) => deleteDoc(doc.ref));
     await Promise.all(deletePromises);
     console.log("Todas as categorias foram removidas");
     return { success: true };

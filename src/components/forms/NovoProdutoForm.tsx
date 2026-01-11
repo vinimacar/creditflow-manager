@@ -123,7 +123,7 @@ export function NovoProdutoForm({ open, onOpenChange, onSalvar }: NovoProdutoFor
     try {
       await addCategoriaProduto({
         nome: novaCategoriaNome.trim(),
-        ativo: true,
+        status: "ativo",
       });
       
       toast.success("Categoria cadastrada com sucesso!");
@@ -588,16 +588,15 @@ export function NovoProdutoForm({ open, onOpenChange, onSalvar }: NovoProdutoFor
           </div>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancelar
-          </Button>
-          <Button onClick={handleSalvar} disabled={salvando}>
-            {salvando ? "Salvando..." : "Cadastrar Produto"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      <DialogFooter>
+        <Button variant="outline" onClick={() => onOpenChange(false)}>
+          Cancelar
+        </Button>
+        <Button onClick={handleSalvar} disabled={salvando}>
+          {salvando ? "Salvando..." : "Cadastrar Produto"}
+        </Button>
+      </DialogFooter>
+    </DialogContent>
 
     {/* Dialog Nova Categoria */}
     <Dialog open={novaCategoriaDialog} onOpenChange={setNovaCategoriaDialog}>
@@ -642,6 +641,7 @@ export function NovoProdutoForm({ open, onOpenChange, onSalvar }: NovoProdutoFor
           </Button>
         </DialogFooter>
       </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }
