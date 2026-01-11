@@ -36,11 +36,11 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { CalendarIcon, Plus, Trash2, Edit, Receipt, TrendingDown } from "lucide-react";
+import { CalendarIcon, Plus, Trash2, Edit, Receipt, TrendingDown, Users } from "lucide-react";
 import { toast } from "sonner";
-import { getDespesas, addDespesa, updateDespesa, deleteDespesa, type Despesa } from "@/lib/firestore";
+import { getDespesas, addDespesa, updateDespesa, deleteDespesa, type Despesa, getFuncionarios } from "@/lib/firestore";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   AlertDialog,
@@ -52,6 +52,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { collection, getDocs, query, where } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { FolhaPagamento } from "@/types/folhaPagamento";
+
+// Tipo extendido para incluir nome do funcionário
+interface FolhaPagamentoComNome extends FolhaPagamento {
+  funcionarioNome: string;
+}
 
 const categoriasDespesa = [
   "Aluguel",
@@ -80,6 +88,7 @@ const statusPagamento = ["Pago", "Pendente", "Atrasado"] as const;
 export default function Despesas() {
   const { hasPermission } = useAuth();
   const [despesas, setDespesas] = useState<Despesa[]>([]);
+  const [folhasPagamento, setFolhasPagamento] = useState<FolhaPagamentoComNome[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editando, setEditando] = useState<Despesa | null>(null);
@@ -102,8 +111,32 @@ export default function Despesas() {
   const carregarDespesas = async () => {
     try {
       setLoading(true);
-      const dados = await getDespesas();
-      setDespesas(dados);
+      const [despesasData, funcionariosData] = await Promise.all([
+        getDespesas(),
+        getFuncionarios()
+      ]);
+      setDespesas(despesasData);
+
+      // Buscar folhas de pagamento
+      const folhasSnapshot = await getDocs(collection(db, "folhaPagamento"));
+      const folhasData = folhasSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+        criadoEm: doc.data().criadoEm?.toDate(),
+        atualizadoEm: doc.data().atualizadoEm?.toDate(),
+        dataPagamento: doc.data().dataPagamento?.toDate(),
+      })) as FolhaPagamento[];
+
+      // Adicionar nome do funcionário às folhas
+      const folhasComNome = folhasData.map(folha => {
+        const funcionario = funcionariosData.find(f => f.id === folha.funcionarioId);
+        return {
+          ...folha,
+          funcionarioNome: funcionario?.nome || "Funcionário não encontrado"
+        };
+      });
+
+      setFolhasPagamento(folhasComNome);
     } catch (error) {
       console.error("Erro ao carregar despesas:", error);
       toast.error("Erro ao carregar despesas");
@@ -199,6 +232,7 @@ export default function Despesas() {
   const totalPago = despesas.filter(d => d.status === "Pago").reduce((sum, d) => sum + d.valor, 0);
   const totalPendente = despesas.filter(d => d.status === "Pendente").reduce((sum, d) => sum + d.valor, 0);
   const totalAtrasado = despesas.filter(d => d.status === "Atrasado").reduce((sum, d) => sum + d.valor, 0);
+  const totalFolhas = folhasPagamento.reduce((sum, f) => sum + f.salarioLiquido, 0);
 
   const getStatusBadge = (status: typeof statusPagamento[number]) => {
     const variants: Record<typeof statusPagamento[number], "default" | "secondary" | "destructive"> = {
@@ -230,7 +264,7 @@ export default function Despesas() {
       />
 
       {/* Cartões de Resumo */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <Card className="p-6">
           <div className="flex items-center justify-between">
             <div>
@@ -240,6 +274,18 @@ export default function Despesas() {
               </h3>
             </div>
             <Receipt className="w-8 h-8 text-red-600" />
+          </div>
+        </Card>
+
+        <Card className="p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Folhas de Pagamento</p>
+              <h3 className="text-2xl font-bold mt-2 text-blue-600">
+                R$ {totalFolhas.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+              </h3>
+            </div>
+            <Users className="w-8 h-8 text-blue-600" />
           </div>
         </Card>
 
@@ -511,6 +557,75 @@ export default function Despesas() {
                           <Trash2 className="w-4 h-4 text-destructive" />
                         </Button>
                       </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </Card>
+
+      {/* Tabela de Folhas de Pagamento */}
+      <Card>
+        <div className="p-6 border-b">
+          <div>
+            <h3 className="text-lg font-semibold">Folhas de Pagamento</h3>
+            <p className="text-sm text-muted-foreground">
+              {folhasPagamento.length} {folhasPagamento.length === 1 ? "folha" : "folhas"} geradas
+            </p>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Funcionário</TableHead>
+                <TableHead>Mês Referência</TableHead>
+                <TableHead>Salário Bruto</TableHead>
+                <TableHead>Descontos</TableHead>
+                <TableHead>Salário Líquido</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Data Criação</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                    Carregando folhas de pagamento...
+                  </TableCell>
+                </TableRow>
+              ) : folhasPagamento.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                    Nenhuma folha de pagamento gerada
+                  </TableCell>
+                </TableRow>
+              ) : (
+                folhasPagamento.map((folha) => (
+                  <TableRow key={folha.id}>
+                    <TableCell className="font-medium">{folha.funcionarioNome}</TableCell>
+                    <TableCell>
+                      {format(parseISO(folha.mesReferencia + "-01"), "MM/yyyy", { locale: ptBR })}
+                    </TableCell>
+                    <TableCell>
+                      R$ {folha.salarioBruto.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                    </TableCell>
+                    <TableCell>
+                      R$ {folha.descontos.total.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                    </TableCell>
+                    <TableCell className="font-semibold text-green-600">
+                      R$ {folha.salarioLiquido.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={folha.status === "processada" ? "default" : "secondary"}>
+                        {folha.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {folha.criadoEm ? format(folha.criadoEm, "dd/MM/yyyy", { locale: ptBR }) : "-"}
                     </TableCell>
                   </TableRow>
                 ))

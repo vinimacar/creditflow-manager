@@ -60,14 +60,14 @@ export default function Dashboard() {
 
       // Calcular totais
       const vendasMes = vendasMesAtual.reduce((sum, v) => sum + v.valorContrato, 0);
-      const comissoesMes = vendasMesAtual.reduce((sum, v) => sum + (v.comissao || 0), 0);
+      const comissoesMes = vendasMesAtual.reduce((sum, v) => sum + (v.comissaoFornecedor || 0), 0);
       
       const vendasMesAnteriorTotal = vendasMesAnterior.reduce((sum, v) => sum + v.valorContrato, 0);
-      const comissoesMesAnteriorTotal = vendasMesAnterior.reduce((sum, v) => sum + (v.comissao || 0), 0);
+      const comissoesMesAnteriorTotal = vendasMesAnterior.reduce((sum, v) => sum + (v.comissaoFornecedor || 0), 0);
 
       console.log("Vendas do mês atual:", vendasMesAtual);
-      console.log("Total de comissões do mês:", comissoesMes);
-      console.log("Vendas com comissão:", vendasMesAtual.filter(v => v.comissao > 0));
+      console.log("Total de comissões dos fornecedores:", comissoesMes);
+      console.log("Vendas com comissão fornecedor:", vendasMesAtual.filter(v => (v.comissaoFornecedor || 0) > 0));
 
       // Calcular crescimento
       const crescimentoVendas = vendasMesAnteriorTotal > 0
@@ -147,7 +147,7 @@ export default function Dashboard() {
           iconColor="primary"
         />
         <StatCard
-          title="Comissões"
+          title="Receita (Comissão Fornecedores)"
           value={`R$ ${stats!.comissoesMes.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`}
           change={`${stats!.crescimentoComissoes > 0 ? "+" : ""}${stats!.crescimentoComissoes.toFixed(1)}% vs mês anterior`}
           changeType={stats!.crescimentoComissoes >= 0 ? "positive" : "negative"}
