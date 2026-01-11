@@ -297,6 +297,10 @@ export default function Relatorios() {
       const comissaoPercentual = produto?.comissao || 0;
       const comissaoCalculada = v.comissao || (v.valorContrato * comissaoPercentual / 100);
       
+      // Calcular comissão do fornecedor (valor a receber)
+      const comissaoFornecedorPercentual = produto?.comissaoFornecedor || 0;
+      const valorAReceber = v.valorContrato * comissaoFornecedorPercentual / 100;
+      
       return {
         id: v.id,
         data: v.createdAt?.toDate?.() || new Date(v.createdAt),
@@ -308,6 +312,8 @@ export default function Relatorios() {
         prazo: v.prazo,
         comissao: comissaoCalculada,
         comissaoPercentual: comissaoPercentual,
+        comissaoFornecedorPercentual: comissaoFornecedorPercentual,
+        valorAReceber: valorAReceber,
         status: v.status,
       };
     });
@@ -611,6 +617,7 @@ export default function Relatorios() {
         head: [["Métrica", "Valor"]],
         body: [
           ["Total de Vendas", `R$ ${estatisticas.totalVendas.toLocaleString("pt-BR")}`],
+          ["Total a Receber", `R$ ${dadosFiltrados.reduce((sum, v) => sum + v.valorAReceber, 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`],
           ["Crescimento", `${estatisticas.crescimento > 0 ? "+" : ""}${estatisticas.crescimento.toFixed(1)}%`],
           ["Ticket Médio", `R$ ${estatisticas.ticketMedio.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`],
           ["Total de Funcionários", estatisticas.totalFuncionarios.toString()],
@@ -678,6 +685,39 @@ export default function Relatorios() {
         theme: "striped",
         headStyles: { fillColor: [59, 130, 246] },
       });
+
+      // Detalhamento das Vendas com Valores a Receber
+      if (dadosFiltrados.length > 0) {
+        doc.addPage();
+        y = 20;
+        doc.setFontSize(14);
+        doc.setFont("helvetica", "bold");
+        doc.text("Detalhamento de Vendas", 14, y);
+
+        y += 10;
+        autoTable(doc, {
+          startY: y,
+          head: [["Data", "Cliente", "Produto", "Valor Contrato", "Valor a Receber", "Comissão"]],
+          body: dadosFiltrados.map(v => [
+            format(v.data, "dd/MM/yyyy", { locale: ptBR }),
+            v.cliente,
+            v.produto,
+            `R$ ${v.valorContrato.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
+            `R$ ${v.valorAReceber.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
+            `R$ ${v.comissao.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
+          ]),
+          theme: "striped",
+          headStyles: { fillColor: [59, 130, 246] },
+          columnStyles: {
+            0: { cellWidth: 25 },
+            1: { cellWidth: 35 },
+            2: { cellWidth: 35 },
+            3: { cellWidth: 30, halign: 'right' },
+            4: { cellWidth: 30, halign: 'right' },
+            5: { cellWidth: 30, halign: 'right' },
+          },
+        });
+      }
 
       // Rodapé
       const pageCount = doc.getNumberOfPages();
@@ -861,6 +901,7 @@ export default function Relatorios() {
                   <TableHead>Produto</TableHead>
                   <TableHead className="text-right">Valor Contrato</TableHead>
                   <TableHead className="text-right">Prazo</TableHead>
+                  <TableHead className="text-right bg-blue-50">Valor a Receber</TableHead>
                   <TableHead className="text-right bg-green-50">Comissão (%)</TableHead>
                   <TableHead className="text-right bg-green-50">Comissão (R$)</TableHead>
                   <TableHead>Status</TableHead>
@@ -876,6 +917,7 @@ export default function Relatorios() {
                     <TableCell>{venda.produto}</TableCell>
                     <TableCell className="text-right">R$ {venda.valorContrato.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</TableCell>
                     <TableCell className="text-right">{venda.prazo} meses</TableCell>
+                    <TableCell className="text-right bg-blue-50 font-semibold text-blue-700">R$ {venda.valorAReceber.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</TableCell>
                     <TableCell className="text-right bg-green-50 font-semibold text-green-700">{venda.comissaoPercentual.toFixed(2)}%</TableCell>
                     <TableCell className="text-right bg-green-50 font-semibold text-green-700">R$ {venda.comissao.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</TableCell>
                     <TableCell>

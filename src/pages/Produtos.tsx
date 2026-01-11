@@ -3,7 +3,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { DataTable } from "@/components/ui/DataTable";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Package, Upload } from "lucide-react";
+import { Package, Upload, FolderTree } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -13,6 +13,7 @@ import {
 import { ProdutoForm } from "@/components/forms/ProdutoForm";
 import { NovoProdutoForm, type ProdutoNovo } from "@/components/forms/NovoProdutoForm";
 import { ImportDialog } from "@/components/ui/ImportDialog";
+import { GerenciarCategorias } from "@/components/configuracoes/GerenciarCategorias";
 import { getProdutos, deleteProduto, type Produto } from "@/lib/firestore";
 import { addDoc, collection } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -96,6 +97,7 @@ export default function Produtos() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isNovoProdutoOpen, setIsNovoProdutoOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
+  const [isCategoriasOpen, setIsCategoriasOpen] = useState(false);
   const [produtos, setProdutos] = useState<ProdutoDisplay[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedProduto, setSelectedProduto] = useState<Produto | null>(null);
@@ -194,8 +196,9 @@ export default function Produtos() {
           onClick: () => setIsNovoProdutoOpen(true),
         }}
       >
-        <Button variant="outline" className="gap-2" onClick={() => setIsFormOpen(true)}>
-          Editar
+        <Button variant="outline" className="gap-2" onClick={() => setIsCategoriasOpen(true)}>
+          <FolderTree className="w-4 h-4" />
+          Categorias
         </Button>
         <Button variant="outline" className="gap-2" onClick={() => setIsImportOpen(true)}>
           <Upload className="w-4 h-4" />
@@ -241,6 +244,12 @@ export default function Produtos() {
         description="Importe seu catálogo de produtos a partir de um arquivo CSV"
         templateColumns={produtoTemplateColumns}
         onImport={handleImport}
+      />
+
+      {/* Dialog Gerenciar Categorias */}
+      <GerenciarCategorias
+        open={isCategoriasOpen}
+        onOpenChange={setIsCategoriasOpen}
       />
     </div>
   );
