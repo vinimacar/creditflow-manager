@@ -46,6 +46,7 @@ export interface ProdutoNovo {
   prazoMinimo: number;
   prazoMaximo: number;
   taxaJuros: number;
+  taxaNegociada?: number; // Taxa específica negociada com o fornecedor
   comissaoFornecedor: number; // Comissão paga pelo fornecedor (%)
   comissaoAgente: number; // Comissão para o agente vendedor (%)
   fornecedorId?: string; // ID do fornecedor
@@ -64,6 +65,7 @@ export function NovoProdutoForm({ open, onOpenChange, onSalvar }: NovoProdutoFor
     prazoMinimo: 12,
     prazoMaximo: 84,
     taxaJuros: 0,
+    taxaNegociada: 0,
     comissaoFornecedor: 0,
     comissaoAgente: 0,
     status: "ativo",
@@ -175,6 +177,7 @@ export function NovoProdutoForm({ open, onOpenChange, onSalvar }: NovoProdutoFor
         prazoMinimo: 12,
         prazoMaximo: 84,
         taxaJuros: 0,
+        taxaNegociada: 0,
         comissaoFornecedor: 0,
         comissaoAgente: 0,
         status: "ativo",
@@ -297,7 +300,8 @@ export function NovoProdutoForm({ open, onOpenChange, onSalvar }: NovoProdutoFor
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Taxas e Comissões */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="taxaJuros">Taxa de Juros (% a.m.)</Label>
               <Input
@@ -308,6 +312,58 @@ export function NovoProdutoForm({ open, onOpenChange, onSalvar }: NovoProdutoFor
                 min="0"
                 step="0.01"
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="taxaNegociada">Taxa Negociada (% a.m.)</Label>
+              <Input
+                id="taxaNegociada"
+                type="number"
+                value={formData.taxaNegociada || 0}
+                onChange={(e) => handleChange("taxaNegociada", parseFloat(e.target.value) || 0)}
+                min="0"
+                step="0.01"
+                placeholder="Taxa acordada com fornecedor"
+              />
+              <p className="text-xs text-muted-foreground">
+                Taxa específica negociada para este produto
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="comissaoFornecedor">Comissão Fornecedor (%)</Label>
+              <Input
+                id="comissaoFornecedor"
+                type="number"
+                value={formData.comissaoFornecedor}
+                onChange={(e) => handleChange("comissaoFornecedor", parseFloat(e.target.value) || 0)}
+                min="0"
+                max="100"
+                step="0.1"
+                placeholder="% paga pelo fornecedor"
+              />
+              <p className="text-xs text-muted-foreground">
+                Percentual que o fornecedor paga sobre a venda
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="comissaoAgente">Comissão Agente (%)</Label>
+              <Input
+                id="comissaoAgente"
+                type="number"
+                value={formData.comissaoAgente}
+                onChange={(e) => handleChange("comissaoAgente", parseFloat(e.target.value) || 0)}
+                min="0"
+                max="100"
+                step="0.1"
+                placeholder="% para o agente"
+              />
+              <p className="text-xs text-muted-foreground">
+                Percentual que o agente recebe sobre a venda
+              </p>
             </div>
 
             <div className="space-y-2">

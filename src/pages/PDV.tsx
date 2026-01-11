@@ -70,6 +70,7 @@ import {
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { getClientes, getProdutos, getFuncionarios, getVendas, getFornecedores, getBancos, getCategoriasProdutos, addBanco, addCategoriaProduto, type Cliente, type Produto, type Funcionario, type Venda, type Fornecedor, type Banco, type CategoriaProduto } from "@/lib/firestore";
+import { BANCOS_BRASIL, buscarBancoPorCodigo } from "@/lib/bancos-brasil";
 import { collection, addDoc, Timestamp, updateDoc, doc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -94,6 +95,7 @@ export default function PDV() {
   const [selectedBanco, setSelectedBanco] = useState<string>("");
   const [selectedCategoria, setSelectedCategoria] = useState<string>("");
   const [valorContrato, setValorContrato] = useState<string>("");
+  const [numeroContrato, setNumeroContrato] = useState<string>("");
   const [prazo, setPrazo] = useState<string>("");
   const [processando, setProcessando] = useState(false);
   
@@ -150,6 +152,19 @@ export default function PDV() {
   const comissaoValor = valorContrato
     ? (parseFloat(valorContrato) * (comissaoPerc / 100)).toFixed(2)
     : "0.00";
+  
+  // Novas comissões
+  const comissaoFornecedorPerc = produto?.comissaoFornecedor || 0;
+  const comissaoAgentePerc = produto?.comissaoAgente || 0;
+  const comissaoFornecedorValor = valorContrato
+    ? (parseFloat(valorContrato) * (comissaoFornecedorPerc / 100)).toFixed(2)
+    : "0.00";
+  const comissaoAgenteValor = valorContrato
+    ? (parseFloat(valorContrato) * (comissaoAgentePerc / 100)).toFixed(2)
+    : "0.00";
+  
+  // Verificar se pode visualizar comissões
+  const podeVisualizarComissoes = userProfile?.papel === "Gerente" || userProfile?.papel === "Administrador";
 
   const handleFinalizarVenda = async () => {
     if (!selectedCliente || !selectedProduto || !selectedFuncionario || !valorContrato || !prazo) {
@@ -161,6 +176,13 @@ export default function PDV() {
     try {
       const vendaId = `VND-${Date.now().toString().slice(-6)}`;
       const produtoSelecionado = produtos.find(p => p.id === selectedProduto);
+      const valorContratoNum = parseFloat(valorContrato);
+      
+      // Calcular comissões
+      const comissaoFornecedorPerc = produtoSelecionado?.comissaoFornecedor || 0;
+      const comissaoAgentePerc = produtoSelecionado?.comissaoAgente || 0;
+      const comissaoFornecedorValor = (valorContratoNum * comissaoFornecedorPerc) / 100;
+      const comissaoAgenteValor = (valorContratoNum * comissaoAgentePerc) / 100;
       
       await addDoc(collection(db, "vendas"), {
         id: vendaId,
@@ -170,10 +192,15 @@ export default function PDV() {
         fornecedorId: selectedFornecedor || produtoSelecionado?.fornecedorId || "",
         bancoId: selectedBanco || "",
         categoriaId: selectedCategoria || "",
-        valorContrato: parseFloat(valorContrato),
+        valorContrato: valorContratoNum,
+        numeroContrato: numeroContrato || "",
         prazo: parseInt(prazo),
-        comissao: parseFloat(comissaoValor),
-        comissaoPercentual: comissaoPerc,
+        comissao: parseFloat(comissaoValor), // Mantido para compatibilidade
+        comissaoPercentual: comissaoPerc, // Mantido para compatibilidade
+        comissaoFornecedor: comissaoFornecedorValor,
+        comissaoFornecedorPercentual: comissaoFornecedorPerc,
+        comissaoAgente: comissaoAgenteValor,
+        comissaoAgentePercentual: comissaoAgentePerc,
         status: "aprovada",
         criadoPor: userProfile?.uid || "",
         createdAt: Timestamp.now(),
@@ -192,6 +219,7 @@ export default function PDV() {
       setSelectedBanco("");
       setSelectedCategoria("");
       setValorContrato("");
+      setNumeroContrato("");
       setPrazo("");
     } catch (error) {
       console.error("Erro ao registrar venda:", error);
@@ -663,21 +691,41 @@ export default function PDV() {
                     className="h-6 text-xs"
                     onClick={() => setNovoBancoDialog(true)}
                   >
-                    + Cadastrar
+                    + Cadastrar Outro
                   </Button>
                 </Label>
                 <Select value={selectedBanco} onValueChange={setSelectedBanco}>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione o banco" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="max-h-[300px]">
+                    <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+                      Bancos Cadastrados
+                    </div>
                     {bancos.map((banco) => (
                       <SelectItem key={banco.id} value={banco.id!}>
-                        {banco.nome}
+                        {banco.codigo ? `${banco.codigo} - ${banco.nome}` : banco.nome}
                       </SelectItem>
                     ))}
+                    
+                    {BANCOS_BRASIL.length > 0 && (
+                      <>
+                        <Separator className="my-2" />
+                        <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+                          Todos os Bancos do Brasil
+                        </div>
+                        {BANCOS_BRASIL.map((banco) => (
+                          <SelectItem key={`br-${banco.codigo}`} value={`banco-br-${banco.codigo}`}>
+                            {banco.codigo} - {banco.nome}
+                          </SelectItem>
+                        ))}
+                      </>
+                    )}
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {BANCOS_BRASIL.length} bancos disponíveis
+                </p>
               </div>
               <div>
                 <Label className="flex items-center justify-between">
@@ -728,6 +776,18 @@ export default function PDV() {
                   value={valorContrato}
                   onChange={(e) => setValorContrato(e.target.value)}
                 />
+              </div>
+              <div>
+                <Label>Número do Contrato</Label>
+                <Input
+                  type="text"
+                  placeholder="Ex: CT-2024-00001"
+                  value={numeroContrato}
+                  onChange={(e) => setNumeroContrato(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Número de identificação do contrato (opcional)
+                </p>
               </div>
               <div>
                 <Label>Agente Responsável *</Label>
@@ -788,14 +848,49 @@ export default function PDV() {
               </div>
               <Separator />
               <div className="flex justify-between items-center py-2">
+                <span className="text-muted-foreground">Nº Contrato</span>
+                <span className="font-medium text-sm">
+                  {numeroContrato || "-"}
+                </span>
+              </div>
+              <Separator />
+              <div className="flex justify-between items-center py-2">
                 <span className="text-muted-foreground">Valor do Contrato</span>
                 <span className="font-semibold text-lg">
                   R$ {valorContrato ? parseFloat(valorContrato).toLocaleString("pt-BR", { minimumFractionDigits: 2 }) : "0,00"}
                 </span>
               </div>
+              
+              {podeVisualizarComissoes && (
+                <>
+                  <Separator />
+                  <div className="flex items-center gap-2 py-2 bg-amber-50 dark:bg-amber-950/20 px-3 rounded-md">
+                    <Shield className="w-4 h-4 text-amber-600" />
+                    <span className="text-xs text-amber-600 font-medium">
+                      Informações visíveis apenas para Gerentes e Administradores
+                    </span>
+                  </div>
+                  
+                  <div className="flex justify-between items-center py-2">
+                    <span className="text-muted-foreground">Comissão Fornecedor ({comissaoFornecedorPerc}%)</span>
+                    <span className="font-semibold text-orange-600 text-lg">
+                      R$ {parseFloat(comissaoFornecedorValor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                  
+                  <Separator />
+                  <div className="flex justify-between items-center py-2">
+                    <span className="text-muted-foreground">Comissão Agente ({comissaoAgentePerc}%)</span>
+                    <span className="font-semibold text-success text-lg">
+                      R$ {parseFloat(comissaoAgenteValor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                </>
+              )}
+              
               <Separator />
               <div className="flex justify-between items-center py-2">
-                <span className="text-muted-foreground">Comissão ({comissaoPerc}%)</span>
+                <span className="text-muted-foreground">Comissão Total ({comissaoPerc}%)</span>
                 <span className="font-semibold text-success text-lg">
                   R$ {parseFloat(comissaoValor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                 </span>
