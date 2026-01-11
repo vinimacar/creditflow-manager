@@ -152,16 +152,23 @@ export default function Relatorios() {
       }
 
       // Calcular vendas por funcionário
-      const vendaPorFunc = new Map<string, { vendas: number; comissao: number }>();
+      const vendaPorFunc = new Map<string, { vendas: number; comissao: number; comissaoFornecedor: number }>();
       vendas.forEach((venda) => {
         const produto = produtos.find(p => p.id === venda.produtoId);
+        
+        // Comissão do agente
         const comissaoPercentual = produto?.comissao || 0;
         const comissaoCalculada = venda.comissao || (venda.valorContrato * comissaoPercentual / 100);
         
-        const current = vendaPorFunc.get(venda.funcionarioId) || { vendas: 0, comissao: 0 };
+        // Comissão do fornecedor (receita bruta da empresa)
+        const comissaoFornecedorPercentual = venda.comissaoFornecedorPercentual || produto?.comissaoFornecedor || 0;
+        const comissaoFornecedorCalculada = venda.comissaoFornecedor || (venda.valorContrato * comissaoFornecedorPercentual / 100);
+        
+        const current = vendaPorFunc.get(venda.funcionarioId) || { vendas: 0, comissao: 0, comissaoFornecedor: 0 };
         vendaPorFunc.set(venda.funcionarioId, {
           vendas: current.vendas + 1,
           comissao: current.comissao + comissaoCalculada,
+          comissaoFornecedor: current.comissaoFornecedor + comissaoFornecedorCalculada,
         });
       });
 
@@ -172,6 +179,7 @@ export default function Relatorios() {
             nome: func?.nome || "Desconhecido",
             vendas: stats.vendas,
             comissao: stats.comissao,
+            comissaoFornecedor: stats.comissaoFornecedor,
           };
         })
         .sort((a, b) => b.vendas - a.vendas)
@@ -424,16 +432,23 @@ export default function Relatorios() {
     }
 
     // Recalcular vendas por funcionário
-    const vendaPorFunc = new Map<string, { vendas: number; comissao: number }>();
+    const vendaPorFunc = new Map<string, { vendas: number; comissao: number; comissaoFornecedor: number }>();
     vendasFiltradas.forEach((venda) => {
       const produto = produtosCompletos.find(p => p.id === venda.produtoId);
+      
+      // Comissão do agente
       const comissaoPercentual = produto?.comissao || 0;
       const comissaoCalculada = venda.comissao || (venda.valorContrato * comissaoPercentual / 100);
       
-      const current = vendaPorFunc.get(venda.funcionarioId) || { vendas: 0, comissao: 0 };
+      // Comissão do fornecedor (receita bruta da empresa)
+      const comissaoFornecedorPercentual = venda.comissaoFornecedorPercentual || produto?.comissaoFornecedor || 0;
+      const comissaoFornecedorCalculada = venda.comissaoFornecedor || (venda.valorContrato * comissaoFornecedorPercentual / 100);
+      
+      const current = vendaPorFunc.get(venda.funcionarioId) || { vendas: 0, comissao: 0, comissaoFornecedor: 0 };
       vendaPorFunc.set(venda.funcionarioId, {
         vendas: current.vendas + 1,
         comissao: current.comissao + comissaoCalculada,
+        comissaoFornecedor: current.comissaoFornecedor + comissaoFornecedorCalculada,
       });
     });
 
@@ -444,6 +459,7 @@ export default function Relatorios() {
           nome: func?.nome || "Desconhecido",
           vendas: stats.vendas,
           comissao: stats.comissao,
+          comissaoFornecedor: stats.comissaoFornecedor,
         };
       })
       .sort((a, b) => b.vendas - a.vendas)
@@ -558,10 +574,13 @@ export default function Relatorios() {
     const totalVendas = dados.vendas.reduce((sum, v) => sum + v.valor, 0); // Valor total negociado pelos agentes
     const totalAnterior = dados.vendas.slice(0, -1).reduce((sum, v) => sum + v.valor, 0);
     const crescimento = totalAnterior > 0 ? ((totalVendas - totalAnterior) / totalAnterior) * 100 : 0;
-    const totalComissoes = dados.funcionarios.reduce((sum, f) => sum + f.comissao, 0); // Receita real (comissões recebidas dos fornecedores)
+    
+    // Receita Bruta = soma das comissões pagas pelos fornecedores
+    const totalComissoes = dados.funcionarios.reduce((sum, f) => sum + (f.comissaoFornecedor || 0), 0);
+    
     const totalDespesas = dados.despesas.reduce((sum, d) => sum + d.valor, 0);
     const totalReceitas = dados.receitas.reduce((sum, r) => sum + r.valor, 0);
-    const receitaLiquida = totalComissoes - totalDespesas; // Receita líquida = comissões - despesas
+    const receitaLiquida = totalComissoes - totalDespesas; // Receita líquida = comissões dos fornecedores - despesas
     const lucroTotal = totalReceitas - totalDespesas;
     const margemLucro = totalComissoes > 0 ? (receitaLiquida / totalComissoes) * 100 : 0;
 
@@ -571,7 +590,7 @@ export default function Relatorios() {
       ticketMedio: totalVendas / dados.vendas.reduce((sum, v) => sum + v.quantidade, 0) || 0,
       totalFuncionarios: dados.funcionarios.length,
       produtoMaisVendido: dados.produtos[0]?.nome || "N/A",
-      totalComissoes, // Receita bruta (comissões recebidas)
+      totalComissoes, // Receita bruta (comissões recebidas dos fornecedores)
       totalDespesas,
       totalReceitas,
       receitaLiquida, // Receita líquida
