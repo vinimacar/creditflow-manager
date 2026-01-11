@@ -148,20 +148,52 @@ export default function PDV() {
 
   const clienteSelecionado = clientes.find((c) => c.id === selectedCliente);
   const produto = produtos.find((p) => p.id === selectedProduto);
-  const comissaoPerc = produto?.comissao || 0;
-  const comissaoValor = valorContrato
-    ? (parseFloat(valorContrato) * (comissaoPerc / 100)).toFixed(2)
-    : "0.00";
   
-  // Novas comissões
+  // Função para calcular comissão baseada na tabela de faixas ou percentual fixo
+  const calcularComissao = (valorContratoNum: number, produto: Produto | undefined): { percentual: number; valor: number } => {
+    if (!produto) return { percentual: 0, valor: 0 };
+    
+    // Se existir tabela de comissões por faixa, usar ela
+    if (produto.comissoes && produto.comissoes.length > 0) {
+      const faixaAplicavel = produto.comissoes.find(
+        faixa => valorContratoNum >= faixa.valorMin && valorContratoNum <= faixa.valorMax
+      );
+      
+      if (faixaAplicavel) {
+        return {
+          percentual: faixaAplicavel.percentual,
+          valor: (valorContratoNum * faixaAplicavel.percentual) / 100
+        };
+      }
+      
+      // Se não encontrar faixa, usar a última (maior valor)
+      const ultimaFaixa = produto.comissoes[produto.comissoes.length - 1];
+      return {
+        percentual: ultimaFaixa.percentual,
+        valor: (valorContratoNum * ultimaFaixa.percentual) / 100
+      };
+    }
+    
+    // Caso contrário, usar comissão fixa do agente
+    const percentual = produto.comissaoAgente || produto.comissao || 0;
+    return {
+      percentual,
+      valor: (valorContratoNum * percentual) / 100
+    };
+  };
+  
+  const valorContratoNum = valorContrato ? parseFloat(valorContrato) : 0;
+  const comissaoCalculada = calcularComissao(valorContratoNum, produto);
+  const comissaoPerc = comissaoCalculada.percentual;
+  const comissaoValor = comissaoCalculada.valor.toFixed(2);
+  
+  // Comissões do fornecedor e agente
   const comissaoFornecedorPerc = produto?.comissaoFornecedor || 0;
-  const comissaoAgentePerc = produto?.comissaoAgente || 0;
+  const comissaoAgentePerc = comissaoCalculada.percentual;
   const comissaoFornecedorValor = valorContrato
     ? (parseFloat(valorContrato) * (comissaoFornecedorPerc / 100)).toFixed(2)
     : "0.00";
-  const comissaoAgenteValor = valorContrato
-    ? (parseFloat(valorContrato) * (comissaoAgentePerc / 100)).toFixed(2)
-    : "0.00";
+  const comissaoAgenteValor = comissaoValor;
   
   // Verificar se pode visualizar comissões
   const podeVisualizarComissoes = userProfile?.papel === "Gerente" || userProfile?.papel === "Administrador";
@@ -178,11 +210,10 @@ export default function PDV() {
       const produtoSelecionado = produtos.find(p => p.id === selectedProduto);
       const valorContratoNum = parseFloat(valorContrato);
       
-      // Calcular comissões
+      // Calcular comissões usando a tabela de faixas ou percentual fixo
+      const comissaoCalculadaAgente = calcularComissao(valorContratoNum, produtoSelecionado);
       const comissaoFornecedorPerc = produtoSelecionado?.comissaoFornecedor || 0;
-      const comissaoAgentePerc = produtoSelecionado?.comissaoAgente || 0;
       const comissaoFornecedorValor = (valorContratoNum * comissaoFornecedorPerc) / 100;
-      const comissaoAgenteValor = (valorContratoNum * comissaoAgentePerc) / 100;
       
       await addDoc(collection(db, "vendas"), {
         id: vendaId,
@@ -190,14 +221,21 @@ export default function PDV() {
         produtoId: selectedProduto,
         funcionarioId: selectedFuncionario,
         fornecedorId: selectedFornecedor || produtoSelecionado?.fornecedorId || "",
-        bancoId: selectedBanco || "",
-        categoriaId: selectedCategoria || "",
+        bancoId: selectedBanco || produtoSelecionado?.bancoId || "",
+        categoriaId: selectedCategoria || produtoSelecionado?.categoriaId || "",
         valorContrato: valorContratoNum,
         numeroContrato: numeroContrato || "",
         prazo: parseInt(prazo),
-        comissao: parseFloat(comissaoValor), // Mantido para compatibilidade
-        comissaoPercentual: comissaoPerc, // Mantido para compatibilidade
+        comissao: comissaoCalculadaAgente.valor, // Comissão do agente em R$
+        comissaoPercentual: comissaoCalculadaAgente.percentual, // Comissão do agente em %
         comissaoFornecedor: comissaoFornecedorValor,
+        comissaoFornecedorPercentual: comissaoFornecedorPerc,
+        comissaoAgente: comissaoCalculadaAgente.valor,
+        comissaoAgentePercentual: comissaoCalculadaAgente.percentual,
+        status: "aprovada",
+        criadoPor: userProfile?.uid || "",
+        createdAt: Timestamp.now(),
+      });
         comissaoFornecedorPercentual: comissaoFornecedorPerc,
         comissaoAgente: comissaoAgenteValor,
         comissaoAgentePercentual: comissaoAgentePerc,
@@ -256,9 +294,12 @@ export default function PDV() {
 
     try {
       const produtoSelecionado = produtos.find(p => p.id === editProdutoId);
-      const comissaoPerc = produtoSelecionado?.comissao || 0;
       const valorContratoNum = parseFloat(editValorContrato);
-      const comissaoValor = (valorContratoNum * comissaoPerc) / 100;
+      
+      // Calcular comissões usando a tabela de faixas ou percentual fixo
+      const comissaoCalculada = calcularComissao(valorContratoNum, produtoSelecionado);
+      const comissaoFornecedorPerc = produtoSelecionado?.comissaoFornecedor || 0;
+      const comissaoFornecedorValor = (valorContratoNum * comissaoFornecedorPerc) / 100;
 
       const vendaRef = doc(db, "vendas", vendaSelecionada.id);
       await updateDoc(vendaRef, {
@@ -266,10 +307,16 @@ export default function PDV() {
         produtoId: editProdutoId,
         funcionarioId: editFuncionarioId,
         fornecedorId: produtoSelecionado?.fornecedorId || "",
+        bancoId: produtoSelecionado?.bancoId || "",
+        categoriaId: produtoSelecionado?.categoriaId || "",
         valorContrato: valorContratoNum,
         prazo: parseInt(editPrazo),
-        comissao: comissaoValor,
-        comissaoPercentual: comissaoPerc,
+        comissao: comissaoCalculada.valor,
+        comissaoPercentual: comissaoCalculada.percentual,
+        comissaoAgente: comissaoCalculada.valor,
+        comissaoAgentePercentual: comissaoCalculada.percentual,
+        comissaoFornecedor: comissaoFornecedorValor,
+        comissaoFornecedorPercentual: comissaoFornecedorPerc,
       });
 
       toast.success("Venda atualizada com sucesso!");

@@ -143,9 +143,30 @@ export default function Conciliacao() {
         const funcionario = funcionarios.find(f => f.id === venda.funcionarioId);
         const fornecedor = fornecedoresData.find(f => f.id === produto?.fornecedorId);
 
-        // Calcular comissão usando o percentual do produto se disponível
-        const comissaoPercentual = produto?.comissao || venda.comissaoPercentual || 0;
-        const valorComissao = venda.comissao || (venda.valorContrato * (comissaoPercentual / 100));
+        // Usar comissão salva na venda (já calculada corretamente no PDV)
+        // Ou calcular baseado no produto se não houver comissão salva
+        let valorComissao = venda.comissao || 0;
+        let comissaoPercentual = venda.comissaoPercentual || 0;
+        
+        if (!venda.comissao && produto) {
+          // Se a venda não tem comissão salva, calcular usando tabela de faixas ou percentual fixo
+          if (produto.comissoes && produto.comissoes.length > 0) {
+            const faixaAplicavel = produto.comissoes.find(
+              faixa => venda.valorContrato >= faixa.valorMin && venda.valorContrato <= faixa.valorMax
+            );
+            
+            if (faixaAplicavel) {
+              comissaoPercentual = faixaAplicavel.percentual;
+            } else {
+              const ultimaFaixa = produto.comissoes[produto.comissoes.length - 1];
+              comissaoPercentual = ultimaFaixa.percentual;
+            }
+          } else {
+            comissaoPercentual = produto.comissaoAgente || produto.comissao || 0;
+          }
+          
+          valorComissao = venda.valorContrato * (comissaoPercentual / 100);
+        }
 
         return {
           contrato: venda.id || "",

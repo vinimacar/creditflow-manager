@@ -294,12 +294,33 @@ export default function Relatorios() {
       const funcionario = funcionariosCompletos.find(f => f.id === v.funcionarioId);
       const produto = produtosCompletos.find(p => p.id === v.produtoId);
       
-      const comissaoPercentual = produto?.comissao || 0;
-      const comissaoCalculada = v.comissao || (v.valorContrato * comissaoPercentual / 100);
+      // Usar comissão salva na venda ou calcular
+      let comissaoPercentual = v.comissaoPercentual || v.comissaoAgentePercentual || 0;
+      let comissaoCalculada = v.comissao || v.comissaoAgente || 0;
       
-      // Calcular comissão do fornecedor (valor a receber)
-      const comissaoFornecedorPercentual = produto?.comissaoFornecedor || 0;
-      const valorAReceber = v.valorContrato * comissaoFornecedorPercentual / 100;
+      // Se não houver comissão salva, calcular usando tabela de faixas ou percentual fixo
+      if (!comissaoCalculada && produto) {
+        if (produto.comissoes && produto.comissoes.length > 0) {
+          const faixaAplicavel = produto.comissoes.find(
+            faixa => v.valorContrato >= faixa.valorMin && v.valorContrato <= faixa.valorMax
+          );
+          
+          if (faixaAplicavel) {
+            comissaoPercentual = faixaAplicavel.percentual;
+          } else {
+            const ultimaFaixa = produto.comissoes[produto.comissoes.length - 1];
+            comissaoPercentual = ultimaFaixa.percentual;
+          }
+        } else {
+          comissaoPercentual = produto.comissaoAgente || produto.comissao || 0;
+        }
+        
+        comissaoCalculada = v.valorContrato * (comissaoPercentual / 100);
+      }
+      
+      // Calcular comissão do fornecedor (valor a receber) - usar valor salvo ou calcular
+      const comissaoFornecedorPercentual = v.comissaoFornecedorPercentual || produto?.comissaoFornecedor || 0;
+      const valorAReceber = v.comissaoFornecedor || (v.valorContrato * comissaoFornecedorPercentual / 100);
       
       return {
         id: v.id,

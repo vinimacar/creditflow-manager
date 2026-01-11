@@ -93,11 +93,15 @@ export interface Venda {
   produtoId: string;
   funcionarioId: string;
   fornecedorId?: string; // ID do fornecedor (Banco) do produto no momento da venda
+  bancoId?: string; // ID do banco do produto no momento da venda
+  categoriaId?: string; // ID da categoria do produto no momento da venda
   numeroContrato?: string; // Número do contrato no banco
   valorContrato: number;
   prazo: number;
-  comissao: number; // Comissão do agente em R$
-  comissaoPercentual: number; // Comissão do agente em %
+  comissao: number; // Comissão do agente em R$ (mantido para compatibilidade)
+  comissaoPercentual: number; // Comissão do agente em % (mantido para compatibilidade)
+  comissaoAgente?: number; // Comissão do agente em R$
+  comissaoAgentePercentual?: number; // Comissão do agente em %
   comissaoFornecedor?: number; // Comissão do fornecedor em R$
   comissaoFornecedorPercentual?: number; // Comissão do fornecedor em %
   status: "aprovada" | "pendente" | "em_analise" | "recusada";
