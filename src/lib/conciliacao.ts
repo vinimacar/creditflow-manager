@@ -16,6 +16,7 @@ export interface Divergencia {
   tiposDivergencia: string[];
   diferencaComissao: number;
   diferencaProduto: number;
+  criterioMatch?: string; // Critério usado para fazer o match (debug)
   validacaoInteligente?: {
     taxaAplicadaInterno: number;
     taxaAplicadaFornecedor: number;
@@ -119,12 +120,64 @@ export function analisarConciliacao(
   const contratosFornecedor = new Set(dadosFornecedor.map(d => d.contrato.trim().toUpperCase()));
   const contratosInternos = new Set(dadosInternos.map(d => d.contrato.trim().toUpperCase()));
 
-  // Analisar dados internos
-  dadosInternos.forEach((interno, index) => {
+  // Função auxiliar para normalizar CPF
+  const normalizarCPF = (cpf: string | undefined): string => {
+    if (!cpf) return "";
+    return cpf.replace(/\D/g, ""); // Remove tudo que não é dígito
+  };
+
+  // Função auxiliar para encontrar match por múltiplos critérios
+  const encontrarMatch = (interno: DadosExcel): { match?: DadosExcel; criterio?: string } => {
     const contratoNormalizado = interno.contrato.trim().toUpperCase();
-    const fornecedor = dadosFornecedor.find(
+    const cpfClienteNormalizado = normalizarCPF(interno.cpfCliente);
+    const cpfFuncionarioNormalizado = normalizarCPF(interno.cpfFuncionario);
+    
+    // Tentar encontrar por contrato (primeira prioridade)
+    let match = dadosFornecedor.find(
       f => f.contrato.trim().toUpperCase() === contratoNormalizado
     );
+    if (match) return { match, criterio: "Contrato exato" };
+    
+    // Se não encontrou por contrato, tentar por CPF do cliente + valor (segunda prioridade)
+    if (cpfClienteNormalizado) {
+      match = dadosFornecedor.find(f => {
+        const cpfFornecedor = normalizarCPF(f.cpfCliente);
+        const diferencaValor = Math.abs(interno.valorProduto - f.valorProduto);
+        return cpfFornecedor === cpfClienteNormalizado && diferencaValor < 1.0; // Tolerância de R$ 1
+      });
+      if (match) return { match, criterio: "CPF Cliente + Valor" };
+    }
+    
+    // Se não encontrou, tentar por nome do cliente + valor aproximado (terceira prioridade)
+    if (interno.cliente) {
+      const nomeClienteNormalizado = interno.cliente.trim().toUpperCase();
+      match = dadosFornecedor.find(f => {
+        const nomeFornecedor = (f.cliente || "").trim().toUpperCase();
+        const diferencaValor = Math.abs(interno.valorProduto - f.valorProduto);
+        const nomesSimilares = nomeFornecedor === nomeClienteNormalizado || 
+                               nomeFornecedor.includes(nomeClienteNormalizado) ||
+                               nomeClienteNormalizado.includes(nomeFornecedor);
+        return nomesSimilares && diferencaValor < 1.0;
+      });
+      if (match) return { match, criterio: "Nome Cliente + Valor" };
+    }
+    
+    // Se não encontrou, tentar por CPF do funcionário + valor (quarta prioridade)
+    if (cpfFuncionarioNormalizado) {
+      match = dadosFornecedor.find(f => {
+        const cpfFornecedor = normalizarCPF(f.cpfFuncionario);
+        const diferencaValor = Math.abs(interno.valorProduto - f.valorProduto);
+        return cpfFornecedor === cpfFuncionarioNormalizado && diferencaValor < 5.0; // Tolerância maior
+      });
+      if (match) return { match, criterio: "CPF Funcionário + Valor" };
+    }
+    
+    return { match: undefined, criterio: undefined };
+  };
+
+  // Analisar dados internos
+  dadosInternos.forEach((interno, index) => {
+    const { match: fornecedor, criterio } = encontrarMatch(interno);
 
     const tiposDivergencia: string[] = [];
     let status: Divergencia["status"] = "ok";
@@ -145,7 +198,7 @@ export function analisarConciliacao(
 
     if (!fornecedor) {
       status = "nao_encontrado_fornecedor";
-      tiposDivergencia.push("Contrato não encontrado no relatório do fornecedor");
+      tiposDivergencia.push("Pagamento não encontrado no extrato bancário");
     } else {
       // Verificar divergências de valores
       const diferencaComissao = Math.abs(interno.valorComissao - fornecedor.valorComissao);
@@ -170,7 +223,7 @@ export function analisarConciliacao(
       // Verificar divergências de cliente
       if (fornecedor.cliente && interno.cliente !== fornecedor.cliente) {
         tiposDivergencia.push("Nome do cliente divergente");
-        status = "divergente";
+        // Não marca como divergente se for apenas diferença no nome
       }
     }
 
@@ -190,6 +243,7 @@ export function analisarConciliacao(
       tiposDivergencia,
       diferencaComissao: fornecedor ? Math.abs(interno.valorComissao - fornecedor.valorComissao) : interno.valorComissao,
       diferencaProduto: fornecedor ? Math.abs(interno.valorProduto - fornecedor.valorProduto) : interno.valorProduto,
+      criterioMatch: criterio, // Adicionar critério de match para debug
       validacaoInteligente,
     });
   });

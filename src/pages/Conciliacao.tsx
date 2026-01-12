@@ -658,8 +658,48 @@ export default function Conciliacao() {
               <AlertDescription>
                 Importe o arquivo de extrato bancário (Excel ou PDF) para que o sistema possa 
                 identificar automaticamente as divergências entre suas vendas e os pagamentos recebidos.
+                <br /><br />
+                <strong>Campos necessários no extrato:</strong> Contrato, Cliente, CPF Cliente, Valor do Produto, Comissão
               </AlertDescription>
             </Alert>
+
+            {/* Preview dos dados do extrato se já foi importado */}
+            {dadosFornecedor.length > 0 && (
+              <Card className="bg-yellow-50 border-yellow-200">
+                <div className="p-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-5 h-5 text-yellow-600" />
+                    <h4 className="font-semibold text-yellow-900">Preview do Extrato Importado</h4>
+                  </div>
+                  <div className="text-sm space-y-2">
+                    <p className="text-yellow-800">
+                      <strong>{dadosFornecedor.length} registros</strong> importados do extrato bancário.
+                      Primeira linha como exemplo:
+                    </p>
+                    {dadosFornecedor[0] && (
+                      <div className="bg-white p-3 rounded border border-yellow-300 text-xs font-mono">
+                        <div><strong>Contrato:</strong> {dadosFornecedor[0].contrato || "(vazio)"}</div>
+                        <div><strong>Cliente:</strong> {dadosFornecedor[0].cliente || "(vazio)"}</div>
+                        <div><strong>CPF Cliente:</strong> {dadosFornecedor[0].cpfCliente || "(vazio)"}</div>
+                        <div><strong>Valor Produto:</strong> R$ {dadosFornecedor[0].valorProduto?.toFixed(2) || "0.00"}</div>
+                        <div><strong>Comissão:</strong> R$ {dadosFornecedor[0].valorComissao?.toFixed(2) || "0.00"}</div>
+                      </div>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        console.log("Dados do Extrato:", dadosFornecedor);
+                        toast.success("Dados do extrato exibidos no console (F12)");
+                      }}
+                      className="mt-2"
+                    >
+                      Ver todos os dados no console
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Card className="p-6">
