@@ -14,7 +14,14 @@ import {
   Package,
   Building2,
   FileSpreadsheet,
+  HelpCircle,
 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   Table,
   TableBody,
@@ -657,7 +664,7 @@ export default function Relatorios() {
         head: [["Métrica", "Valor"]],
         body: [
           ["Total de Vendas", `R$ ${estatisticas.totalVendas.toLocaleString("pt-BR")}`],
-          ["Total a Receber", `R$ ${dadosFiltrados.reduce((sum, v) => sum + v.valorAReceber, 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`],
+          ["Total Comissão Fornecedor", `R$ ${dadosFiltrados.reduce((sum, v) => sum + v.valorAReceber, 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`],
           ["Crescimento", `${estatisticas.crescimento > 0 ? "+" : ""}${estatisticas.crescimento.toFixed(1)}%`],
           ["Ticket Médio", `R$ ${estatisticas.ticketMedio.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`],
           ["Total de Funcionários", estatisticas.totalFuncionarios.toString()],
@@ -737,7 +744,7 @@ export default function Relatorios() {
         y += 10;
         autoTable(doc, {
           startY: y,
-          head: [["Data", "Cliente", "Produto", "Valor Contrato", "Valor a Receber", "Comissão"]],
+          head: [["Data", "Cliente", "Produto", "Valor Contrato", "Comissão Fornecedor", "Comissão Agente"]],
           body: dadosFiltrados.map(v => [
             format(v.data, "dd/MM/yyyy", { locale: ptBR }),
             v.cliente,
@@ -941,9 +948,45 @@ export default function Relatorios() {
                   <TableHead>Produto</TableHead>
                   <TableHead className="text-right">Valor Contrato</TableHead>
                   <TableHead className="text-right">Prazo</TableHead>
-                  <TableHead className="text-right bg-blue-50">Valor a Receber</TableHead>
-                  <TableHead className="text-right bg-green-50">Comissão (%)</TableHead>
-                  <TableHead className="text-right bg-green-50">Comissão (R$)</TableHead>
+                  <TableHead className="text-right bg-blue-50">
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger className="flex items-center justify-end gap-1 w-full">
+                          Comissão Fornecedor
+                          <HelpCircle className="w-3 h-3" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Valor da comissão que será paga pelo fornecedor/banco</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </TableHead>
+                  <TableHead className="text-right bg-green-50">
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger className="flex items-center justify-end gap-1 w-full">
+                          Comissão Agente (%)
+                          <HelpCircle className="w-3 h-3" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Percentual da comissão do agente/vendedor</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </TableHead>
+                  <TableHead className="text-right bg-green-50">
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger className="flex items-center justify-end gap-1 w-full">
+                          Comissão Agente (R$)
+                          <HelpCircle className="w-3 h-3" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Valor em reais da comissão do agente/vendedor</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </TableHead>
                   <TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
