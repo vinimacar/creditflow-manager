@@ -109,6 +109,7 @@ export default function FolhaPagamento() {
   
   // Estados para cálculos adicionais
   const [numeroDependentes, setNumeroDependentes] = useState(0);
+  const [numeroFilhos, setNumeroFilhos] = useState(0); // Para cálculo do salário família
   const [diasFaltas, setDiasFaltas] = useState(0);
   const [diasUteis, setDiasUteis] = useState(22); // Padrão 22 dias úteis
   const [diasDSR, setDiasDSR] = useState(8); // Padrão ~8 domingos/feriados
@@ -219,6 +220,7 @@ export default function FolhaPagamento() {
         planoDeSaude,
         outrosDescontos,
         numeroDependentes: numeroDependentes || funcionario.dependentes || 0,
+        numeroFilhos,
         diasFaltas,
         diasUteis,
         diasDSR,
@@ -870,6 +872,43 @@ export default function FolhaPagamento() {
                     </div>
 
                     <Separator />
+                    <h4 className="font-semibold text-sm">Salário e Dados Pessoais</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label>Salário Bruto (R$) *</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={salarioBaseAtual}
+                          onChange={(e) => setSalarioBaseAtual(Number(e.target.value))}
+                          placeholder="Ex: 3500.00"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">Valor base para cálculos</p>
+                      </div>
+                      <div>
+                        <Label>Número de Filhos (até 14 anos)</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          value={numeroFilhos}
+                          onChange={(e) => setNumeroFilhos(Number(e.target.value))}
+                          placeholder="0"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {numeroFilhos > 0 && salarioBaseAtual <= 1819.26 ? (
+                            <span className="text-green-600 font-medium">
+                              Salário Família: R$ {(numeroFilhos * 62.04).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                            </span>
+                          ) : numeroFilhos > 0 ? (
+                            <span className="text-orange-600">Salário acima do limite (R$ 1.819,26)</span>
+                          ) : (
+                            "R$ 62,04 por filho (até R$ 1.819,26)"
+                          )}
+                        </p>
+                      </div>
+                    </div>
+
+                    <Separator />
                     <h4 className="font-semibold text-sm">Horas Trabalhadas e Extras (2026)</h4>
                     <div className="grid grid-cols-3 gap-4">
                       <div>
@@ -1079,8 +1118,10 @@ export default function FolhaPagamento() {
                           </ul>
                         </div>
                         <div className="pt-2 border-t border-green-300 dark:border-green-700">
-                          <strong>Outros encargos:</strong>
-                          <ul className="ml-4 mt-1">
+                          <strong>Proventos e benefícios:</strong>
+                          <ul className="ml-4 mt-1 space-y-0.5">
+                            <li>• <strong>Salário Família:</strong> R$ 62,04 por filho (até 14 anos ou inválido)</li>
+                            <li className="text-green-700 dark:text-green-400">- Limite de renda: até R$ 1.819,26</li>
                             <li>• Vale Transporte: 6% do salário (limitado ao custo)</li>
                             <li>• FGTS: 8% (encargo patronal, não descontado do salário)</li>
                           </ul>

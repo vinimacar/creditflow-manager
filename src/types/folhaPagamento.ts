@@ -45,6 +45,7 @@ export interface Proventos {
   bonus: number;
   insalubridade: number;
   periculosidade: number;
+  salarioFamilia: number; // Salário família conforme legislação brasileira
   outros: number;
   total: number;
 }
@@ -103,9 +104,38 @@ export const DEDUCAO_POR_DEPENDENTE_2026 = 189.59;
 // Salário mínimo 2026
 export const SALARIO_MINIMO_2026 = 1518.00;
 
+// Salário Família 2026 - Portaria Interministerial MPS/MF
+// Benefício pago aos trabalhadores com filhos de até 14 anos ou inválidos
+export const TABELA_SALARIO_FAMILIA_2026 = [
+  { ate: 1819.26, valorPorFilho: 62.04 },  // Até R$ 1.819,26 - R$ 62,04 por filho
+  // Acima de R$ 1.819,26 não tem direito ao salário família
+];
+
 // ============================================
 // FUNÇÕES DE CÁLCULO - FOLHA DE PAGAMENTO 2026
 // ============================================
+
+/**
+ * Calcula o Salário Família conforme legislação brasileira 2026
+ * Benefício devido ao segurado com salário até R$ 1.819,26
+ * @param salarioBruto Salário bruto do funcionário
+ * @param numeroFilhos Número de filhos de até 14 anos ou inválidos
+ * @returns Valor do salário família
+ */
+export function calcularSalarioFamilia(
+  salarioBruto: number,
+  numeroFilhos: number = 0
+): number {
+  if (numeroFilhos <= 0) return 0;
+  
+  // Verifica se o salário está dentro do limite
+  const faixa = TABELA_SALARIO_FAMILIA_2026.find(f => salarioBruto <= f.ate);
+  
+  if (!faixa) return 0; // Acima do limite não tem direito
+  
+  const valorTotal = faixa.valorPorFilho * numeroFilhos;
+  return Number(valorTotal.toFixed(2));
+}
 
 /**
  * Calcula o INSS com base nas alíquotas progressivas de 2026
@@ -347,6 +377,7 @@ export interface CalculoFolhaParams {
   optouVT?: boolean;
   custoVT?: number;
   numeroDependentes?: number;
+  numeroFilhos?: number; // Para cálculo do salário família
   diasFaltas?: number;
   diasUteis?: number;
   diasDSR?: number;
@@ -372,6 +403,7 @@ export function calcularFolhaPagamentoCompleta(params: CalculoFolhaParams): Part
     optouVT = true,
     custoVT = 0,
     numeroDependentes = 0,
+    numeroFilhos = 0,
     diasFaltas = 0,
     diasUteis = 22,
     diasDSR = 8,
@@ -393,6 +425,7 @@ export function calcularFolhaPagamentoCompleta(params: CalculoFolhaParams): Part
   const outrosDescontosNum = Number(outrosDescontos) || 0;
   const custoVTNum = Number(custoVT) || 0;
   const numeroDependentesNum = Number(numeroDependentes) || 0;
+  const numeroFilhosNum = Number(numeroFilhos) || 0;
   const diasFaltasNum = Number(diasFaltas) || 0;
   const diasUteisNum = Number(diasUteis) || 22;
   const diasDSRNum = Number(diasDSR) || 8;
@@ -405,6 +438,9 @@ export function calcularFolhaPagamentoCompleta(params: CalculoFolhaParams): Part
   
   const totalHEeAdicionais = valorHE50 + valorHE100 + valorAdicNoturno;
   const valorDSR = calcularDSR(totalHEeAdicionais, diasUteisNum, diasDSRNum);
+  
+  // Calcular salário família (baseado no salário base, antes dos adicionais)
+  const valorSalarioFamilia = calcularSalarioFamilia(salarioBaseNum, numeroFilhosNum);
 
   const proventos: Proventos = {
     salarioBase: salarioBaseNum,
@@ -416,6 +452,7 @@ export function calcularFolhaPagamentoCompleta(params: CalculoFolhaParams): Part
     bonus: bonusNum,
     insalubridade: insalubridadeNum,
     periculosidade: periculosidadeNum,
+    salarioFamilia: Number(valorSalarioFamilia) || 0,
     outros: outrosProventosNum,
     total: 0,
   };
@@ -430,6 +467,7 @@ export function calcularFolhaPagamentoCompleta(params: CalculoFolhaParams): Part
     bonusNum + 
     insalubridadeNum + 
     periculosidadeNum + 
+    (Number(valorSalarioFamilia) || 0) +
     outrosProventosNum;
   
   proventos.total = Number(totalProventos.toFixed(2));
