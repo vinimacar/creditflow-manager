@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -140,6 +140,50 @@ export default function FolhaPagamento() {
   const [novoSalarioData, setNovoSalarioData] = useState<Date>(new Date());
   const [novoSalarioObs, setNovoSalarioObs] = useState("");
 
+  // Preview dos cálculos em tempo real
+  const previewCalculos = useMemo(() => {
+    if (!salarioBaseAtual || salarioBaseAtual <= 0) return null;
+    
+    try {
+      const params: CalculoFolhaParams = {
+        funcionarioId: funcionarioSelecionado || "preview",
+        mesReferencia: format(mesReferencia, "yyyy-MM"),
+        salarioBase: salarioBaseAtual,
+        horasExtras50,
+        horasExtras100,
+        horasAdicionalNoturno,
+        comissoes,
+        bonus,
+        insalubridade,
+        periculosidade,
+        outrosProventos,
+        valeRefeicao,
+        planoDeSaude,
+        outrosDescontos,
+        numeroDependentes,
+        numeroFilhos,
+        diasFaltas,
+        diasUteis,
+        diasDSR,
+        horasMensais,
+        optouVT,
+        custoVT,
+      };
+      
+      const resultado = calcularFolhaPagamentoCompleta(params);
+      return resultado;
+    } catch (error) {
+      console.error("Erro no preview:", error);
+      return null;
+    }
+  }, [
+    salarioBaseAtual, horasExtras50, horasExtras100, horasAdicionalNoturno,
+    comissoes, bonus, insalubridade, periculosidade, outrosProventos,
+    valeRefeicao, planoDeSaude, outrosDescontos, numeroDependentes,
+    numeroFilhos, diasFaltas, diasUteis, diasDSR, horasMensais,
+    optouVT, custoVT, mesReferencia, funcionarioSelecionado
+  ]);
+
   useEffect(() => {
     carregarDados();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -197,11 +241,14 @@ export default function FolhaPagamento() {
         return;
       }
 
-      // Buscar salário vigente do funcionário ou usar o cadastrado
-      const salarioVigente = await getSalarioVigentePorFuncionario(funcionarioSelecionado);
-      const salarioBase = salarioVigente?.salarioBase || funcionario.salarioBruto || funcionario.salario || 0;
+      // Usar o salário bruto atual (editável do formulário)
+      const salarioBase = salarioBaseAtual;
       
-      setSalarioBaseAtual(salarioBase);
+      if (!salarioBase || salarioBase <= 0) {
+        toast.error("Informe um salário bruto válido");
+        setProcessando(false);
+        return;
+      }
 
       // Usar a nova função de cálculo completo
       const params: CalculoFolhaParams = {
@@ -234,12 +281,12 @@ export default function FolhaPagamento() {
       const folha: Omit<FolhaPagamentoType, "id"> = {
         funcionarioId: funcionarioSelecionado,
         mesReferencia: format(mesReferencia, "yyyy-MM"),
-        salarioBruto: resultado.salarioBruto,
-        proventos: resultado.proventos,
-        descontos: resultado.descontos,
-        salarioLiquido: resultado.salarioLiquido,
-        fgts: resultado.fgts,
-        encargos: resultado.encargos,
+        salarioBruto: resultado.salarioBruto || 0,
+        proventos: resultado.proventos!,
+        descontos: resultado.descontos!,
+        salarioLiquido: resultado.salarioLiquido || 0,
+        fgts: resultado.fgts || 0,
+        encargos: resultado.encargos!,
         status: "processada",
         criadoEm: new Date(),
         atualizadoEm: new Date(),
@@ -1128,6 +1175,53 @@ export default function FolhaPagamento() {
                         </div>
                       </div>
                     </div>
+
+                    {/* Preview dos Cálculos Automáticos */}
+                    {previewCalculos && salarioBaseAtual > 0 && (
+                      <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 p-4 rounded-lg border-2 border-purple-200 dark:border-purple-800">
+                        <h4 className="font-semibold text-sm text-purple-900 dark:text-purple-100 mb-3 flex items-center gap-2">
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                          </svg>
+                          Preview - Cálculos Automáticos
+                        </h4>
+                        <div className="grid grid-cols-3 gap-4">
+                          <div className="bg-white dark:bg-gray-800 p-3 rounded border border-purple-200 dark:border-purple-700">
+                            <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Salário Bruto</p>
+                            <p className="text-lg font-bold text-purple-700 dark:text-purple-300">
+                              R$ {(previewCalculos.salarioBruto || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                            </p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                              Base + Proventos
+                            </p>
+                          </div>
+                          <div className="bg-white dark:bg-gray-800 p-3 rounded border border-red-200 dark:border-red-700">
+                            <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Descontos</p>
+                            <p className="text-lg font-bold text-red-600 dark:text-red-400">
+                              R$ {(previewCalculos.descontos?.total || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                            </p>
+                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 space-y-0.5">
+                              <div>INSS: R$ {(previewCalculos.descontos?.inss || 0).toFixed(2)}</div>
+                              <div>IRRF: R$ {(previewCalculos.descontos?.irrf || 0).toFixed(2)}</div>
+                            </div>
+                          </div>
+                          <div className="bg-white dark:bg-gray-800 p-3 rounded border border-green-200 dark:border-green-700">
+                            <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Salário Líquido</p>
+                            <p className="text-xl font-bold text-green-600 dark:text-green-400">
+                              R$ {(previewCalculos.salarioLiquido || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                            </p>
+                            <p className="text-xs text-green-700 dark:text-green-500 mt-1">
+                              A receber
+                            </p>
+                          </div>
+                        </div>
+                        <div className="mt-3 pt-3 border-t border-purple-200 dark:border-purple-700">
+                          <p className="text-xs text-purple-700 dark:text-purple-300 font-medium">
+                            ✓ Deduções automáticas aplicadas conforme legislação brasileira 2026
+                          </p>
+                        </div>
+                      </div>
+                    )}
 
                     <div className="flex justify-end gap-2 mt-6">
                       <Button variant="outline" onClick={() => setNovaFolhaDialog(false)}>
