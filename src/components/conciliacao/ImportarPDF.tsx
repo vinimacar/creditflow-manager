@@ -21,9 +21,14 @@ export function ImportarPDF({ onImport, tipo, apenasButton = false }: ImportarPD
   const [uploading, setUploading] = useState(false);
   const [progresso, setProgresso] = useState<string>("");
 
-  const extrairTextoComOCR = async (imageData: ImageData): Promise<string> => {
+  const extrairTextoComOCR = async (canvas: HTMLCanvasElement): Promise<string> => {
     try {
-      const result = await Tesseract.recognize(imageData, "por", {
+      // Converter canvas para blob
+      const blob = await new Promise<Blob>((resolve) => {
+        canvas.toBlob((b) => resolve(b!), 'image/png');
+      });
+
+      const result = await Tesseract.recognize(blob, "por", {
         logger: (m) => {
           if (m.status === "recognizing text") {
             setProgresso(`Reconhecendo texto: ${Math.round(m.progress * 100)}%`);
@@ -63,9 +68,8 @@ export function ImportarPDF({ onImport, tipo, apenasButton = false }: ImportarPD
         canvas: canvas,
       }).promise;
 
-      // Extrair texto com OCR
-      const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-      const texto = await extrairTextoComOCR(imageData);
+      // Extrair texto com OCR usando o canvas diretamente
+      const texto = await extrairTextoComOCR(canvas);
       textoCompleto += texto + "\n\n";
     }
 
