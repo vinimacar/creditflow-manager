@@ -372,10 +372,9 @@ export function ImportarExcel({ onImport, tipo, apenasButton = false }: Importar
               <Label>Coluna de Valor do Contrato (Opcional)</Label>
               <Select value={colunaValor} onValueChange={setColunaValor}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione a coluna de valor..." />
+                  <SelectValue placeholder="Nenhuma (deixe em branco se não aplicável)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Nenhuma</SelectItem>
                   {colunasSugeridas.map((col) => (
                     <SelectItem key={col} value={col}>
                       {col}
