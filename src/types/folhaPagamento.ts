@@ -378,53 +378,91 @@ export function calcularFolhaPagamentoCompleta(params: CalculoFolhaParams): Part
     horasMensais = 220,
   } = params;
 
+  // Garantir que todos os valores numéricos sejam válidos
+  const salarioBaseNum = Number(salarioBase) || 0;
+  const horasExtras50Num = Number(horasExtras50) || 0;
+  const horasExtras100Num = Number(horasExtras100) || 0;
+  const horasAdicionalNoturnoNum = Number(horasAdicionalNoturno) || 0;
+  const comissoesNum = Number(comissoes) || 0;
+  const bonusNum = Number(bonus) || 0;
+  const insalubridadeNum = Number(insalubridade) || 0;
+  const periculosidadeNum = Number(periculosidade) || 0;
+  const outrosProventosNum = Number(outrosProventos) || 0;
+  const valeRefeicaoNum = Number(valeRefeicao) || 0;
+  const planoDeSaudeNum = Number(planoDeSaude) || 0;
+  const outrosDescontosNum = Number(outrosDescontos) || 0;
+  const custoVTNum = Number(custoVT) || 0;
+  const numeroDependentesNum = Number(numeroDependentes) || 0;
+  const diasFaltasNum = Number(diasFaltas) || 0;
+  const diasUteisNum = Number(diasUteis) || 22;
+  const diasDSRNum = Number(diasDSR) || 8;
+  const horasMensaisNum = Number(horasMensais) || 220;
+
   // Calcular proventos
-  const valorHE50 = calcularHorasExtras50(salarioBase, horasExtras50, horasMensais);
-  const valorHE100 = calcularHorasExtras100(salarioBase, horasExtras100, horasMensais);
-  const valorAdicNoturno = calcularAdicionalNoturno(salarioBase, horasAdicionalNoturno, horasMensais);
+  const valorHE50 = calcularHorasExtras50(salarioBaseNum, horasExtras50Num, horasMensaisNum);
+  const valorHE100 = calcularHorasExtras100(salarioBaseNum, horasExtras100Num, horasMensaisNum);
+  const valorAdicNoturno = calcularAdicionalNoturno(salarioBaseNum, horasAdicionalNoturnoNum, horasMensaisNum);
   
   const totalHEeAdicionais = valorHE50 + valorHE100 + valorAdicNoturno;
-  const valorDSR = calcularDSR(totalHEeAdicionais, diasUteis, diasDSR);
+  const valorDSR = calcularDSR(totalHEeAdicionais, diasUteisNum, diasDSRNum);
 
   const proventos: Proventos = {
-    salarioBase,
-    horasExtras50: valorHE50,
-    horasExtras100: valorHE100,
-    adicionalNoturno: valorAdicNoturno,
-    dsr: valorDSR,
-    comissoes,
-    bonus,
-    insalubridade,
-    periculosidade,
-    outros: outrosProventos,
+    salarioBase: salarioBaseNum,
+    horasExtras50: Number(valorHE50) || 0,
+    horasExtras100: Number(valorHE100) || 0,
+    adicionalNoturno: Number(valorAdicNoturno) || 0,
+    dsr: Number(valorDSR) || 0,
+    comissoes: comissoesNum,
+    bonus: bonusNum,
+    insalubridade: insalubridadeNum,
+    periculosidade: periculosidadeNum,
+    outros: outrosProventosNum,
     total: 0,
   };
-  proventos.total = Number((
-    salarioBase + valorHE50 + valorHE100 + valorAdicNoturno + valorDSR +
-    comissoes + bonus + insalubridade + periculosidade + outrosProventos
-  ).toFixed(2));
+  
+  const totalProventos = 
+    salarioBaseNum + 
+    (Number(valorHE50) || 0) + 
+    (Number(valorHE100) || 0) + 
+    (Number(valorAdicNoturno) || 0) + 
+    (Number(valorDSR) || 0) +
+    comissoesNum + 
+    bonusNum + 
+    insalubridadeNum + 
+    periculosidadeNum + 
+    outrosProventosNum;
+  
+  proventos.total = Number(totalProventos.toFixed(2));
 
   // Calcular descontos
-  const valorFaltas = calcularDescontoFaltas(salarioBase, diasFaltas, diasUteis);
-  const baseCalculo = proventos.total - valorFaltas;
+  const valorFaltas = calcularDescontoFaltas(salarioBaseNum, diasFaltasNum, diasUteisNum);
+  const baseCalculo = proventos.total - (Number(valorFaltas) || 0);
   
   const inss = calcularINSS(baseCalculo);
-  const irrf = calcularIRRF(baseCalculo, inss, numeroDependentes);
-  const valeTransporte = calcularValeTransporte(baseCalculo, custoVT, optouVT);
+  const irrf = calcularIRRF(baseCalculo, inss, numeroDependentesNum);
+  const valeTransporte = calcularValeTransporte(baseCalculo, custoVTNum, optouVT);
 
   const descontos: Descontos = {
-    inss,
-    irrf,
-    valeTransporte,
-    valeRefeicao,
-    planoDeSaude,
-    faltas: valorFaltas,
-    outros: outrosDescontos,
+    inss: Number(inss) || 0,
+    irrf: Number(irrf) || 0,
+    valeTransporte: Number(valeTransporte) || 0,
+    valeRefeicao: valeRefeicaoNum,
+    planoDeSaude: planoDeSaudeNum,
+    faltas: Number(valorFaltas) || 0,
+    outros: outrosDescontosNum,
     total: 0,
   };
-  descontos.total = Number((
-    inss + irrf + valeTransporte + valeRefeicao + planoDeSaude + valorFaltas + outrosDescontos
-  ).toFixed(2));
+  
+  const totalDescontos = 
+    (Number(inss) || 0) + 
+    (Number(irrf) || 0) + 
+    (Number(valeTransporte) || 0) + 
+    valeRefeicaoNum + 
+    planoDeSaudeNum + 
+    (Number(valorFaltas) || 0) + 
+    outrosDescontosNum;
+  
+  descontos.total = Number(totalDescontos.toFixed(2));
 
   // Calcular encargos patronais
   const encargos = calcularEncargosPatronais(proventos.total);
