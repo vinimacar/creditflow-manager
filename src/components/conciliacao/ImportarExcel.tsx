@@ -61,35 +61,103 @@ export function ImportarExcel({ onImport, tipo, apenasButton = false }: Importar
         dateNF: "dd/mm/yyyy"
       });
 
+      // Debug: Mostrar colunas detectadas
+      if (jsonData.length > 0) {
+        const primeiraLinha = jsonData[0] as ExcelRow;
+        const colunas = Object.keys(primeiraLinha);
+        console.log("Colunas detectadas no Excel:", colunas);
+        console.log("Primeira linha de dados:", primeiraLinha);
+      }
+
       // Mapear colunas para o formato esperado
       const dadosFormatados: DadosExcel[] = jsonData.map((row: ExcelRow) => {
         // Normalizar nomes de colunas (aceitar variações)
         const normalizar = (obj: ExcelRow) => {
           const resultado: Record<string, unknown> = {};
           Object.keys(obj).forEach(key => {
-            const keyLower = key.toLowerCase().trim();
+            const keyLower = key.toLowerCase().trim()
+              .replace(/[áàâã]/g, 'a')
+              .replace(/[éèê]/g, 'e')
+              .replace(/[íì]/g, 'i')
+              .replace(/[óòôõ]/g, 'o')
+              .replace(/[úù]/g, 'u')
+              .replace(/[ç]/g, 'c')
+              .replace(/\s+/g, '_'); // Substituir espaços por underscore
             resultado[keyLower] = obj[key];
           });
           return resultado;
         };
 
         const rowNormalizada = normalizar(row);
+        
+        // Tentar encontrar a coluna de comissão com múltiplas variações
+        const valorComissaoStr = String(
+          rowNormalizada.comissao || 
+          rowNormalizada.comissão || 
+          rowNormalizada.valor_comissao || 
+          rowNormalizada.valorcomissao || 
+          rowNormalizada.valor_da_comissao ||
+          rowNormalizada.vlr_comissao ||
+          rowNormalizada.vlrcomissao ||
+          rowNormalizada.valor_pago ||
+          rowNormalizada.valorpago ||
+          rowNormalizada.vr_comissao ||
+          rowNormalizada.vrcomissao ||
+          rowNormalizada.comissao_paga ||
+          rowNormalizada.comissaopaga ||
+          rowNormalizada.pagamento ||
+          rowNormalizada.valor_pagamento ||
+          0
+        );
+        
+        // Tentar encontrar a coluna de valor do produto com múltiplas variações
+        const valorProdutoStr = String(
+          rowNormalizada.valor || 
+          rowNormalizada.valor_produto || 
+          rowNormalizada.valorproduto ||
+          rowNormalizada.valor_contrato ||
+          rowNormalizada.valorcontrato ||
+          rowNormalizada.vlr_produto ||
+          rowNormalizada.vlrproduto ||
+          rowNormalizada.valor_liberado ||
+          rowNormalizada.valorliberado ||
+          rowNormalizada.vr_contrato ||
+          rowNormalizada.vrcontrato ||
+          0
+        );
+
+        // Converter valores removendo formatação brasileira e símbolos
+        const parseValor = (str: string): number => {
+          if (!str) return 0;
+          // Remove tudo exceto dígitos, vírgula e ponto
+          const limpo = String(str).replace(/[^\d.,\-]/g, "");
+          // Se tiver vírgula e ponto, assume formato brasileiro (1.234,56)
+          if (limpo.includes('.') && limpo.includes(',')) {
+            return parseFloat(limpo.replace(/\./g, "").replace(",", ".")) || 0;
+          }
+          // Se tiver apenas vírgula, assume formato brasileiro (1234,56)
+          if (limpo.includes(',')) {
+            return parseFloat(limpo.replace(",", ".")) || 0;
+          }
+          // Caso contrário, tenta converter direto
+          return parseFloat(limpo) || 0;
+        };
 
         return {
-          contrato: String(rowNormalizada.contrato || rowNormalizada.numero_contrato || rowNormalizada.numerocontrato || ""),
-          cliente: String(rowNormalizada.cliente || rowNormalizada.nome_cliente || rowNormalizada.nomecliente || ""),
-          cpfCliente: String(rowNormalizada.cpf_cliente || rowNormalizada.cpfcliente || rowNormalizada.cpf || ""),
-          fornecedor: String(rowNormalizada.fornecedor || rowNormalizada.banco || rowNormalizada.financeira || ""),
-          funcionario: String(rowNormalizada.funcionario || rowNormalizada.vendedor || rowNormalizada.agente || ""),
-          cpfFuncionario: String(rowNormalizada.cpf_funcionario || rowNormalizada.cpffuncionario || ""),
-          produto: String(rowNormalizada.produto || rowNormalizada.nome_produto || rowNormalizada.nomeproduto || ""),
-          prazo: parseInt(String(rowNormalizada.prazo || rowNormalizada.meses || 0)) || undefined,
-          valorComissao: parseFloat(String(rowNormalizada.comissao || rowNormalizada.valor_comissao || rowNormalizada.valorcomissao || 0).replace(/[^\d.,]/g, "").replace(",", ".")) || 0,
-          valorProduto: parseFloat(String(rowNormalizada.valor || rowNormalizada.valor_produto || rowNormalizada.valorproduto || 0).replace(/[^\d.,]/g, "").replace(",", ".")) || 0,
+          contrato: String(rowNormalizada.contrato || rowNormalizada.numero_contrato || rowNormalizada.numerocontrato || rowNormalizada.num_contrato || rowNormalizada.nr_contrato || ""),
+          cliente: String(rowNormalizada.cliente || rowNormalizada.nome_cliente || rowNormalizada.nomecliente || rowNormalizada.nome || ""),
+          cpfCliente: String(rowNormalizada.cpf_cliente || rowNormalizada.cpfcliente || rowNormalizada.cpf || rowNormalizada.documento || ""),
+          fornecedor: String(rowNormalizada.fornecedor || rowNormalizada.banco || rowNormalizada.financeira || rowNormalizada.instituicao || ""),
+          funcionario: String(rowNormalizada.funcionario || rowNormalizada.vendedor || rowNormalizada.agente || rowNormalizada.corretor || ""),
+          cpfFuncionario: String(rowNormalizada.cpf_funcionario || rowNormalizada.cpffuncionario || rowNormalizada.cpf_vendedor || ""),
+          produto: String(rowNormalizada.produto || rowNormalizada.nome_produto || rowNormalizada.nomeproduto || rowNormalizada.tipo_produto || ""),
+          prazo: parseInt(String(rowNormalizada.prazo || rowNormalizada.meses || rowNormalizada.parcelas || 0)) || undefined,
+          valorComissao: parseValor(valorComissaoStr),
+          valorProduto: parseValor(valorProdutoStr),
           dataVenda: rowNormalizada.data_venda || rowNormalizada.datavenda || rowNormalizada.data ? new Date(String(rowNormalizada.data_venda || rowNormalizada.datavenda || rowNormalizada.data)) : new Date(),
-          dataPagamento: rowNormalizada.data_pagamento || rowNormalizada.datapagamento ? new Date(String(rowNormalizada.data_pagamento || rowNormalizada.datapagamento)) : undefined,
-          status: String(rowNormalizada.status || ""),
-          observacoes: String(rowNormalizada.observacoes || rowNormalizada.obs || ""),
+          dataPagamento: rowNormalizada.data_pagamento || rowNormalizada.datapagamento || rowNormalizada.dt_pagamento ? new Date(String(rowNormalizada.data_pagamento || rowNormalizada.datapagamento || rowNormalizada.dt_pagamento)) : undefined,
+          status: String(rowNormalizada.status || rowNormalizada.situacao || ""),
+          observacoes: String(rowNormalizada.observacoes || rowNormalizada.obs || rowNormalizada.observacao || ""),
           ...row // Manter dados originais
         };
       });
@@ -97,6 +165,18 @@ export function ImportarExcel({ onImport, tipo, apenasButton = false }: Importar
       if (dadosFormatados.length === 0) {
         toast.error("Nenhum dado encontrado na planilha");
         return;
+      }
+
+      // Verificar se muitos valores de comissão estão zerados
+      const comissoesZeradas = dadosFormatados.filter(d => d.valorComissao === 0).length;
+      const percentualZerado = (comissoesZeradas / dadosFormatados.length) * 100;
+      
+      if (percentualZerado > 80) {
+        toast.warning(
+          `Atenção: ${percentualZerado.toFixed(0)}% dos registros têm comissão zerada. Verifique se a coluna de comissão está correta no Excel.`,
+          { duration: 8000 }
+        );
+        console.warn("Muitas comissões zeradas. Colunas disponíveis:", Object.keys(jsonData[0] || {}));
       }
 
       toast.success(`${dadosFormatados.length} registros importados com sucesso!`);
