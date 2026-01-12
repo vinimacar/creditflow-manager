@@ -806,11 +806,29 @@ export default function FolhaPagamento() {
                   <Label>Funcionário</Label>
                   <Select value={funcionarioSelecionado} onValueChange={async (value) => {
                     setFuncionarioSelecionado(value);
-                    // Buscar e mostrar o salário do funcionário
-                    const salarioVigente = await getSalarioVigentePorFuncionario(value);
+                    
+                    // Buscar funcionário selecionado
                     const funcionario = funcionarios.find(f => f.id === value);
-                    const salario = salarioVigente?.salarioBase || funcionario?.salarioBruto || funcionario?.salario || 0;
-                    setSalarioBaseAtual(salario);
+                    
+                    if (funcionario) {
+                      // Buscar salário vigente ou usar salário cadastrado
+                      const salarioVigente = await getSalarioVigentePorFuncionario(value);
+                      const salario = salarioVigente?.salarioBase || funcionario.salarioBruto || funcionario.salario || 0;
+                      setSalarioBaseAtual(salario);
+                      
+                      // Importar número de dependentes do cadastro
+                      const deps = funcionario.dependentes || 0;
+                      setNumeroDependentes(deps);
+                      
+                      // Log para debug
+                      console.log("Funcionário selecionado:", {
+                        nome: funcionario.nome,
+                        salarioBase: salario,
+                        dependentes: deps,
+                      });
+                      
+                      toast.success(`Dados de ${funcionario.nome} carregados: Salário R$ ${salario.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`);
+                    }
                   }}>
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione o funcionário" />
@@ -827,13 +845,28 @@ export default function FolhaPagamento() {
 
                 {funcionarioSelecionado && (
                   <>
-                    <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
-                      <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
-                        Salário Base Cadastrado: R$ {salarioBaseAtual.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                      </p>
-                      <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
-                        Este valor será usado como salário base e somado aos proventos adicionais.
-                      </p>
+                    <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg space-y-2">
+                      <div>
+                        <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                          Salário Base: R$ {salarioBaseAtual.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                        </p>
+                        <p className="text-xs text-blue-700 dark:text-blue-300">
+                          Valor importado do cadastro do funcionário
+                        </p>
+                      </div>
+                      {numeroDependentes > 0 && (
+                        <div>
+                          <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                            Dependentes: {numeroDependentes}
+                          </p>
+                          <p className="text-xs text-blue-700 dark:text-blue-300">
+                            Dedução IRRF: R$ {(numeroDependentes * 189.59).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} (R$ 189,59 por dependente)
+                          </p>
+                        </div>
+                      )}
+                      <div className="text-xs text-blue-600 dark:text-blue-400 pt-2 border-t border-blue-200 dark:border-blue-800">
+                        ℹ️ Cálculos seguem tabelas INSS e IRRF 2026 (Lei nº 14.848/2024)
+                      </div>
                     </div>
 
                     <Separator />
@@ -1012,6 +1045,46 @@ export default function FolhaPagamento() {
                           value={outrosDescontos}
                           onChange={(e) => setOutrosDescontos(Number(e.target.value))}
                         />
+                      </div>
+                    </div>
+
+                    {/* Card informativo sobre legislação */}
+                    <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg border border-green-200 dark:border-green-800">
+                      <h4 className="font-semibold text-sm text-green-900 dark:text-green-100 mb-2 flex items-center gap-2">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Deduções Conforme Legislação Brasileira 2026
+                      </h4>
+                      <div className="text-xs text-green-800 dark:text-green-300 space-y-2">
+                        <div>
+                          <strong>INSS (Progressivo):</strong>
+                          <ul className="ml-4 mt-1 space-y-0.5">
+                            <li>• Até R$ 1.518,00: 7,5%</li>
+                            <li>• R$ 1.518,01 a R$ 2.793,88: 9%</li>
+                            <li>• R$ 2.793,89 a R$ 4.190,83: 12%</li>
+                            <li>• Acima de R$ 4.190,84: 14%</li>
+                            <li className="text-green-700 dark:text-green-400">Teto: R$ 8.157,41</li>
+                          </ul>
+                        </div>
+                        <div>
+                          <strong>IRRF (Progressivo):</strong>
+                          <ul className="ml-4 mt-1 space-y-0.5">
+                            <li>• Até R$ 2.259,20: Isento</li>
+                            <li>• R$ 2.259,21 a R$ 2.826,65: 7,5%</li>
+                            <li>• R$ 2.826,66 a R$ 3.751,05: 15%</li>
+                            <li>• R$ 3.751,06 a R$ 4.664,68: 22,5%</li>
+                            <li>• Acima de R$ 4.664,68: 27,5%</li>
+                            <li className="text-green-700 dark:text-green-400">Dedução por dependente: R$ 189,59</li>
+                          </ul>
+                        </div>
+                        <div className="pt-2 border-t border-green-300 dark:border-green-700">
+                          <strong>Outros encargos:</strong>
+                          <ul className="ml-4 mt-1">
+                            <li>• Vale Transporte: 6% do salário (limitado ao custo)</li>
+                            <li>• FGTS: 8% (encargo patronal, não descontado do salário)</li>
+                          </ul>
+                        </div>
                       </div>
                     </div>
 
