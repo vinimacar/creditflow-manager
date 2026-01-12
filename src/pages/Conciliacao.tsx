@@ -71,6 +71,7 @@ export default function Conciliacao() {
   const [periodoImportacao, setPeriodoImportacao] = useState<{ inicio?: Date; fim?: Date }>({});
   const [fornecedores, setFornecedores] = useState<Fornecedor[]>([]);
   const [fornecedorFiltro, setFornecedorFiltro] = useState<string>("todos");
+  const [etapaAtual, setEtapaAtual] = useState<1 | 2 | 3>(1); // Controle de etapas do processo
 
   // Carregar fornecedores
   useEffect(() => {
@@ -88,11 +89,17 @@ export default function Conciliacao() {
   const handleImportarInterno = (dados: DadosExcel[]) => {
     setDadosInternos(dados);
     toast.success(`${dados.length} registros internos importados`);
+    if (dados.length > 0) {
+      setEtapaAtual(2); // Avança para a etapa de importar extrato
+    }
   };
 
   const handleImportarFornecedor = (dados: DadosExcel[]) => {
     setDadosFornecedor(dados);
-    toast.success(`${dados.length} registros do fornecedor importados`);
+    toast.success(`${dados.length} registros do extrato bancário importados`);
+    if (dados.length > 0) {
+      setEtapaAtual(3); // Avança para visualizar resultados da conciliação
+    }
   };
 
   // Carregar dados do sistema (vendas do Firestore)
@@ -192,6 +199,10 @@ export default function Conciliacao() {
         ? `${dadosFormatados.length} vendas carregadas (${format(periodoImportacao.inicio, "dd/MM/yyyy")} - ${format(periodoImportacao.fim, "dd/MM/yyyy")})`
         : `${dadosFormatados.length} vendas carregadas do sistema`;
       toast.success(mensagem);
+      
+      if (dadosFormatados.length > 0) {
+        setEtapaAtual(2); // Avança para importar extrato bancário
+      }
     } catch (error) {
       console.error("Erro ao carregar dados do sistema:", error);
       toast.error("Erro ao carregar vendas do sistema");
@@ -399,133 +410,154 @@ export default function Conciliacao() {
         description="Análise e validação de comissões pagas pelos fornecedores"
       />
 
-      {/* Cards de Importação */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* Indicador de Etapas */}
+      <Card className="p-6">
+        <div className="flex items-center justify-between max-w-3xl mx-auto">
+          <div className="flex flex-col items-center flex-1">
+            <div className={cn(
+              "w-10 h-10 rounded-full flex items-center justify-center font-semibold",
+              etapaAtual >= 1 ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+            )}>
+              1
+            </div>
+            <p className={cn(
+              "text-sm mt-2 font-medium",
+              etapaAtual >= 1 ? "text-foreground" : "text-muted-foreground"
+            )}>
+              Filtrar Vendas
+            </p>
+            {dadosInternos.length > 0 && (
+              <p className="text-xs text-muted-foreground mt-1">
+                {dadosInternos.length} vendas
+              </p>
+            )}
+          </div>
+          
+          <div className={cn(
+            "flex-1 h-0.5 mx-4",
+            etapaAtual >= 2 ? "bg-primary" : "bg-muted"
+          )} />
+          
+          <div className="flex flex-col items-center flex-1">
+            <div className={cn(
+              "w-10 h-10 rounded-full flex items-center justify-center font-semibold",
+              etapaAtual >= 2 ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+            )}>
+              2
+            </div>
+            <p className={cn(
+              "text-sm mt-2 font-medium",
+              etapaAtual >= 2 ? "text-foreground" : "text-muted-foreground"
+            )}>
+              Importar Extrato
+            </p>
+            {dadosFornecedor.length > 0 && (
+              <p className="text-xs text-muted-foreground mt-1">
+                {dadosFornecedor.length} lançamentos
+              </p>
+            )}
+          </div>
+          
+          <div className={cn(
+            "flex-1 h-0.5 mx-4",
+            etapaAtual >= 3 ? "bg-primary" : "bg-muted"
+          )} />
+          
+          <div className="flex flex-col items-center flex-1">
+            <div className={cn(
+              "w-10 h-10 rounded-full flex items-center justify-center font-semibold",
+              etapaAtual >= 3 ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+            )}>
+              3
+            </div>
+            <p className={cn(
+              "text-sm mt-2 font-medium",
+              etapaAtual >= 3 ? "text-foreground" : "text-muted-foreground"
+            )}>
+              Resultado
+            </p>
+            {divergencias.length > 0 && (
+              <p className="text-xs text-muted-foreground mt-1">
+                {divergencias.length} análises
+              </p>
+            )}
+          </div>
+        </div>
+      </Card>
+
+      {/* Etapa 1: Filtrar e Carregar Vendas */}
+      {etapaAtual === 1 && (
         <Card className="p-6">
-          <div className="space-y-4">
+          <div className="space-y-6">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-primary/10 rounded-lg">
                 <Database className="w-5 h-5 text-primary" />
               </div>
               <div>
-                <h3 className="font-semibold">Dados Internos</h3>
+                <h3 className="font-semibold text-lg">Etapa 1: Carregar Vendas do Sistema</h3>
                 <p className="text-sm text-muted-foreground">
-                  {dadosInternos.length > 0 
-                    ? `${dadosInternos.length} registros carregados`
-                    : "Carregue ou importe dados internos"
-                  }
+                  Selecione o período e fornecedor para filtrar as vendas que serão conciliadas
                 </p>
               </div>
             </div>
-            
-            {/* Filtro de período para importação */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Período (opcional)</label>
-              <div className="flex gap-2">
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className={cn(
-                        "flex-1 justify-start text-left font-normal",
-                        !periodoImportacao.inicio && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {periodoImportacao.inicio ? format(periodoImportacao.inicio, "dd/MM/yyyy", { locale: ptBR }) : "Data inicial"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={periodoImportacao.inicio}
-                      onSelect={(date) => setPeriodoImportacao(prev => ({ ...prev, inicio: date }))}
-                      locale={ptBR}
-                    />
-                  </PopoverContent>
-                </Popover>
 
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className={cn(
-                        "flex-1 justify-start text-left font-normal",
-                        !periodoImportacao.fim && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {periodoImportacao.fim ? format(periodoImportacao.fim, "dd/MM/yyyy", { locale: ptBR }) : "Data final"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={periodoImportacao.fim}
-                      onSelect={(date) => setPeriodoImportacao(prev => ({ ...prev, fim: date }))}
-                      locale={ptBR}
-                    />
-                  </PopoverContent>
-                </Popover>
+            {/* Filtros */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-muted/30 p-4 rounded-lg">
+              <div className="space-y-2">
+                <Label>Período</Label>
+                <div className="flex gap-2">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className={cn(
+                          "flex-1 justify-start text-left font-normal",
+                          !periodoImportacao.inicio && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {periodoImportacao.inicio ? format(periodoImportacao.inicio, "dd/MM/yyyy", { locale: ptBR }) : "Data inicial"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={periodoImportacao.inicio}
+                        onSelect={(date) => setPeriodoImportacao(prev => ({ ...prev, inicio: date }))}
+                        locale={ptBR}
+                      />
+                    </PopoverContent>
+                  </Popover>
+
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className={cn(
+                          "flex-1 justify-start text-left font-normal",
+                          !periodoImportacao.fim && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {periodoImportacao.fim ? format(periodoImportacao.fim, "dd/MM/yyyy", { locale: ptBR }) : "Data final"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={periodoImportacao.fim}
+                        onSelect={(date) => setPeriodoImportacao(prev => ({ ...prev, fim: date }))}
+                        locale={ptBR}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
               </div>
-            </div>
-            
-            <div className="flex gap-2">
-              <Button
-                onClick={handleCarregarDoSistema}
-                disabled={carregandoSistema}
-                className="flex-1 gap-2"
-                variant="default"
-              >
-                {carregandoSistema ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                    Carregando...
-                  </>
-                ) : (
-                  <>
-                    <Database className="w-4 h-4" />
-                    Carregar do Sistema
-                  </>
-                )}
-              </Button>
-              <ImportarExcel tipo="interno" onImport={handleImportarInterno} apenasButton={true} />
-              <ImportarPDF tipo="interno" onImport={handleImportarInterno} apenasButton={true} />
-            </div>
-            {dadosInternos.length > 0 && (
-              <Button
-                onClick={handleExportarExcel}
-                variant="outline"
-                className="w-full gap-2"
-              >
-                <FileSpreadsheet className="w-4 h-4" />
-                Exportar Excel ({dadosInternos.length} vendas)
-              </Button>
-            )}
-          </div>
-        </Card>
-        
-        <div className="space-y-4">
-          <ImportarExcel tipo="fornecedor" onImport={handleImportarFornecedor} />
-          <ImportarPDF tipo="fornecedor" onImport={handleImportarFornecedor} />
-        </div>
-      </div>
 
-      {/* Tabela de Dados Internos Carregados */}
-      {dadosInternos.length > 0 && divergencias.length === 0 && (
-        <Card>
-          <div className="p-6 border-b space-y-4">
-            <div>
-              <h3 className="text-lg font-semibold">Dados Internos Carregados</h3>
-              <p className="text-sm text-muted-foreground">
-                {dadosInternos.length} {dadosInternos.length === 1 ? "venda carregada" : "vendas carregadas"}
-              </p>
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="w-64">
-                <Label>Filtrar por Fornecedor</Label>
+              <div className="space-y-2">
+                <Label>Fornecedor (opcional)</Label>
                 <Select value={fornecedorFiltro} onValueChange={setFornecedorFiltro}>
                   <SelectTrigger>
                     <SelectValue placeholder="Todos os fornecedores" />
@@ -540,97 +572,172 @@ export default function Conciliacao() {
                   </SelectContent>
                 </Select>
               </div>
-              {fornecedorFiltro !== "todos" && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setFornecedorFiltro("todos")}
-                  className="gap-2 mt-6"
-                >
-                  <X className="w-4 h-4" />
-                  Limpar Filtro
-                </Button>
-              )}
+            </div>
+
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Como funciona?</AlertTitle>
+              <AlertDescription>
+                Carregue as vendas do sistema ou importe uma planilha Excel com seus dados. 
+                As vendas serão comparadas com o extrato bancário na próxima etapa.
+              </AlertDescription>
+            </Alert>
+
+            <div className="flex gap-3">
+              <Button
+                onClick={handleCarregarDoSistema}
+                disabled={carregandoSistema}
+                className="flex-1 gap-2 h-12"
+                size="lg"
+              >
+                {carregandoSistema ? (
+                  <>
+                    <RefreshCw className="w-5 h-5 animate-spin" />
+                    Carregando...
+                  </>
+                ) : (
+                  <>
+                    <Database className="w-5 h-5" />
+                    Carregar Vendas do Sistema
+                  </>
+                )}
+              </Button>
+              <ImportarExcel tipo="interno" onImport={handleImportarInterno} apenasButton={true} />
+              <ImportarPDF tipo="interno" onImport={handleImportarInterno} apenasButton={true} />
             </div>
           </div>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Contrato</TableHead>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead>CPF Cliente</TableHead>
-                  <TableHead>Produto</TableHead>
-                  <TableHead>Prazo</TableHead>
-                  <TableHead>Fornecedor</TableHead>
-                  <TableHead>Funcionário</TableHead>
-                  <TableHead className="text-right">Valor Produto</TableHead>
-                  <TableHead className="text-right bg-blue-50">Comissão</TableHead>
-                  <TableHead>Data Venda</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {dadosInternos
-                  .filter(venda => fornecedorFiltro === "todos" || venda.fornecedor === fornecedorFiltro)
-                  .slice(0, 50)
-                  .map((venda, index) => (
-                  <TableRow key={index}>
-                    <TableCell className="font-mono text-xs">{venda.contrato}</TableCell>
-                    <TableCell className="font-medium">{venda.cliente}</TableCell>
-                    <TableCell className="text-sm">{venda.cpfCliente || "-"}</TableCell>
-                    <TableCell>{venda.produto || "-"}</TableCell>
-                    <TableCell>{venda.prazo ? `${venda.prazo} meses` : "-"}</TableCell>
-                    <TableCell>{venda.fornecedor}</TableCell>
-                    <TableCell>{venda.funcionario}</TableCell>
-                    <TableCell className="text-right">
-                      R$ {venda.valorProduto.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                    </TableCell>
-                    <TableCell className="text-right bg-blue-50 font-semibold text-blue-700">
-                      R$ {venda.valorComissao.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap">
-                      {venda.dataVenda ? format(new Date(venda.dataVenda), "dd/MM/yyyy HH:mm", { locale: ptBR }) : "-"}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={venda.status === "aprovada" ? "default" : "secondary"}>
-                        {venda.status || "pendente"}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-          {(() => {
-            const vendasFiltradas = dadosInternos.filter(venda => 
-              fornecedorFiltro === "todos" || venda.fornecedor === fornecedorFiltro
-            );
-            return vendasFiltradas.length > 50 ? (
-              <div className="p-4 border-t text-center text-sm text-muted-foreground">
-                Mostrando 50 de {vendasFiltradas.length} vendas {fornecedorFiltro !== "todos" && `(${fornecedorFiltro})`}. Exporte para ver todos os dados.
-              </div>
-            ) : vendasFiltradas.length > 0 && vendasFiltradas.length !== dadosInternos.length ? (
-              <div className="p-4 border-t text-center text-sm text-muted-foreground">
-                Mostrando {vendasFiltradas.length} {vendasFiltradas.length === 1 ? "venda" : "vendas"} de {fornecedorFiltro}
-              </div>
-            ) : null;
-          })()}
         </Card>
       )}
 
-      {/* Estatísticas */}
-      {divergencias.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-          <Card className="p-6">
+      {/* Etapa 2: Importar Extrato Bancário */}
+      {etapaAtual === 2 && (
+        <Card className="p-6">
+          <div className="space-y-6">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Total</p>
-                <h3 className="text-2xl font-bold mt-2">{estatisticas.total}</h3>
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-primary/10 rounded-lg">
+                  <FileSpreadsheet className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-lg">Etapa 2: Importar Extrato Bancário</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Importe o extrato bancário para conciliar com as {dadosInternos.length} vendas carregadas
+                  </p>
+                </div>
               </div>
-              <FileBarChart className="w-8 h-8 text-muted-foreground" />
+              <Button variant="ghost" size="sm" onClick={() => setEtapaAtual(1)}>
+                ← Voltar
+              </Button>
             </div>
-          </Card>
+
+            {/* Resumo das vendas carregadas */}
+            <div className="bg-muted/30 p-4 rounded-lg">
+              <div className="grid grid-cols-3 gap-4 text-center">
+                <div>
+                  <p className="text-2xl font-bold text-primary">{dadosInternos.length}</p>
+                  <p className="text-sm text-muted-foreground">Vendas</p>
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-green-600">
+                    R$ {dadosInternos.reduce((sum, v) => sum + v.valorComissao, 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                  </p>
+                  <p className="text-sm text-muted-foreground">Total Comissões</p>
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-blue-600">
+                    R$ {dadosInternos.reduce((sum, v) => sum + v.valorProduto, 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                  </p>
+                  <p className="text-sm text-muted-foreground">Total Produtos</p>
+                </div>
+              </div>
+            </div>
+
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Próximo passo</AlertTitle>
+              <AlertDescription>
+                Importe o arquivo de extrato bancário (Excel ou PDF) para que o sistema possa 
+                identificar automaticamente as divergências entre suas vendas e os pagamentos recebidos.
+              </AlertDescription>
+            </Alert>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Card className="p-6">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <FileSpreadsheet className="w-5 h-5 text-primary" />
+                    <div>
+                      <h4 className="font-medium">Importar Excel</h4>
+                      <p className="text-xs text-muted-foreground">Arquivo .xlsx ou .xls</p>
+                    </div>
+                  </div>
+                  <ImportarExcel tipo="fornecedor" onImport={handleImportarFornecedor} apenasButton={true} />
+                </div>
+              </Card>
+
+              <Card className="p-6">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <FileSpreadsheet className="w-5 h-5 text-red-600" />
+                    <div>
+                      <h4 className="font-medium">Importar PDF</h4>
+                      <p className="text-xs text-muted-foreground">Extrato em formato PDF</p>
+                    </div>
+                  </div>
+                  <ImportarPDF tipo="fornecedor" onImport={handleImportarFornecedor} apenasButton={true} />
+                </div>
+              </Card>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* Etapa 3: Visualizar Resultados - Só quando houver divergências */}
+      {etapaAtual === 3 && divergencias.length > 0 && (
+        <>
+          <div className="flex justify-between items-center">
+            <div>
+              <h3 className="text-lg font-semibold">Resultado da Conciliação</h3>
+              <p className="text-sm text-muted-foreground">
+                Análise completa entre vendas e extrato bancário
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="ghost" size="sm" onClick={() => setEtapaAtual(1)}>
+                Nova Conciliação
+              </Button>
+              <Button
+                onClick={handleGerarPDF}
+                disabled={processando}
+                className="gap-2"
+                size="sm"
+              >
+                {processando ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    Gerando...
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-4 h-4" />
+                    Baixar PDF
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+
+          {/* Estatísticas */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            <Card className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Total</p>
+                  <h3 className="text-2xl font-bold mt-2">{estatisticas.total}</h3>
+                </div>
+                <FileBarChart className="w-8 h-8 text-muted-foreground" />
+              </div>
+            </Card>
 
           <Card className="p-6">
             <div className="flex items-center justify-between">
@@ -690,20 +797,16 @@ export default function Conciliacao() {
             </div>
           </Card>
         </div>
-      )}
 
-      {/* Filtros */}
-      {divergencias.length > 0 && (
+        {/* Filtros */}
         <FiltrosInteligentesConciliacao
           filtros={filtros}
           onFiltrosChange={setFiltros}
           fornecedores={fornecedoresUnicos}
           funcionarios={funcionariosUnicos}
         />
-      )}
 
-      {/* Tabela de Divergências */}
-      {divergencias.length > 0 ? (
+        {/* Tabela de Divergências */}
         <Card>
           <div className="p-6">
             <div className="flex items-center justify-between mb-4">
@@ -830,18 +933,7 @@ export default function Conciliacao() {
             </div>
           </div>
         </Card>
-      ) : (
-        <Card className="p-12">
-          <div className="text-center space-y-4">
-            <FileBarChart className="w-16 h-16 mx-auto text-muted-foreground" />
-            <div>
-              <h3 className="text-lg font-semibold mb-2">Nenhuma conciliação iniciada</h3>
-              <p className="text-muted-foreground max-w-md mx-auto">
-                Importe os dados internos e o relatório do fornecedor para iniciar a análise de conciliação.
-              </p>
-            </div>
-          </div>
-        </Card>
+        </>
       )}
     </div>
   );
