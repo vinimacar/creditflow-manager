@@ -127,49 +127,50 @@ export function analisarConciliacao(
   };
 
   // Função auxiliar para encontrar match por múltiplos critérios
+  // Prioridade: 1) Contrato, 2) CPF + Valor da Comissão, 3) CPF + Valor Pago no Extrato
   const encontrarMatch = (interno: DadosExcel): { match?: DadosExcel; criterio?: string } => {
     const contratoNormalizado = interno.contrato.trim().toUpperCase();
     const cpfClienteNormalizado = normalizarCPF(interno.cpfCliente);
     const cpfFuncionarioNormalizado = normalizarCPF(interno.cpfFuncionario);
+    const toleranciaValor = 0.50; // Tolerância de R$ 0,50 para comparação de valores
     
-    // Tentar encontrar por contrato (primeira prioridade)
+    // PRIORIDADE 1: Contrato informado no PDV (critério mais confiável)
     let match = dadosFornecedor.find(
       f => f.contrato.trim().toUpperCase() === contratoNormalizado
     );
-    if (match) return { match, criterio: "Contrato exato" };
+    if (match) return { match, criterio: "Contrato PDV" };
     
-    // Se não encontrou por contrato, tentar por CPF do cliente + valor (segunda prioridade)
+    // PRIORIDADE 2: CPF + Valor da Comissão (validar se a comissão bate)
     if (cpfClienteNormalizado) {
       match = dadosFornecedor.find(f => {
         const cpfFornecedor = normalizarCPF(f.cpfCliente);
-        const diferencaValor = Math.abs(interno.valorProduto - f.valorProduto);
-        return cpfFornecedor === cpfClienteNormalizado && diferencaValor < 1.0; // Tolerância de R$ 1
+        const diferencaComissao = Math.abs(interno.valorComissao - f.valorComissao);
+        return cpfFornecedor === cpfClienteNormalizado && diferencaComissao <= toleranciaValor;
       });
-      if (match) return { match, criterio: "CPF Cliente + Valor" };
+      if (match) return { match, criterio: "CPF + Comissão" };
     }
     
-    // Se não encontrou, tentar por nome do cliente + valor aproximado (terceira prioridade)
-    if (interno.cliente) {
-      const nomeClienteNormalizado = interno.cliente.trim().toUpperCase();
+    // PRIORIDADE 3: CPF + Valor Pago no Extrato (verificar valor pago informado pelo banco)
+    if (cpfClienteNormalizado) {
       match = dadosFornecedor.find(f => {
-        const nomeFornecedor = (f.cliente || "").trim().toUpperCase();
-        const diferencaValor = Math.abs(interno.valorProduto - f.valorProduto);
-        const nomesSimilares = nomeFornecedor === nomeClienteNormalizado || 
-                               nomeFornecedor.includes(nomeClienteNormalizado) ||
-                               nomeClienteNormalizado.includes(nomeFornecedor);
-        return nomesSimilares && diferencaValor < 1.0;
+        const cpfFornecedor = normalizarCPF(f.cpfCliente);
+        const diferencaValorPago = Math.abs(interno.valorComissao - f.valorComissao);
+        const diferencaValorProduto = Math.abs(interno.valorProduto - f.valorProduto);
+        // Aceita se QUALQUER um dos valores estiver próximo
+        return cpfFornecedor === cpfClienteNormalizado && 
+               (diferencaValorPago <= toleranciaValor || diferencaValorProduto <= toleranciaValor);
       });
-      if (match) return { match, criterio: "Nome Cliente + Valor" };
+      if (match) return { match, criterio: "CPF + Valor Extrato" };
     }
     
-    // Se não encontrou, tentar por CPF do funcionário + valor (quarta prioridade)
+    // PRIORIDADE 4: CPF do Funcionário + Comissão (útil para vendedores externos)
     if (cpfFuncionarioNormalizado) {
       match = dadosFornecedor.find(f => {
         const cpfFornecedor = normalizarCPF(f.cpfFuncionario);
-        const diferencaValor = Math.abs(interno.valorProduto - f.valorProduto);
-        return cpfFornecedor === cpfFuncionarioNormalizado && diferencaValor < 5.0; // Tolerância maior
+        const diferencaComissao = Math.abs(interno.valorComissao - f.valorComissao);
+        return cpfFornecedor === cpfFuncionarioNormalizado && diferencaComissao <= toleranciaValor;
       });
-      if (match) return { match, criterio: "CPF Funcionário + Valor" };
+      if (match) return { match, criterio: "CPF Funcionário + Comissão" };
     }
     
     return { match: undefined, criterio: undefined };
@@ -181,6 +182,29 @@ export function analisarConciliacao(
 
     const tiposDivergencia: string[] = [];
     let status: Divergencia["status"] = "ok";
+
+    // Log detalhado para debug
+    console.log(`\n=== CONCILIAÇÃO ${index + 1}/${dadosInternos.length} ===`);
+    console.log("Dados PDV:", {
+      contrato: interno.contrato,
+      cpfCliente: interno.cpfCliente,
+      valorComissao: interno.valorComissao,
+      valorProduto: interno.valorProduto,
+    });
+    console.log("Match encontrado?", fornecedor ? "SIM" : "NÃO");
+    if (fornecedor) {
+      console.log("Critério:", criterio);
+      console.log("Dados Extrato:", {
+        contrato: fornecedor.contrato,
+        cpfCliente: fornecedor.cpfCliente,
+        valorComissao: fornecedor.valorComissao,
+        valorProduto: fornecedor.valorProduto,
+      });
+      console.log("Diferenças:", {
+        comissao: Math.abs(interno.valorComissao - fornecedor.valorComissao).toFixed(2),
+        produto: Math.abs(interno.valorProduto - fornecedor.valorProduto).toFixed(2),
+      });
+    }
 
     // Executar validação inteligente
     const validacaoInteligente = validarTaxasEValoresPagos(
@@ -200,30 +224,56 @@ export function analisarConciliacao(
       status = "nao_encontrado_fornecedor";
       tiposDivergencia.push("Pagamento não encontrado no extrato bancário");
     } else {
-      // Verificar divergências de valores
+      // Verificar divergências de valores com validação rigorosa
       const diferencaComissao = Math.abs(interno.valorComissao - fornecedor.valorComissao);
       const diferencaProduto = Math.abs(interno.valorProduto - fornecedor.valorProduto);
       
-      const tolerancia = 0.01; // Tolerância de 1 centavo para erros de arredondamento
+      const tolerancia = 0.50; // Tolerância de R$ 0,50 para comparação
 
+      // VALIDAÇÃO CRÍTICA: Valor da Comissão
       if (diferencaComissao > tolerancia) {
         tiposDivergencia.push(
-          `Divergência na comissão: R$ ${diferencaComissao.toFixed(2)}`
+          `❌ Comissão divergente: PDV R$ ${interno.valorComissao.toFixed(2)} vs Extrato R$ ${fornecedor.valorComissao.toFixed(2)} (diferença: R$ ${diferencaComissao.toFixed(2)})`
         );
         status = "divergente";
       }
 
+      // VALIDAÇÃO CRÍTICA: Valor Pago no Extrato
       if (diferencaProduto > tolerancia) {
         tiposDivergencia.push(
-          `Divergência no valor do produto: R$ ${diferencaProduto.toFixed(2)}`
+          `❌ Valor do contrato divergente: PDV R$ ${interno.valorProduto.toFixed(2)} vs Extrato R$ ${fornecedor.valorProduto.toFixed(2)} (diferença: R$ ${diferencaProduto.toFixed(2)})`
         );
         status = "divergente";
       }
 
-      // Verificar divergências de cliente
+      // Verificar se CPF está presente e se bate
+      const cpfInternoNormalizado = normalizarCPF(interno.cpfCliente);
+      const cpfFornecedorNormalizado = normalizarCPF(fornecedor.cpfCliente);
+      
+      if (cpfInternoNormalizado && cpfFornecedorNormalizado && cpfInternoNormalizado !== cpfFornecedorNormalizado) {
+        tiposDivergencia.push(
+          `⚠️ CPF divergente: PDV ${interno.cpfCliente} vs Extrato ${fornecedor.cpfCliente}`
+        );
+        status = "divergente";
+      }
+
+      // Verificar divergências de contrato
+      if (fornecedor.contrato && interno.contrato.trim().toUpperCase() !== fornecedor.contrato.trim().toUpperCase()) {
+        tiposDivergencia.push(
+          `⚠️ Número de contrato divergente: PDV ${interno.contrato} vs Extrato ${fornecedor.contrato}`
+        );
+        // Não marca como divergente crítico, apenas aviso
+      }
+
+      // Verificar divergências de cliente (apenas informativo)
       if (fornecedor.cliente && interno.cliente !== fornecedor.cliente) {
-        tiposDivergencia.push("Nome do cliente divergente");
-        // Não marca como divergente se for apenas diferença no nome
+        tiposDivergencia.push(`ℹ️ Nome do cliente ligeiramente diferente`);
+        // Não marca como divergente
+      }
+      
+      // Se encontrou match mas não há divergências críticas, marcar como OK
+      if (status !== "divergente" && tiposDivergencia.length === 0) {
+        tiposDivergencia.push(`✓ Conciliação OK pelo critério: ${criterio}`);
       }
     }
 
