@@ -605,6 +605,104 @@ export default function Conciliacao() {
               <ImportarExcel tipo="interno" onImport={handleImportarInterno} apenasButton={true} />
               <ImportarPDF tipo="interno" onImport={handleImportarInterno} apenasButton={true} />
             </div>
+
+            {/* Preview das Vendas Carregadas */}
+            {dadosInternos.length > 0 && (
+              <Card className="bg-green-50 border-green-200">
+                <div className="p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-5 h-5 text-green-600" />
+                      <h4 className="font-semibold text-green-900">Vendas Carregadas do Sistema</h4>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setEtapaAtual(2)}
+                      className="gap-2"
+                    >
+                      Próxima Etapa →
+                    </Button>
+                  </div>
+                  
+                  <div className="bg-white p-3 rounded border border-green-300">
+                    <div className="grid grid-cols-3 gap-4 mb-3 text-center">
+                      <div>
+                        <p className="text-2xl font-bold text-primary">{dadosInternos.length}</p>
+                        <p className="text-xs text-muted-foreground">Vendas</p>
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold text-green-600">
+                          R$ {dadosInternos.reduce((sum, v) => sum + v.valorComissao, 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                        </p>
+                        <p className="text-xs text-muted-foreground">Total Comissões</p>
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold text-blue-600">
+                          R$ {dadosInternos.reduce((sum, v) => sum + v.valorProduto, 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                        </p>
+                        <p className="text-xs text-muted-foreground">Total Produtos</p>
+                      </div>
+                    </div>
+
+                    <div className="text-sm font-semibold mb-2">Primeiras 5 vendas:</div>
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Contrato</TableHead>
+                            <TableHead>Cliente</TableHead>
+                            <TableHead>Produto</TableHead>
+                            <TableHead>Fornecedor</TableHead>
+                            <TableHead className="text-right">Valor Produto</TableHead>
+                            <TableHead className="text-right">Comissão</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {dadosInternos.slice(0, 5).map((venda, idx) => (
+                            <TableRow key={idx}>
+                              <TableCell className="font-mono text-xs">{venda.contrato || "-"}</TableCell>
+                              <TableCell className="text-xs">{venda.cliente || "-"}</TableCell>
+                              <TableCell className="text-xs">{venda.produto || "-"}</TableCell>
+                              <TableCell className="text-xs">{venda.fornecedor || "-"}</TableCell>
+                              <TableCell className="text-right font-medium text-blue-700">
+                                R$ {venda.valorProduto?.toLocaleString("pt-BR", { minimumFractionDigits: 2 }) || "0,00"}
+                              </TableCell>
+                              <TableCell className="text-right font-bold text-green-700">
+                                R$ {venda.valorComissao?.toLocaleString("pt-BR", { minimumFractionDigits: 2 }) || "0,00"}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        console.log("Vendas do Sistema (todas):", dadosInternos);
+                        toast.success("Vendas exibidas no console (F12)");
+                      }}
+                    >
+                      Ver todas no console ({dadosInternos.length})
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setDadosInternos([]);
+                        setEtapaAtual(1);
+                      }}
+                    >
+                      Limpar
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            )}
           </div>
         </Card>
       )}
