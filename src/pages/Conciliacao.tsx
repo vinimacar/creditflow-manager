@@ -674,28 +674,38 @@ export default function Conciliacao() {
                   <div className="text-sm space-y-2">
                     <p className="text-yellow-800">
                       <strong>{dadosFornecedor.length} registros</strong> importados do extrato bancário.
-                      Primeira linha como exemplo:
                     </p>
-                    {dadosFornecedor[0] && (
-                      <div className="bg-white p-3 rounded border border-yellow-300 text-xs font-mono">
-                        <div><strong>Contrato:</strong> {dadosFornecedor[0].contrato || "(vazio)"}</div>
-                        <div><strong>Cliente:</strong> {dadosFornecedor[0].cliente || "(vazio)"}</div>
-                        <div><strong>CPF Cliente:</strong> {dadosFornecedor[0].cpfCliente || "(vazio)"}</div>
-                        <div><strong>Valor Produto:</strong> R$ {dadosFornecedor[0].valorProduto?.toFixed(2) || "0.00"}</div>
-                        <div><strong>Comissão:</strong> R$ {dadosFornecedor[0].valorComissao?.toFixed(2) || "0.00"}</div>
-                      </div>
-                    )}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        console.log("Dados do Extrato:", dadosFornecedor);
-                        toast.success("Dados do extrato exibidos no console (F12)");
-                      }}
-                      className="mt-2"
-                    >
-                      Ver todos os dados no console
-                    </Button>
+                    <div className="bg-white p-3 rounded border border-yellow-300 space-y-3">
+                      {dadosFornecedor.slice(0, 3).map((item, idx) => (
+                        <div key={idx} className="text-xs font-mono pb-2 border-b last:border-b-0">
+                          <div className="font-bold mb-1">Registro {idx + 1}:</div>
+                          <div><strong>Contrato:</strong> {item.contrato || "(vazio)"}</div>
+                          <div><strong>Cliente:</strong> {item.cliente || "(vazio)"}</div>
+                          <div><strong>CPF Cliente:</strong> {item.cpfCliente || "(vazio)"}</div>
+                          <div className="text-blue-700"><strong>Valor Produto:</strong> R$ {item.valorProduto?.toFixed(2) || "0.00"}</div>
+                          <div className={`font-bold ${item.valorComissao > 0 ? 'text-green-700' : 'text-red-700'}`}>
+                            <strong>Comissão:</strong> R$ {item.valorComissao?.toFixed(2) || "0.00"}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          console.log("Dados do Extrato (todos):", dadosFornecedor);
+                          toast.success("Dados do extrato exibidos no console (F12)");
+                        }}
+                      >
+                        Ver todos no console
+                      </Button>
+                      {dadosFornecedor.filter(d => d.valorComissao === 0).length > 0 && (
+                        <Badge variant="destructive">
+                          {dadosFornecedor.filter(d => d.valorComissao === 0).length} comissões zeradas
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                 </div>
               </Card>

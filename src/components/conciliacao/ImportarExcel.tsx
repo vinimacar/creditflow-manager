@@ -171,12 +171,24 @@ export function ImportarExcel({ onImport, tipo, apenasButton = false }: Importar
       const comissoesZeradas = dadosFormatados.filter(d => d.valorComissao === 0).length;
       const percentualZerado = (comissoesZeradas / dadosFormatados.length) * 100;
       
+      // Log detalhado para debug
+      console.log("=== IMPORT DEBUG ===");
+      console.log("Total de registros:", dadosFormatados.length);
+      console.log("Comissões zeradas:", comissoesZeradas, `(${percentualZerado.toFixed(1)}%)`);
+      console.log("Primeiros 3 registros importados:", dadosFormatados.slice(0, 3));
+      console.log("Valores de comissão detectados:", dadosFormatados.slice(0, 5).map(d => ({
+        valorComissao: d.valorComissao,
+        valorProduto: d.valorProduto,
+        contrato: d.contrato
+      })));
+      
       if (percentualZerado > 80) {
         toast.warning(
           `Atenção: ${percentualZerado.toFixed(0)}% dos registros têm comissão zerada. Verifique se a coluna de comissão está correta no Excel.`,
           { duration: 8000 }
         );
         console.warn("Muitas comissões zeradas. Colunas disponíveis:", Object.keys(jsonData[0] || {}));
+        console.warn("Primeira linha original do Excel:", jsonData[0]);
       }
 
       toast.success(`${dadosFormatados.length} registros importados com sucesso!`);
