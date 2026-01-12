@@ -36,7 +36,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { CalendarIcon, Plus, Trash2, Edit, Receipt, TrendingDown, Users } from "lucide-react";
 import { toast } from "sonner";
@@ -225,6 +225,53 @@ export default function Despesas() {
     } catch (error) {
       console.error("Erro ao excluir despesa:", error);
       toast.error("Erro ao excluir despesa");
+    }
+  };
+
+  const importarFolhasParaDespesas = async () => {
+    try {
+      setLoading(true);
+      
+      // Filtrar folhas que ainda não foram importadas
+      const folhasNaoImportadas = folhasPagamento.filter(folha => {
+        const jaImportada = despesas.some(d => d.origem === "folha_pagamento" && d.origemId === folha.id);
+        return !jaImportada && folha.status === "processada";
+      });
+
+      if (folhasNaoImportadas.length === 0) {
+        toast.info("Todas as folhas processadas já foram importadas como despesas");
+        return;
+      }
+
+      // Importar cada folha como despesa
+      let importadas = 0;
+      for (const folha of folhasNaoImportadas) {
+        const mesRef = parseISO(folha.mesReferencia + "-01");
+        const ultimoDiaMes = endOfMonth(mesRef);
+        
+        const despesaData = {
+          descricao: `Folha de Pagamento - ${folha.funcionarioNome}`,
+          categoria: "Salários",
+          valor: folha.salarioLiquido,
+          dataVencimento: format(ultimoDiaMes, "yyyy-MM-dd"),
+          dataPagamento: folha.dataPagamento ? format(folha.dataPagamento, "yyyy-MM-dd") : undefined,
+          status: folha.status === "paga" ? "Pago" : "Pendente" as "Pago" | "Pendente" | "Atrasado",
+          observacoes: `Importado da folha de pagamento. Mês: ${format(mesRef, "MM/yyyy", { locale: ptBR })}. Bruto: R$ ${folha.salarioBruto.toFixed(2)}. Descontos: R$ ${folha.descontos.total.toFixed(2)}.`,
+          origem: "folha_pagamento" as const,
+          origemId: folha.id,
+        };
+
+        await addDespesa(despesaData);
+        importadas++;
+      }
+
+      toast.success(`${importadas} ${importadas === 1 ? "folha importada" : "folhas importadas"} como despesa${importadas > 1 ? "s" : ""}!`);
+      await carregarDespesas();
+    } catch (error) {
+      console.error("Erro ao importar folhas:", error);
+      toast.error("Erro ao importar folhas de pagamento");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -509,19 +556,20 @@ export default function Despesas() {
                 <TableHead>Vencimento</TableHead>
                 <TableHead>Pagamento</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Origem</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                     Carregando despesas...
                   </TableCell>
                 </TableRow>
               ) : despesas.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                     Nenhuma despesa cadastrada
                   </TableCell>
                 </TableRow>
@@ -540,12 +588,25 @@ export default function Despesas() {
                         : "-"}
                     </TableCell>
                     <TableCell>{getStatusBadge(despesa.status)}</TableCell>
+                    <TableCell>
+                      {despesa.origem === "folha_pagamento" ? (
+                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                          <Users className="w-3 h-3 mr-1" />
+                          Folha
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="bg-gray-50 text-gray-600 border-gray-200">
+                          Manual
+                        </Badge>
+                      )}
+                    </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
                         <Button
                           variant="ghost"
                           size="icon"
                           onClick={() => handleOpenDialog(despesa)}
+                          disabled={despesa.origem === "folha_pagamento"}
                         >
                           <Edit className="w-4 h-4" />
                         </Button>
@@ -553,6 +614,7 @@ export default function Despesas() {
                           variant="ghost"
                           size="icon"
                           onClick={() => setDespesaParaDeletar(despesa.id!)}
+                          disabled={despesa.origem === "folha_pagamento"}
                         >
                           <Trash2 className="w-4 h-4 text-destructive" />
                         </Button>
@@ -568,13 +630,17 @@ export default function Despesas() {
 
       {/* Tabela de Folhas de Pagamento */}
       <Card>
-        <div className="p-6 border-b">
+        <div className="p-6 border-b flex justify-between items-center">
           <div>
             <h3 className="text-lg font-semibold">Folhas de Pagamento</h3>
             <p className="text-sm text-muted-foreground">
               {folhasPagamento.length} {folhasPagamento.length === 1 ? "folha" : "folhas"} geradas
             </p>
           </div>
+          <Button onClick={importarFolhasParaDespesas} variant="outline" className="gap-2">
+            <Receipt className="w-4 h-4" />
+            Importar para Despesas
+          </Button>
         </div>
 
         <div className="overflow-x-auto">

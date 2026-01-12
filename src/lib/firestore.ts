@@ -564,6 +564,8 @@ export interface Despesa {
   dataPagamento?: string;
   status: "Pago" | "Pendente" | "Atrasado";
   observacoes?: string;
+  origem?: "manual" | "folha_pagamento";
+  origemId?: string; // ID da folha de pagamento se origem for folha_pagamento
   createdAt?: Date;
   updatedAt?: Date;
 }

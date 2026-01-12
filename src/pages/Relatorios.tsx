@@ -1021,6 +1021,67 @@ export default function Relatorios() {
         </Card>
       )}
 
+      {/* Tabela de Despesas de Folha de Pagamento */}
+      {despesasCompletas && despesasCompletas.filter(d => d.origem === "folha_pagamento").length > 0 && (
+        <Card>
+          <div className="p-6 border-b">
+            <div>
+              <h3 className="text-lg font-semibold">Despesas de Folha de Pagamento</h3>
+              <p className="text-sm text-muted-foreground">
+                {despesasCompletas.filter(d => d.origem === "folha_pagamento").length} folha(s) importada(s) como despesa
+              </p>
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Descrição</TableHead>
+                  <TableHead>Vencimento</TableHead>
+                  <TableHead>Pagamento</TableHead>
+                  <TableHead className="text-right">Valor</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Observações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {despesasCompletas
+                  .filter(d => d.origem === "folha_pagamento")
+                  .sort((a, b) => new Date(b.dataVencimento).getTime() - new Date(a.dataVencimento).getTime())
+                  .map((despesa) => (
+                    <TableRow key={despesa.id}>
+                      <TableCell className="font-medium">{despesa.descricao}</TableCell>
+                      <TableCell>
+                        {format(new Date(despesa.dataVencimento), "dd/MM/yyyy", { locale: ptBR })}
+                      </TableCell>
+                      <TableCell>
+                        {despesa.dataPagamento
+                          ? format(new Date(despesa.dataPagamento), "dd/MM/yyyy", { locale: ptBR })
+                          : "-"}
+                      </TableCell>
+                      <TableCell className="text-right font-semibold text-red-600">
+                        R$ {despesa.valor.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                      </TableCell>
+                      <TableCell>
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${
+                          despesa.status === "Pago" ? "bg-green-100 text-green-800" :
+                          despesa.status === "Pendente" ? "bg-yellow-100 text-yellow-800" :
+                          "bg-red-100 text-red-800"
+                        }`}>
+                          {despesa.status}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground max-w-xs truncate">
+                        {despesa.observacoes || "-"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+              </TableBody>
+            </Table>
+          </div>
+        </Card>
+      )}
+
       {/* Ações */}
       <div className="flex gap-3 justify-end">
         <Button 
