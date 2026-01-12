@@ -5,13 +5,11 @@ import { Upload, FileText, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import Tesseract from "tesseract.js";
 import * as pdfjsLib from "pdfjs-dist";
+import pdfjsWorker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { DadosExcel } from "./ImportarExcel";
 
-// Configurar worker do PDF.js usando import do node_modules
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.mjs',
-  import.meta.url
-).toString();
+// Configurar worker do PDF.js usando import direto do Vite
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
 interface ImportarPDFProps {
   onImport: (dados: DadosExcel[]) => void;
