@@ -11,20 +11,7 @@
       // Single Page Apps for GitHub Pages
       // MIT License
       // https://github.com/rafgraph/spa-github-pages
-      // Este script pega a URL atual e a converte para uma query string que será processada pelo index.html
-      (function(l) {
-        if (l.search[1] === '/' ) {
-          var decoded = l.search.slice(1).split('&').map(function(s) { 
-            return s.replace(/~and~/g, '&')
-          }).join('?');
-          window.history.replaceState(null, null,
-              l.pathname.slice(0, -1) + decoded + l.hash
-          );
-        }
-      }(window.location))
-    </script>
-    <script>
-      // Redireciona para o index.html preservando o caminho
+      // Mantém 1 segmento (/creditflow-manager/) e codifica o resto
       (function(){
         var pathSegmentsToKeep = 1;
         var l = window.location;
