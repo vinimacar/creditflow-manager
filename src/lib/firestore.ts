@@ -27,6 +27,8 @@ export interface Cliente {
   email: string;
   telefone: string;
   endereco: string;
+  numero?: string;
+  bairro?: string;
   cidade: string;
   estado: string;
   cep?: string;
@@ -242,6 +244,8 @@ export interface Funcionario {
   email: string;
   telefone: string;
   endereco: string;
+  numero?: string;
+  bairro?: string;
   cidade: string;
   uf: string;
   cep?: string;

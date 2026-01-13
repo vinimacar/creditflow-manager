@@ -24,6 +24,8 @@ const clienteSchema = z.object({
   email: z.string().email("Email inválido"),
   telefone: telefoneValidation,
   endereco: z.string().min(5, "Endereço é obrigatório"),
+  numero: z.string().optional(),
+  bairro: z.string().optional(),
   cidade: z.string().min(2, "Cidade é obrigatória"),
   estado: z.string().min(2, "Estado é obrigatório"),
   cep: cepValidation,
@@ -100,6 +102,7 @@ export function ClienteForm({ onSuccess, initialData }: ClienteFormProps) {
         const dados = await buscarCEP(valorMascarado);
         if (dados) {
           setValue("endereco", dados.logradouro);
+          setValue("bairro", dados.bairro);
           setValue("cidade", dados.localidade);
           setValue("estado", dados.uf);
           toast.success("CEP encontrado!");
@@ -186,10 +189,34 @@ export function ClienteForm({ onSuccess, initialData }: ClienteFormProps) {
           {errors.telefone && <p className="text-sm text-destructive mt-1">{errors.telefone.message}</p>}
         </div>
 
-        <div className="md:col-span-2">
-          <Label htmlFor="endereco">Endereço *</Label>
-          <Input id="endereco" {...register("endereco")} placeholder="Rua, número, bairro" />
+        <div>
+          <Label htmlFor="cep">CEP {buscandoCEP && "(Buscando...)"}</Label>
+          <Input 
+            id="cep" 
+            {...register("cep")} 
+            onChange={handleCEPChange}
+            placeholder="00000-000"
+            maxLength={9}
+          />
+          {errors.cep && <p className="text-sm text-destructive mt-1">{errors.cep.message}</p>}
+        </div>
+
+        <div>
+          <Label htmlFor="endereco">Endereço (Rua/Av) *</Label>
+          <Input id="endereco" {...register("endereco")} placeholder="Nome da rua ou avenida" />
           {errors.endereco && <p className="text-sm text-destructive mt-1">{errors.endereco.message}</p>}
+        </div>
+
+        <div>
+          <Label htmlFor="numero">Número</Label>
+          <Input id="numero" {...register("numero")} placeholder="Nº" />
+          {errors.numero && <p className="text-sm text-destructive mt-1">{errors.numero.message}</p>}
+        </div>
+
+        <div>
+          <Label htmlFor="bairro">Bairro</Label>
+          <Input id="bairro" {...register("bairro")} placeholder="Digite o bairro" />
+          {errors.bairro && <p className="text-sm text-destructive mt-1">{errors.bairro.message}</p>}
         </div>
 
         <div>
@@ -213,20 +240,8 @@ export function ClienteForm({ onSuccess, initialData }: ClienteFormProps) {
           {errors.estado && <p className="text-sm text-destructive mt-1">{errors.estado.message}</p>}
         </div>
 
-        <div>
-          <Label htmlFor="cep">CEP {buscandoCEP && "(Buscando...)"}</Label>
-          <Input 
-            id="cep" 
-            {...register("cep")} 
-            onChange={handleCEPChange}
-            placeholder="00000-000"
-            maxLength={9}
-            disabled={buscandoCEP}
-          />
-          {errors.cep && <p className="text-sm text-destructive mt-1">{errors.cep.message}</p>}
-        </div>
-
-        <div>
+        <div className="md:col-span-2">
+          <Label htmlFor="senhaINSS">Senha do INSS (opcional)</Label>
           <div className="relative">
             <Input 
               id="senhaINSS" 

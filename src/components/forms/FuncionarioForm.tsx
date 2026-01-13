@@ -31,6 +31,8 @@ const funcionarioSchema = z.object({
   }),
   salarioBruto: z.string().min(1, "Salário bruto é obrigatório"),
   endereco: z.string().min(5, "Endereço é obrigatório"),
+  numero: z.string().optional(),
+  bairro: z.string().optional(),
   cidade: z.string().min(2, "Cidade é obrigatória"),
   uf: z.string().min(2, "UF é obrigatória"),
   cep: cepValidation,
@@ -97,6 +99,7 @@ export function FuncionarioForm({ onSuccess, initialData }: FuncionarioFormProps
         const dados = await buscarCEP(valorMascarado);
         if (dados) {
           setValue("endereco", dados.logradouro);
+          setValue("bairro", dados.bairro);
           setValue("cidade", dados.localidade);
           setValue("uf", dados.uf);
           toast.success("CEP encontrado!");
@@ -266,10 +269,34 @@ export function FuncionarioForm({ onSuccess, initialData }: FuncionarioFormProps
           </div>
         )}
 
-        <div className="md:col-span-2">
-          <Label htmlFor="endereco">Endereço *</Label>
-          <Input id="endereco" {...register("endereco")} placeholder="Rua, número, bairro" />
+        <div>
+          <Label htmlFor="cep">CEP {buscandoCEP && "(Buscando...)"}</Label>
+          <Input 
+            id="cep" 
+            {...register("cep")} 
+            onChange={handleCEPChange}
+            placeholder="00000-000"
+            maxLength={9}
+          />
+          {errors.cep && <p className="text-sm text-destructive mt-1">{errors.cep.message}</p>}
+        </div>
+
+        <div>
+          <Label htmlFor="endereco">Endereço (Rua/Av) *</Label>
+          <Input id="endereco" {...register("endereco")} placeholder="Nome da rua ou avenida" />
           {errors.endereco && <p className="text-sm text-destructive mt-1">{errors.endereco.message}</p>}
+        </div>
+
+        <div>
+          <Label htmlFor="numero">Número</Label>
+          <Input id="numero" {...register("numero")} placeholder="Nº" />
+          {errors.numero && <p className="text-sm text-destructive mt-1">{errors.numero.message}</p>}
+        </div>
+
+        <div>
+          <Label htmlFor="bairro">Bairro</Label>
+          <Input id="bairro" {...register("bairro")} placeholder="Digite o bairro" />
+          {errors.bairro && <p className="text-sm text-destructive mt-1">{errors.bairro.message}</p>}
         </div>
 
         <div>
@@ -278,30 +305,23 @@ export function FuncionarioForm({ onSuccess, initialData }: FuncionarioFormProps
           {errors.cidade && <p className="text-sm text-destructive mt-1">{errors.cidade.message}</p>}
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <Label htmlFor="uf">UF *</Label>
-            <Select onValueChange={(value) => setValue("uf", value)}>
-              <SelectTrigger>
-                <SelectValue placeholder="UF" />
-              </SelectTrigger>
-              <SelectContent>
-                {estados.map((uf) => (
-                  <SelectItem key={uf} value={uf}>{uf}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {errors.uf && <p className="text-sm text-destructive mt-1">{errors.uf.message}</p>}
-          </div>
+        <div>
+          <Label htmlFor="uf">UF *</Label>
+          <Select onValueChange={(value) => setValue("uf", value)}>
+            <SelectTrigger>
+              <SelectValue placeholder="UF" />
+            </SelectTrigger>
+            <SelectContent>
+              {estados.map((uf) => (
+                <SelectItem key={uf} value={uf}>{uf}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {errors.uf && <p className="text-sm text-destructive mt-1">{errors.uf.message}</p>}
+        </div>
 
-          <div>
-            <Label htmlFor="cep">CEP {buscandoCEP && "(Buscando...)"}</Label>
-            <Input 
-              id="cep" 
-              {...register("cep")} 
-              onChange={handleCEPChange}
-              placeholder="00000-000"
-              maxLength={9}
+        <div>
+          <Label htmlFor="dataNascimento">Data de Nascimento *</Label>
               disabled={buscandoCEP}
             />
             {errors.cep && <p className="text-sm text-destructive mt-1">{errors.cep.message}</p>}
