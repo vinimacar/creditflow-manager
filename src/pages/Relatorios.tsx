@@ -163,13 +163,20 @@ export default function Relatorios() {
       vendas.forEach((venda) => {
         const produto = produtos.find(p => p.id === venda.produtoId);
         
-        // Comissão do agente
-        const comissaoPercentual = produto?.comissao || 0;
-        const comissaoCalculada = venda.comissao || (venda.valorContrato * comissaoPercentual / 100);
+        // Comissão do agente - importar da venda (priority 1) ou calcular do produto
+        let comissaoCalculada = venda.comissaoAgente || venda.comissao || 0;
+        if (!comissaoCalculada && produto) {
+          const comissaoPercentual = venda.comissaoAgentePercentual || venda.comissaoPercentual || produto?.comissaoAgente || produto?.comissao || 0;
+          comissaoCalculada = venda.valorContrato * (comissaoPercentual / 100);
+        }
         
-        // Comissão do fornecedor (receita bruta da empresa)
-        const comissaoFornecedorPercentual = venda.comissaoFornecedorPercentual || produto?.comissaoFornecedor || 0;
-        const comissaoFornecedorCalculada = venda.comissaoFornecedor || (venda.valorContrato * comissaoFornecedorPercentual / 100);
+        // Comissão do fornecedor - sempre importar da venda (dados reais salvos)
+        let comissaoFornecedorCalculada = venda.comissaoFornecedor || 0;
+        if (!comissaoFornecedorCalculada && venda.comissaoFornecedorPercentual) {
+          comissaoFornecedorCalculada = venda.valorContrato * (venda.comissaoFornecedorPercentual / 100);
+        } else if (!comissaoFornecedorCalculada && produto?.comissaoFornecedor) {
+          comissaoFornecedorCalculada = venda.valorContrato * (produto.comissaoFornecedor / 100);
+        }
         
         const current = vendaPorFunc.get(venda.funcionarioId) || { vendas: 0, comissao: 0, comissaoFornecedor: 0 };
         vendaPorFunc.set(venda.funcionarioId, {
@@ -443,13 +450,20 @@ export default function Relatorios() {
     vendasFiltradas.forEach((venda) => {
       const produto = produtosCompletos.find(p => p.id === venda.produtoId);
       
-      // Comissão do agente
-      const comissaoPercentual = produto?.comissao || 0;
-      const comissaoCalculada = venda.comissao || (venda.valorContrato * comissaoPercentual / 100);
+      // Comissão do agente - importar da venda (priority 1) ou calcular do produto
+      let comissaoCalculada = venda.comissaoAgente || venda.comissao || 0;
+      if (!comissaoCalculada && produto) {
+        const comissaoPercentual = venda.comissaoAgentePercentual || venda.comissaoPercentual || produto?.comissaoAgente || produto?.comissao || 0;
+        comissaoCalculada = venda.valorContrato * (comissaoPercentual / 100);
+      }
       
-      // Comissão do fornecedor (receita bruta da empresa)
-      const comissaoFornecedorPercentual = venda.comissaoFornecedorPercentual || produto?.comissaoFornecedor || 0;
-      const comissaoFornecedorCalculada = venda.comissaoFornecedor || (venda.valorContrato * comissaoFornecedorPercentual / 100);
+      // Comissão do fornecedor - sempre importar da venda (dados reais salvos)
+      let comissaoFornecedorCalculada = venda.comissaoFornecedor || 0;
+      if (!comissaoFornecedorCalculada && venda.comissaoFornecedorPercentual) {
+        comissaoFornecedorCalculada = venda.valorContrato * (venda.comissaoFornecedorPercentual / 100);
+      } else if (!comissaoFornecedorCalculada && produto?.comissaoFornecedor) {
+        comissaoFornecedorCalculada = venda.valorContrato * (produto.comissaoFornecedor / 100);
+      }
       
       const current = vendaPorFunc.get(venda.funcionarioId) || { vendas: 0, comissao: 0, comissaoFornecedor: 0 };
       vendaPorFunc.set(venda.funcionarioId, {
