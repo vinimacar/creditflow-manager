@@ -322,10 +322,8 @@ export function FuncionarioForm({ onSuccess, initialData }: FuncionarioFormProps
 
         <div>
           <Label htmlFor="dataNascimento">Data de Nascimento *</Label>
-              disabled={buscandoCEP}
-            />
-            {errors.cep && <p className="text-sm text-destructive mt-1">{errors.cep.message}</p>}
-          </div>
+          <Input id="dataNascimento" type="date" {...register("dataNascimento")} />
+          {errors.dataNascimento && <p className="text-sm text-destructive mt-1">{errors.dataNascimento.message}</p>}
         </div>
 
         <div>
