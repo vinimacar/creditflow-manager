@@ -22,6 +22,11 @@ import FolhaPagamento from "./pages/FolhaPagamento";
 import Despesas from "./pages/Despesas";
 import AguardandoAprovacao from "./pages/AguardandoAprovacao";
 import NotFound from "./pages/NotFound";
+import FluxoCaixa from "./pages/FluxoCaixa";
+import ComissoesReceber from "./pages/ComissoesReceber";
+import ComissoesPagar from "./pages/ComissoesPagar";
+import MetasPerformance from "./pages/MetasPerformance";
+import Auditoria from "./pages/Auditoria";
 
 const queryClient = new QueryClient();
 
@@ -156,6 +161,56 @@ function AppRoutes() {
         element={
           <AppLayout>
             <Configuracoes />
+          </AppLayout>
+        }
+      />
+      <Route
+        path="/fluxo-caixa"
+        element={
+          <AppLayout>
+            <ProtectedRoute allowedRoles={["admin", "gerente"]}>
+              <FluxoCaixa />
+            </ProtectedRoute>
+          </AppLayout>
+        }
+      />
+      <Route
+        path="/comissoes-receber"
+        element={
+          <AppLayout>
+            <ProtectedRoute allowedRoles={["admin", "gerente"]}>
+              <ComissoesReceber />
+            </ProtectedRoute>
+          </AppLayout>
+        }
+      />
+      <Route
+        path="/comissoes-pagar"
+        element={
+          <AppLayout>
+            <ProtectedRoute allowedRoles={["admin", "gerente"]}>
+              <ComissoesPagar />
+            </ProtectedRoute>
+          </AppLayout>
+        }
+      />
+      <Route
+        path="/metas"
+        element={
+          <AppLayout>
+            <ProtectedRoute allowedRoles={["admin", "gerente"]}>
+              <MetasPerformance />
+            </ProtectedRoute>
+          </AppLayout>
+        }
+      />
+      <Route
+        path="/auditoria"
+        element={
+          <AppLayout>
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <Auditoria />
+            </ProtectedRoute>
           </AppLayout>
         }
       />

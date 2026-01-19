@@ -2,64 +2,44 @@ import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { CalendarIcon, CheckCircle, Clock, AlertTriangle, X } from "lucide-react";
+import { CalendarIcon, CheckCircle, Clock, AlertTriangle, DollarSign } from "lucide-react";
 import { toast } from "sonner";
-import { getVendas, getFornecedores, getProdutos, getFuncionarios, getClientes } from "@/lib/firestore";
+import { getVendas, getProdutos, getFuncionarios, getClientes } from "@/lib/firestore";
 import { collection, addDoc, updateDoc, doc, getDocs, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { ComissaoReceber } from "@/types/financeiro";
+import { ComissaoPagar } from "@/types/financeiro";
 import { calcularComissoes } from "@/lib/calculos-comissoes";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/contexts/AuthContext";
-import { Textarea } from "@/components/ui/textarea";
 
-export default function ComissoesReceber() {
-  const { hasPermission, user } = useAuth();
+export default function ComissoesPagar() {
+  const { hasPermission } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [comissoes, setComissoes] = useState<(ComissaoReceber & { fornecedorNome: string; vendedorNome: string; clienteNome: string; produtoNome: string })[]>([]);
+  const [comissoes, setComissoes] = useState<(ComissaoPagar & { funcionarioNome: string; clienteNome: string; produtoNome: string })[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [comissaoSelecionada, setComissaoSelecionada] = useState<(ComissaoReceber & { fornecedorNome: string; vendedorNome: string; clienteNome: string; produtoNome: string }) | null>(null);
+  const [comissaoSelecionada, setComissaoSelecionada] = useState<any>(null);
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
+  const [selecionadas, setSelecionadas] = useState<Set<string>>(new Set());
 
   const [formData, setFormData] = useState({
-    dataRecebimento: new Date(),
+    dataPagamento: new Date(),
     formaPagamento: "",
     comprovante: "",
     observacoes: "",
+    integradoFolha: false,
   });
 
   useEffect(() => {
@@ -70,35 +50,31 @@ export default function ComissoesReceber() {
     try {
       setLoading(true);
 
-      const [vendas, fornecedores, produtos, funcionarios, clientes, comissoesSnapshot] = await Promise.all([
+      const [vendas, produtos, funcionarios, clientes, comissoesSnapshot] = await Promise.all([
         getVendas(),
-        getFornecedores(),
         getProdutos(),
         getFuncionarios(),
         getClientes(),
-        getDocs(collection(db, "comissoesReceber")),
+        getDocs(collection(db, "comissoesPagar")),
       ]);
 
-      // Mapear comissões existentes
       const comissoesExistentes = new Map(
         comissoesSnapshot.docs.map(doc => [
           doc.data().vendaId,
-          { id: doc.id, ...doc.data(), dataVenda: doc.data().dataVenda?.toDate(), dataVencimento: doc.data().dataVencimento?.toDate(), dataRecebimento: doc.data().dataRecebimento?.toDate(), criadoEm: doc.data().criadoEm?.toDate(), atualizadoEm: doc.data().atualizadoEm?.toDate() } as ComissaoReceber
+          { id: doc.id, ...doc.data(), dataVenda: doc.data().dataVenda?.toDate(), dataVencimento: doc.data().dataVencimento?.toDate(), dataPagamento: doc.data().dataPagamento?.toDate(), criadoEm: doc.data().criadoEm?.toDate(), atualizadoEm: doc.data().atualizadoEm?.toDate() } as ComissaoPagar
         ])
       );
 
-      // Para cada venda aprovada, criar/atualizar comissão a receber
-      const comissoesCompletas: (ComissaoReceber & { fornecedorNome: string; vendedorNome: string; clienteNome: string; produtoNome: string })[] = [];
+      const comissoesCompletas: any[] = [];
 
       for (const venda of vendas) {
         if (venda.status !== "aprovada") continue;
 
         const produto = produtos.find(p => p.id === venda.produtoId);
-        const fornecedor = fornecedores.find(f => f.id === produto?.fornecedorId);
         const funcionario = funcionarios.find(f => f.id === venda.funcionarioId);
         const cliente = clientes.find(c => c.id === venda.clienteId);
 
-        if (!produto || !fornecedor) continue;
+        if (!produto || !funcionario) continue;
 
         const comissoes = calcularComissoes(venda, produto);
         const dataVenda = venda.createdAt?.toDate?.() || new Date(venda.createdAt);
@@ -106,22 +82,21 @@ export default function ComissoesReceber() {
         let comissao = comissoesExistentes.get(venda.id!);
 
         if (!comissao) {
-          // Criar nova comissão a receber
-          const novaComissao: ComissaoReceber = {
+          const novaComissao: ComissaoPagar = {
             vendaId: venda.id!,
-            fornecedorId: fornecedor.id!,
             funcionarioId: venda.funcionarioId,
             produtoId: produto.id!,
-            valorComissao: comissoes.comissaoFornecedor,
-            percentualComissao: comissoes.comissaoFornecedorPercentual,
+            valorComissao: comissoes.comissaoAgente,
+            percentualComissao: comissoes.comissaoAgentePercentual,
             dataVenda,
-            dataVencimento: new Date(dataVenda.getTime() + 30 * 24 * 60 * 60 * 1000), // 30 dias após venda
+            dataVencimento: new Date(dataVenda.getTime() + 15 * 24 * 60 * 60 * 1000), // 15 dias
             status: 'pendente',
+            integradoFolha: false,
             criadoEm: new Date(),
             atualizadoEm: new Date(),
           };
 
-          const docRef = await addDoc(collection(db, "comissoesReceber"), {
+          const docRef = await addDoc(collection(db, "comissoesPagar"), {
             ...novaComissao,
             dataVenda: Timestamp.fromDate(novaComissao.dataVenda),
             dataVencimento: Timestamp.fromDate(novaComissao.dataVencimento),
@@ -132,10 +107,9 @@ export default function ComissoesReceber() {
           comissao = { ...novaComissao, id: docRef.id };
         }
 
-        // Atualizar status baseado em datas
         let status = comissao.status;
-        if (comissao.dataRecebimento) {
-          status = 'recebido';
+        if (comissao.dataPagamento) {
+          status = 'pago';
         } else if (new Date() > comissao.dataVencimento) {
           status = 'atrasado';
         }
@@ -143,73 +117,112 @@ export default function ComissoesReceber() {
         comissoesCompletas.push({
           ...comissao,
           status,
-          fornecedorNome: fornecedor.nomeFantasia || fornecedor.razaoSocial,
-          vendedorNome: funcionario?.nome || "N/A",
+          funcionarioNome: funcionario.nome,
           clienteNome: cliente?.nome || "N/A",
           produtoNome: produto.nome,
         });
       }
 
       setComissoes(comissoesCompletas);
-
     } catch (error) {
-      console.error("Erro ao carregar comissões a receber:", error);
+      console.error("Erro ao carregar comissões a pagar:", error);
       toast.error("Erro ao carregar comissões");
     } finally {
       setLoading(false);
     }
   };
 
-  const registrarRecebimento = async () => {
+  const registrarPagamento = async () => {
     if (!comissaoSelecionada || !formData.formaPagamento) {
       toast.error("Preencha todos os campos obrigatórios");
       return;
     }
 
     try {
-      await updateDoc(doc(db, "comissoesReceber", comissaoSelecionada.id!), {
-        dataRecebimento: Timestamp.fromDate(formData.dataRecebimento),
+      await updateDoc(doc(db, "comissoesPagar", comissaoSelecionada.id!), {
+        dataPagamento: Timestamp.fromDate(formData.dataPagamento),
         formaPagamento: formData.formaPagamento,
         comprovante: formData.comprovante || "",
         observacoes: formData.observacoes || "",
-        status: 'recebido',
+        integradoFolha: formData.integradoFolha,
+        status: 'pago',
         atualizadoEm: Timestamp.fromDate(new Date()),
       });
 
-      toast.success("Recebimento registrado com sucesso!");
+      toast.success("Pagamento registrado com sucesso!");
       setDialogOpen(false);
       setComissaoSelecionada(null);
-      setFormData({
-        dataRecebimento: new Date(),
-        formaPagamento: "",
-        comprovante: "",
-        observacoes: "",
-      });
+      resetForm();
       await carregarComissoes();
-
     } catch (error) {
-      console.error("Erro ao registrar recebimento:", error);
-      toast.error("Erro ao registrar recebimento");
+      console.error("Erro ao registrar pagamento:", error);
+      toast.error("Erro ao registrar pagamento");
     }
   };
 
-  const abrirDialogRecebimento = (comissao: ComissaoReceber & { fornecedorNome: string; vendedorNome: string; clienteNome: string; produtoNome: string }) => {
+  const pagarEmLote = async () => {
+    if (selecionadas.size === 0) {
+      toast.error("Selecione pelo menos uma comissão");
+      return;
+    }
+
+    try {
+      for (const id of selecionadas) {
+        await updateDoc(doc(db, "comissoesPagar", id), {
+          dataPagamento: Timestamp.fromDate(new Date()),
+          formaPagamento: 'folha',
+          integradoFolha: true,
+          status: 'pago',
+          atualizadoEm: Timestamp.fromDate(new Date()),
+        });
+      }
+
+      toast.success(`${selecionadas.size} comissões marcadas como pagas via folha!`);
+      setSelecionadas(new Set());
+      await carregarComissoes();
+    } catch (error) {
+      console.error("Erro ao pagar em lote:", error);
+      toast.error("Erro ao processar pagamentos");
+    }
+  };
+
+  const resetForm = () => {
+    setFormData({
+      dataPagamento: new Date(),
+      formaPagamento: "",
+      comprovante: "",
+      observacoes: "",
+      integradoFolha: false,
+    });
+  };
+
+  const abrirDialogPagamento = (comissao: any) => {
     setComissaoSelecionada(comissao);
     setFormData({
-      dataRecebimento: comissao.dataRecebimento || new Date(),
+      dataPagamento: comissao.dataPagamento || new Date(),
       formaPagamento: comissao.formaPagamento || "",
       comprovante: comissao.comprovante || "",
       observacoes: comissao.observacoes || "",
+      integradoFolha: comissao.integradoFolha || false,
     });
     setDialogOpen(true);
+  };
+
+  const toggleSelecao = (id: string) => {
+    const novas = new Set(selecionadas);
+    if (novas.has(id)) {
+      novas.delete(id);
+    } else {
+      novas.add(id);
+    }
+    setSelecionadas(novas);
   };
 
   const getStatusBadge = (status: string) => {
     const badges = {
       pendente: { variant: "secondary" as const, icon: Clock, label: "Pendente" },
-      recebido: { variant: "default" as const, icon: CheckCircle, label: "Recebido" },
+      pago: { variant: "default" as const, icon: CheckCircle, label: "Pago" },
       atrasado: { variant: "destructive" as const, icon: AlertTriangle, label: "Atrasado" },
-      cancelado: { variant: "outline" as const, icon: X, label: "Cancelado" },
     };
     const config = badges[status as keyof typeof badges] || badges.pendente;
     const Icon = config.icon;
@@ -224,11 +237,9 @@ export default function ComissoesReceber() {
   if (!hasPermission(["admin", "gerente"])) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Comissões a Receber" description="Acesso restrito" />
+        <PageHeader title="Comissões a Pagar" description="Acesso restrito" />
         <Card className="p-6">
-          <p className="text-muted-foreground">
-            Você não tem permissão para acessar esta página.
-          </p>
+          <p className="text-muted-foreground">Você não tem permissão para acessar esta página.</p>
         </Card>
       </div>
     );
@@ -237,29 +248,26 @@ export default function ComissoesReceber() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Comissões a Receber" description="Carregando..." />
+        <PageHeader title="Comissões a Pagar" description="Carregando..." />
         <Skeleton className="h-96 w-full" />
       </div>
     );
   }
 
-  const comissoesFiltradas = filtroStatus === "todos"
-    ? comissoes
-    : comissoes.filter(c => c.status === filtroStatus);
-
+  const comissoesFiltradas = filtroStatus === "todos" ? comissoes : comissoes.filter(c => c.status === filtroStatus);
   const totalPendente = comissoes.filter(c => c.status === 'pendente').reduce((sum, c) => sum + c.valorComissao, 0);
-  const totalRecebido = comissoes.filter(c => c.status === 'recebido').reduce((sum, c) => sum + c.valorComissao, 0);
+  const totalPago = comissoes.filter(c => c.status === 'pago').reduce((sum, c) => sum + c.valorComissao, 0);
   const totalAtrasado = comissoes.filter(c => c.status === 'atrasado').reduce((sum, c) => sum + c.valorComissao, 0);
+  const totalSelecionadas = Array.from(selecionadas).reduce((sum, id) => {
+    const c = comissoes.find(com => com.id === id);
+    return sum + (c?.valorComissao || 0);
+  }, 0);
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Comissões a Receber"
-        description="Controle de comissões pagas pelos fornecedores"
-      />
+      <PageHeader title="Comissões a Pagar" description="Controle de comissões pagas aos vendedores" />
 
-      {/* Cards Resumo */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card className="p-6 bg-yellow-50 dark:bg-yellow-950">
           <div className="flex items-center justify-between">
             <div>
@@ -267,9 +275,7 @@ export default function ComissoesReceber() {
               <h3 className="text-2xl font-bold mt-2 text-yellow-700">
                 R$ {totalPendente.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
               </h3>
-              <p className="text-xs text-yellow-700 mt-1">
-                {comissoes.filter(c => c.status === 'pendente').length} comissões
-              </p>
+              <p className="text-xs text-yellow-700 mt-1">{comissoes.filter(c => c.status === 'pendente').length} comissões</p>
             </div>
             <Clock className="w-8 h-8 text-yellow-600" />
           </div>
@@ -278,13 +284,11 @@ export default function ComissoesReceber() {
         <Card className="p-6 bg-green-50 dark:bg-green-950">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-green-900 dark:text-green-100">Recebido</p>
+              <p className="text-sm font-medium text-green-900 dark:text-green-100">Pago</p>
               <h3 className="text-2xl font-bold mt-2 text-green-700">
-                R$ {totalRecebido.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                R$ {totalPago.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
               </h3>
-              <p className="text-xs text-green-700 mt-1">
-                {comissoes.filter(c => c.status === 'recebido').length} comissões
-              </p>
+              <p className="text-xs text-green-700 mt-1">{comissoes.filter(c => c.status === 'pago').length} comissões</p>
             </div>
             <CheckCircle className="w-8 h-8 text-green-600" />
           </div>
@@ -297,43 +301,70 @@ export default function ComissoesReceber() {
               <h3 className="text-2xl font-bold mt-2 text-red-700">
                 R$ {totalAtrasado.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
               </h3>
-              <p className="text-xs text-red-700 mt-1">
-                {comissoes.filter(c => c.status === 'atrasado').length} comissões
-              </p>
+              <p className="text-xs text-red-700 mt-1">{comissoes.filter(c => c.status === 'atrasado').length} comissões</p>
             </div>
             <AlertTriangle className="w-8 h-8 text-red-600" />
           </div>
         </Card>
+
+        <Card className="p-6 bg-blue-50 dark:bg-blue-950">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-blue-900 dark:text-blue-100">Selecionadas</p>
+              <h3 className="text-2xl font-bold mt-2 text-blue-700">
+                R$ {totalSelecionadas.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+              </h3>
+              <p className="text-xs text-blue-700 mt-1">{selecionadas.size} selecionadas</p>
+            </div>
+            <DollarSign className="w-8 h-8 text-blue-600" />
+          </div>
+        </Card>
       </div>
 
-      {/* Filtros */}
       <Card className="p-4">
-        <div className="flex items-center gap-4">
-          <Label>Filtrar por Status:</Label>
-          <Select value={filtroStatus} onValueChange={setFiltroStatus}>
-            <SelectTrigger className="w-48">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos</SelectItem>
-              <SelectItem value="pendente">Pendente</SelectItem>
-              <SelectItem value="recebido">Recebido</SelectItem>
-              <SelectItem value="atrasado">Atrasado</SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Label>Filtrar:</Label>
+            <Select value={filtroStatus} onValueChange={setFiltroStatus}>
+              <SelectTrigger className="w-48">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos</SelectItem>
+                <SelectItem value="pendente">Pendente</SelectItem>
+                <SelectItem value="pago">Pago</SelectItem>
+                <SelectItem value="atrasado">Atrasado</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {selecionadas.size > 0 && (
+            <Button onClick={pagarEmLote}>
+              Pagar {selecionadas.size} Selecionadas via Folha
+            </Button>
+          )}
         </div>
       </Card>
 
-      {/* Tabela */}
       <Card>
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-12">
+                <Checkbox
+                  checked={selecionadas.size === comissoesFiltradas.filter(c => c.status === 'pendente').length && comissoesFiltradas.filter(c => c.status === 'pendente').length > 0}
+                  onCheckedChange={(checked) => {
+                    if (checked) {
+                      setSelecionadas(new Set(comissoesFiltradas.filter(c => c.status === 'pendente').map(c => c.id!)));
+                    } else {
+                      setSelecionadas(new Set());
+                    }
+                  }}
+                />
+              </TableHead>
               <TableHead>Data Venda</TableHead>
+              <TableHead>Funcionário</TableHead>
               <TableHead>Cliente</TableHead>
-              <TableHead>Fornecedor</TableHead>
               <TableHead>Produto</TableHead>
-              <TableHead>Vendedor</TableHead>
               <TableHead className="text-right">Valor</TableHead>
               <TableHead>Vencimento</TableHead>
               <TableHead>Status</TableHead>
@@ -343,28 +374,32 @@ export default function ComissoesReceber() {
           <TableBody>
             {comissoesFiltradas.map((comissao) => (
               <TableRow key={comissao.id}>
+                <TableCell>
+                  {comissao.status === 'pendente' && (
+                    <Checkbox
+                      checked={selecionadas.has(comissao.id!)}
+                      onCheckedChange={() => toggleSelecao(comissao.id!)}
+                    />
+                  )}
+                </TableCell>
                 <TableCell>{format(comissao.dataVenda, "dd/MM/yyyy")}</TableCell>
+                <TableCell>{comissao.funcionarioNome}</TableCell>
                 <TableCell>{comissao.clienteNome}</TableCell>
-                <TableCell>{comissao.fornecedorNome}</TableCell>
                 <TableCell>{comissao.produtoNome}</TableCell>
-                <TableCell>{comissao.vendedorNome}</TableCell>
                 <TableCell className="text-right font-semibold">
                   R$ {comissao.valorComissao.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                 </TableCell>
                 <TableCell>{format(comissao.dataVencimento, "dd/MM/yyyy")}</TableCell>
                 <TableCell>{getStatusBadge(comissao.status)}</TableCell>
                 <TableCell>
-                  {comissao.status !== 'recebido' && (
-                    <Button
-                      size="sm"
-                      onClick={() => abrirDialogRecebimento(comissao)}
-                    >
-                      Registrar Recebimento
+                  {comissao.status !== 'pago' && (
+                    <Button size="sm" onClick={() => abrirDialogPagamento(comissao)}>
+                      Registrar Pagamento
                     </Button>
                   )}
-                  {comissao.status === 'recebido' && comissao.dataRecebimento && (
+                  {comissao.status === 'pago' && comissao.dataPagamento && (
                     <span className="text-xs text-muted-foreground">
-                      Recebido em {format(comissao.dataRecebimento, "dd/MM/yyyy")}
+                      Pago em {format(comissao.dataPagamento, "dd/MM/yyyy")}
                     </span>
                   )}
                 </TableCell>
@@ -381,32 +416,31 @@ export default function ComissoesReceber() {
         </Table>
       </Card>
 
-      {/* Dialog Registrar Recebimento */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Registrar Recebimento de Comissão</DialogTitle>
+            <DialogTitle>Registrar Pagamento de Comissão</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4">
             {comissaoSelecionada && (
               <div className="p-3 bg-muted rounded">
-                <p className="text-sm"><strong>Fornecedor:</strong> {comissaoSelecionada.fornecedorNome}</p>
+                <p className="text-sm"><strong>Funcionário:</strong> {comissaoSelecionada.funcionarioNome}</p>
                 <p className="text-sm"><strong>Valor:</strong> R$ {comissaoSelecionada.valorComissao.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p>
               </div>
             )}
 
             <div className="space-y-2">
-              <Label>Data de Recebimento *</Label>
+              <Label>Data de Pagamento *</Label>
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !formData.dataRecebimento && "text-muted-foreground")}>
+                  <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !formData.dataPagamento && "text-muted-foreground")}>
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {formData.dataRecebimento ? format(formData.dataRecebimento, "dd/MM/yyyy", { locale: ptBR }) : "Selecione a data"}
+                    {formData.dataPagamento ? format(formData.dataPagamento, "dd/MM/yyyy", { locale: ptBR }) : "Selecione a data"}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0">
-                  <Calendar mode="single" selected={formData.dataRecebimento} onSelect={(date) => date && setFormData(prev => ({ ...prev, dataRecebimento: date }))} locale={ptBR} />
+                  <Calendar mode="single" selected={formData.dataPagamento} onSelect={(date) => date && setFormData(prev => ({ ...prev, dataPagamento: date }))} locale={ptBR} />
                 </PopoverContent>
               </Popover>
             </div>
@@ -418,17 +452,28 @@ export default function ComissoesReceber() {
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="folha">Folha de Pagamento</SelectItem>
                   <SelectItem value="pix">PIX</SelectItem>
                   <SelectItem value="transferencia">Transferência</SelectItem>
-                  <SelectItem value="boleto">Boleto</SelectItem>
                   <SelectItem value="dinheiro">Dinheiro</SelectItem>
                   <SelectItem value="outros">Outros</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="integrado"
+                checked={formData.integradoFolha}
+                onCheckedChange={(checked) => setFormData(prev => ({ ...prev, integradoFolha: checked as boolean }))}
+              />
+              <label htmlFor="integrado" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                Integrado à folha de pagamento
+              </label>
+            </div>
+
             <div className="space-y-2">
-              <Label>Comprovante (URL ou código)</Label>
+              <Label>Comprovante</Label>
               <Input value={formData.comprovante} onChange={(e) => setFormData(prev => ({ ...prev, comprovante: e.target.value }))} placeholder="Link ou código do comprovante" />
             </div>
 
@@ -439,12 +484,8 @@ export default function ComissoesReceber() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={registrarRecebimento}>
-              Confirmar Recebimento
-            </Button>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={registrarPagamento}>Confirmar Pagamento</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -17,6 +17,12 @@ import {
   Shield,
   DollarSign,
   Receipt,
+  TrendingUp,
+  ArrowDownCircle,
+  ArrowUpCircle,
+  Target,
+  UserCheck,
+  FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -31,13 +37,18 @@ const menuItems = [
   { icon: UserCog, label: "Funcionários", path: "/funcionarios", roles: ["admin", "gerente", "agente", "atendente"] },
   { icon: DollarSign, label: "Folha de Pagamento", path: "/folha-pagamento", roles: ["admin", "gerente"] },
   { icon: Receipt, label: "Despesas", path: "/despesas", roles: ["admin", "gerente"] },
+  { icon: TrendingUp, label: "Fluxo de Caixa", path: "/fluxo-caixa", roles: ["admin", "gerente"] },
+  { icon: ArrowDownCircle, label: "Comissões a Receber", path: "/comissoes-receber", roles: ["admin", "gerente"] },
+  { icon: ArrowUpCircle, label: "Comissões a Pagar", path: "/comissoes-pagar", roles: ["admin", "gerente"] },
+  { icon: Target, label: "Metas", path: "/metas", roles: ["admin", "gerente"] },
   { icon: ShoppingCart, label: "PDV", path: "/pdv", roles: ["admin", "gerente", "agente", "atendente"] },
   { icon: FileBarChart, label: "Relatórios", path: "/relatorios", roles: ["admin", "gerente"] },
   { icon: Scale, label: "Conciliação", path: "/conciliacao", roles: ["admin", "gerente"] },
 ];
 
 const bottomMenuItems = [
-  { icon: Shield, label: "Usuários", path: "/usuarios", roles: ["admin"] },
+  { icon: FileText, label: "Auditoria", path: "/auditoria", roles: ["admin"] },
+  { icon: UserCheck, label: "Usuários", path: "/usuarios", roles: ["admin"] },
   { icon: Settings, label: "Configurações", path: "/configuracoes", roles: ["admin", "gerente", "agente", "atendente"] },
 ];
 

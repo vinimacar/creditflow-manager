@@ -121,8 +121,8 @@ export interface AuditLog {
   usuario: string;
   usuarioId: string;
   campo?: string;
-  valorAnterior?: any;
-  valorNovo?: any;
+  valorAnterior?: unknown;
+  valorNovo?: unknown;
   ip?: string;
   userAgent?: string;
   timestamp: Date;
