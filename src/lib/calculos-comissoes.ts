@@ -5,20 +5,30 @@ import type { Venda, Produto } from "./firestore";
  * 
  * Este arquivo centraliza toda a lógica de cálculo de comissões para garantir
  * consistência entre Dashboard, Relatórios e Conciliação.
+ * 
+ * NOMENCLATURA:
+ * - comissaoAgente = Comissão do Funcionário (paga pela empresa ao vendedor)
+ * - comissaoFornecedor = Comissão da Empresa (recebida do fornecedor)
  */
 
 export interface ComissoesCalculadas {
-  comissaoAgente: number;
-  comissaoAgentePercentual: number;
-  comissaoFornecedor: number;
-  comissaoFornecedorPercentual: number;
+  comissaoAgente: number;              // Valor pago ao funcionário/vendedor
+  comissaoAgentePercentual: number;    // % pago ao funcionário/vendedor
+  comissaoFornecedor: number;          // Valor recebido pela empresa do fornecedor
+  comissaoFornecedorPercentual: number; // % recebido pela empresa do fornecedor
 }
 
 /**
- * Calcula as comissões do agente e do fornecedor de forma unificada
+ * Calcula as comissões do funcionário e da empresa de forma unificada
  * 
  * REGRA: Sempre priorizar valores salvos na venda (são os valores reais negociados)
  * Se não houver valores salvos, calcular baseado no produto
+ * 
+ * OTIMIZAÇÃO: Se a comissão no produto for 0, retorna 0 direto (não calcula)
+ * 
+ * NOMENCLATURA:
+ * - comissaoAgente = Comissão do Funcionário (pode ser 0 para salário fixo)
+ * - comissaoFornecedor = Comissão da Empresa (recebida do fornecedor)
  * 
  * @param venda - Dados da venda (parcial para compatibilidade)
  * @param produto - Dados do produto (opcional, usado apenas se a venda não tiver comissões salvas)
@@ -28,7 +38,7 @@ export function calcularComissoes(venda: Partial<Venda> & { valorContrato: numbe
   const valorContrato = venda.valorContrato || 0;
 
   // ==========================================
-  // COMISSÃO DO AGENTE
+  // COMISSÃO DO FUNCIONÁRIO (Paga pela Empresa)
   // ==========================================
   let comissaoAgente = 0;
   let comissaoAgentePercentual = 0;
@@ -72,11 +82,14 @@ export function calcularComissoes(venda: Partial<Venda> & { valorContrato: numbe
       comissaoAgentePercentual = produto.comissaoAgente || produto.comissao || 0;
     }
     
-    comissaoAgente = valorContrato * (comissaoAgentePercentual / 100);
+    // Otimização: Se comissão for 0, não calcular
+    if (comissaoAgentePercentual > 0) {
+      comissaoAgente = valorContrato * (comissaoAgentePercentual / 100);
+    }
   }
 
   // ==========================================
-  // COMISSÃO DO FORNECEDOR
+  // COMISSÃO DA EMPRESA (Recebida do Fornecedor)
   // ==========================================
   let comissaoFornecedor = 0;
   let comissaoFornecedorPercentual = 0;
@@ -94,7 +107,10 @@ export function calcularComissoes(venda: Partial<Venda> & { valorContrato: numbe
   // 3. Última opção: calcular do produto (se disponível)
   else if (produto && produto.comissaoFornecedor !== undefined && produto.comissaoFornecedor !== null) {
     comissaoFornecedorPercentual = produto.comissaoFornecedor;
-    comissaoFornecedor = valorContrato * (comissaoFornecedorPercentual / 100);
+    // Otimização: Se comissão for 0, não calcular
+    if (comissaoFornecedorPercentual > 0) {
+      comissaoFornecedor = valorContrato * (comissaoFornecedorPercentual / 100);
+    }
   }
 
   return {
@@ -106,8 +122,8 @@ export function calcularComissoes(venda: Partial<Venda> & { valorContrato: numbe
 }
 
 /**
- * Calcula apenas a comissão do fornecedor
- * (atalho para calcularComissoes quando só precisa da comissão do fornecedor)
+ * Calcula apenas a comissão da empresa (recebida do fornecedor)
+ * (atalho para calcularComissoes quando só precisa da comissão da empresa)
  */
 export function calcularComissaoFornecedor(venda: Venda, produto?: Produto): number {
   const comissoes = calcularComissoes(venda, produto);
@@ -115,8 +131,8 @@ export function calcularComissaoFornecedor(venda: Venda, produto?: Produto): num
 }
 
 /**
- * Calcula apenas a comissão do agente
- * (atalho para calcularComissoes quando só precisa da comissão do agente)
+ * Calcula apenas a comissão do funcionário (paga pela empresa)
+ * (atalho para calcularComissoes quando só precisa da comissão do funcionário)
  */
 export function calcularComissaoAgente(venda: Venda, produto?: Produto): number {
   const comissoes = calcularComissoes(venda, produto);
@@ -124,7 +140,7 @@ export function calcularComissaoAgente(venda: Venda, produto?: Produto): number 
 }
 
 /**
- * Calcula o total de comissões do fornecedor para um array de vendas
+ * Calcula o total de comissões da empresa para um array de vendas
  */
 export function calcularTotalComissoesFornecedor(vendas: Venda[], produtos?: Produto[]): number {
   return vendas.reduce((total, venda) => {
@@ -135,7 +151,7 @@ export function calcularTotalComissoesFornecedor(vendas: Venda[], produtos?: Pro
 }
 
 /**
- * Calcula o total de comissões do agente para um array de vendas
+ * Calcula o total de comissões dos funcionários para um array de vendas
  */
 export function calcularTotalComissoesAgente(vendas: Venda[], produtos?: Produto[]): number {
   return vendas.reduce((total, venda) => {

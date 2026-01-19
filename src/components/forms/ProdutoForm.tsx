@@ -298,8 +298,8 @@ export function ProdutoForm({ onSuccess, initialData }: ProdutoFormProps) {
         </div>
       </div>
 
-      {/* Taxas e Comissões */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* Taxas */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="taxaJuros">Taxa de Juros (% a.m.)</Label>
           <Input
@@ -324,35 +324,60 @@ export function ProdutoForm({ onSuccess, initialData }: ProdutoFormProps) {
             placeholder="Taxa acordada com fornecedor"
           />
         </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="comissaoFornecedor">Comissão Fornecedor (%)</Label>
-          <Input
-            id="comissaoFornecedor"
-            type="number"
-            value={formData.comissaoFornecedor}
-            onChange={(e) => handleChange("comissaoFornecedor", parseFloat(e.target.value) || 0)}
-            min="0"
-            max="100"
-            step="0.1"
-            placeholder="% paga pelo fornecedor"
-          />
-        </div>
       </div>
 
+      {/* Comissões */}
+      <Card className="p-4 bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
+        <h3 className="font-semibold text-sm mb-4 text-blue-900 dark:text-blue-100">Configuração de Comissões</h3>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="comissaoFornecedor" className="flex items-center gap-2">
+              <span>Comissão da Empresa (%)</span>
+              <span className="text-xs text-blue-600 dark:text-blue-400 font-normal">Recebida do fornecedor</span>
+            </Label>
+            <Input
+              id="comissaoFornecedor"
+              type="number"
+              value={formData.comissaoFornecedor}
+              onChange={(e) => handleChange("comissaoFornecedor", parseFloat(e.target.value) || 0)}
+              min="0"
+              max="100"
+              step="0.1"
+              placeholder="Ex: 2.5"
+              className="bg-white dark:bg-gray-950"
+            />
+            <p className="text-xs text-muted-foreground">Percentual que o fornecedor paga à empresa</p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="comissaoAgente" className="flex items-center gap-2">
+              <span>Comissão do Funcionário (% - Opcional)</span>
+              <span className="text-xs text-green-600 dark:text-green-400 font-normal">Paga ao vendedor</span>
+            </Label>
+            <Input
+              id="comissaoAgente"
+              type="number"
+              value={formData.comissaoAgente}
+              onChange={(e) => handleChange("comissaoAgente", parseFloat(e.target.value) || 0)}
+              min="0"
+              max="100"
+              step="0.1"
+              placeholder="0 = Sem comissão (salário fixo)"
+              className="bg-white dark:bg-gray-950"
+            />
+            <p className="text-xs text-muted-foreground">
+              {formData.comissaoAgente > 0 
+                ? `Funcionário receberá ${formData.comissaoAgente}% por venda`
+                : "Deixe em 0 para funcionários com salário fixo"}
+            </p>
+          </div>
+        </div>
+      </Card>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="comissaoAgente">Comissão Agente (%)</Label>
-          <Input
-            id="comissaoAgente"
-            type="number"
-            value={formData.comissaoAgente}
-            onChange={(e) => handleChange("comissaoAgente", parseFloat(e.target.value) || 0)}
-            min="0"
-            max="100"
-            step="0.1"
-            placeholder="% para o agente"
-          />
+        <div className="space-y-2" style={{display: 'none'}}>
+          {/* Campo hidden para manter compatibilidade */}
         </div>
 
         <div className="space-y-2">
@@ -409,10 +434,15 @@ export function ProdutoForm({ onSuccess, initialData }: ProdutoFormProps) {
         </div>
       </div>
 
-      {/* Tabela de Comissões */}
+      {/* Tabela de Comissões por Faixa de Valor */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <Label className="text-base font-semibold">Tabela de Comissões</Label>
+          <div>
+            <Label className="text-base font-semibold">Tabela de Comissões por Faixa de Valor</Label>
+            <p className="text-xs text-muted-foreground mt-1">
+              Configure diferentes percentuais de comissão baseados no valor do contrato (opcional)
+            </p>
+          </div>
           <Button type="button" variant="outline" size="sm" onClick={adicionarFaixa} className="gap-2">
             <Plus className="w-4 h-4" />
             Adicionar Faixa
@@ -432,6 +462,7 @@ export function ProdutoForm({ onSuccess, initialData }: ProdutoFormProps) {
                       onChange={(e) => atualizarFaixa(comissao.id, "valorMin", parseFloat(e.target.value) || 0)}
                       min="0"
                       step="100"
+                      placeholder="0"
                     />
                   </div>
                   <div className="space-y-1">
@@ -442,10 +473,11 @@ export function ProdutoForm({ onSuccess, initialData }: ProdutoFormProps) {
                       onChange={(e) => atualizarFaixa(comissao.id, "valorMax", parseFloat(e.target.value) || 0)}
                       min="0"
                       step="100"
+                      placeholder="10000"
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs">Comissão (%)</Label>
+                    <Label className="text-xs">Comissão Funcionário (%)</Label>
                     <Input
                       type="number"
                       value={comissao.percentual}
@@ -453,6 +485,7 @@ export function ProdutoForm({ onSuccess, initialData }: ProdutoFormProps) {
                       min="0"
                       max="100"
                       step="0.1"
+                      placeholder="0 = Sem comissão"
                     />
                   </div>
                 </div>

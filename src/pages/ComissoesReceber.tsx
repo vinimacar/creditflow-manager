@@ -101,6 +101,13 @@ export default function ComissoesReceber() {
         if (!produto || !fornecedor) continue;
 
         const comissoes = calcularComissoes(venda, produto);
+        
+        // OTIMIZAÇÃO: Não criar comissão se o valor for zero
+        // (produto sem comissão cadastrada)
+        if (comissoes.comissaoFornecedor === 0 && comissoes.comissaoFornecedorPercentual === 0) {
+          continue;
+        }
+        
         const dataVenda = venda.createdAt?.toDate?.() || new Date(venda.createdAt);
 
         let comissao = comissoesExistentes.get(venda.id!);

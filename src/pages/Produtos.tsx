@@ -61,18 +61,28 @@ const columns = [
   },
   {
     key: "comissaoFornecedor",
-    header: "Comissão Fornecedor",
+    header: "Comissão Empresa",
     render: (produto: ProdutoDisplay) => (
-      <span className="font-medium text-blue-600">
-        {produto.comissaoFornecedor ? `${produto.comissaoFornecedor}%` : "-"}
-      </span>
+      <div>
+        <span className="font-medium text-blue-600">
+          {produto.comissaoFornecedor ? `${produto.comissaoFornecedor}%` : "-"}
+        </span>
+        <p className="text-xs text-muted-foreground">Recebida do fornecedor</p>
+      </div>
     ),
   },
   {
     key: "comissao",
-    header: "Comissão Agente",
+    header: "Comissão Funcionário",
     render: (produto: ProdutoDisplay) => (
-      <span className="font-medium text-success">{produto.comissao}%</span>
+      <div>
+        <span className={`font-medium ${produto.comissao > 0 ? 'text-success' : 'text-muted-foreground'}`}>
+          {produto.comissao > 0 ? `${produto.comissao}%` : "Sem comissão"}
+        </span>
+        {produto.comissao > 0 && (
+          <p className="text-xs text-muted-foreground">Paga ao vendedor</p>
+        )}
+      </div>
     ),
   },
   {

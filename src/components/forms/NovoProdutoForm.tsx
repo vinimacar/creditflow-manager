@@ -47,8 +47,8 @@ export interface ProdutoNovo {
   prazoMaximo: number;
   taxaJuros: number;
   taxaNegociada?: number; // Taxa específica negociada com o fornecedor
-  comissaoFornecedor: number; // Comissão paga pelo fornecedor (%)
-  comissaoAgente: number; // Comissão para o agente vendedor (%)
+  comissaoFornecedor: number; // Comissão da Empresa - Recebida do fornecedor (%)
+  comissaoAgente: number; // Comissão do Funcionário - Paga ao vendedor (%)
   fornecedorId?: string; // ID do fornecedor
   bancoId?: string; // ID do banco
   status: "ativo" | "inativo";
@@ -403,7 +403,10 @@ export function NovoProdutoForm({ open, onOpenChange, onSalvar }: NovoProdutoFor
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="comissaoFornecedor">Comissão Fornecedor (%)</Label>
+              <Label htmlFor="comissaoFornecedor" className="flex items-center gap-2">
+                <span>Comissão da Empresa (%)</span>
+                <span className="text-xs text-blue-600 dark:text-blue-400 font-normal">Recebida do fornecedor</span>
+              </Label>
               <Input
                 id="comissaoFornecedor"
                 type="number"
@@ -412,17 +415,20 @@ export function NovoProdutoForm({ open, onOpenChange, onSalvar }: NovoProdutoFor
                 min="0"
                 max="100"
                 step="0.1"
-                placeholder="% paga pelo fornecedor"
+                placeholder="Ex: 2.5"
               />
               <p className="text-xs text-muted-foreground">
-                Percentual que o fornecedor paga sobre a venda
+                Percentual que o fornecedor paga à empresa sobre a venda
               </p>
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="comissaoAgente">Comissão Agente (%)</Label>
+              <Label htmlFor="comissaoAgente" className="flex items-center gap-2">
+                <span>Comissão do Funcionário (% - Opcional)</span>
+                <span className="text-xs text-green-600 dark:text-green-400 font-normal">Paga ao vendedor</span>
+              </Label>
               <Input
                 id="comissaoAgente"
                 type="number"
@@ -431,10 +437,12 @@ export function NovoProdutoForm({ open, onOpenChange, onSalvar }: NovoProdutoFor
                 min="0"
                 max="100"
                 step="0.1"
-                placeholder="% para o agente"
+                placeholder="0 = Sem comissão (salário fixo)"
               />
               <p className="text-xs text-muted-foreground">
-                Percentual que o agente recebe sobre a venda
+                {formData.comissaoAgente > 0 
+                  ? `Funcionário receberá ${formData.comissaoAgente}% por venda`
+                  : "Deixe em 0 para funcionários com salário fixo"}
               </p>
             </div>
 

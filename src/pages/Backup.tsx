@@ -78,11 +78,12 @@ export default function Backup() {
           dataInicio = startOfMonth(new Date());
           dataFim = endOfMonth(new Date());
           break;
-        case "mes_anterior":
+        case "mes_anterior": {
           const mesAnterior = subMonths(new Date(), 1);
           dataInicio = startOfMonth(mesAnterior);
           dataFim = endOfMonth(mesAnterior);
           break;
+        }
         case "ultimos_3_meses":
           dataInicio = startOfMonth(subMonths(new Date(), 3));
           dataFim = endOfMonth(new Date());

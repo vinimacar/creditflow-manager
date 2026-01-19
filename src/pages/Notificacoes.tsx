@@ -1,11 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Bell, CheckCircle, Trash2 } from "lucide-react";
-import { collection, query, orderBy, getDocs, updateDoc, deleteDoc, doc } from "firebase/firestore";
+import { collection, getDocs, updateDoc, deleteDoc, doc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Notificacao } from "@/types/financeiro";
 import { format } from "date-fns";
@@ -22,21 +22,15 @@ export default function Notificacoes() {
   const [notificacoes, setNotificacoes] = useState<Notificacao[]>([]);
   const [filtro, setFiltro] = useState<"todas" | "nao_lidas">("nao_lidas");
 
-  useEffect(() => {
-    carregarNotificacoes();
-  }, [user]);
-
-  const carregarNotificacoes = async () => {
+  const carregarNotificacoes = useCallback(async () => {
     if (!user) return;
 
     try {
       setLoading(true);
-      const q = query(
-        collection(db, "notificacoes"),
-        orderBy("criadoEm", "desc")
-      );
-
-      const snapshot = await getDocs(q);
+      
+      // Query simples sem índice composto - filtragem no cliente
+      const snapshot = await getDocs(collection(db, "notificacoes"));
+      
       const notifs = snapshot.docs
         .map(doc => ({
           id: doc.id,
@@ -45,11 +39,13 @@ export default function Notificacoes() {
           dataLeitura: doc.data().dataLeitura?.toDate(),
         })) as Notificacao[];
 
-      // Filtrar por destinatário
-      const minhasNotifs = notifs.filter(n => 
-        !n.destinatarioId || n.destinatarioId === user.uid ||
-        !n.destinatarioCargo || n.destinatarioCargo === user.cargo
-      );
+      // Filtrar por destinatário e ordenar no cliente
+      const minhasNotifs = notifs
+        .filter(n => 
+          !n.destinatarioId || n.destinatarioId === user.uid ||
+          !n.destinatarioCargo || n.destinatarioCargo === user.role
+        )
+        .sort((a, b) => b.criadoEm.getTime() - a.criadoEm.getTime());
 
       setNotificacoes(minhasNotifs);
     } catch (error) {
@@ -58,7 +54,11 @@ export default function Notificacoes() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    carregarNotificacoes();
+  }, [carregarNotificacoes]);
 
   const marcarComoLida = async (notifId: string) => {
     try {

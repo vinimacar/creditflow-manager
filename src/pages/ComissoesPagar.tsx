@@ -77,6 +77,13 @@ export default function ComissoesPagar() {
         if (!produto || !funcionario) continue;
 
         const comissoes = calcularComissoes(venda, produto);
+        
+        // OTIMIZAÇÃO: Não criar comissão se o valor for zero
+        // (produto sem comissão cadastrada ou funcionário com salário fixo)
+        if (comissoes.comissaoAgente === 0 && comissoes.comissaoAgentePercentual === 0) {
+          continue;
+        }
+        
         const dataVenda = venda.createdAt?.toDate?.() || new Date(venda.createdAt);
 
         let comissao = comissoesExistentes.get(venda.id!);

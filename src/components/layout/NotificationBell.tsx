@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +12,11 @@ import { ptBR } from "date-fns/locale";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 
+interface UserWithCargo {
+  uid: string;
+  cargo?: string;
+}
+
 export function NotificationBell() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -19,15 +24,7 @@ export function NotificationBell() {
   const [naoLidas, setNaoLidas] = useState(0);
   const [open, setOpen] = useState(false);
 
-  useEffect(() => {
-    carregarNotificacoes();
-    
-    // Atualizar a cada 5 minutos
-    const interval = setInterval(carregarNotificacoes, 5 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, [user]);
-
-  const carregarNotificacoes = async () => {
+  const carregarNotificacoes = useCallback(async () => {
     if (!user) return;
 
     try {
@@ -51,7 +48,7 @@ export function NotificationBell() {
       // Filtrar por destinatário
       const minhasNotifs = notifs.filter(n => 
         !n.destinatarioId || n.destinatarioId === user.uid ||
-        !n.destinatarioCargo || n.destinatarioCargo === user.cargo
+        !n.destinatarioCargo || n.destinatarioCargo === user.role
       );
 
       setNotificacoes(minhasNotifs);
@@ -59,7 +56,7 @@ export function NotificationBell() {
     } catch (error) {
       console.error("Erro ao carregar notificações:", error);
     }
-  };
+  }, [user]);
 
   const marcarComoLida = async (notifId: string) => {
     try {
