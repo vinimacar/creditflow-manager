@@ -380,8 +380,8 @@ export default function Relatorios() {
   const dadosGraficos = useMemo(() => {
     if (!dadosRelatorio) return null;
 
-    // Se não há filtros, usar dados originais
-    if (!filtros.periodo && !filtros.cliente && !filtros.funcionario && !filtros.produto) {
+    // Se não há filtros E tipo é "geral", usar dados originais
+    if (filtros.tipoRelatorio === "geral" && !filtros.periodo && !filtros.cliente && !filtros.funcionario && !filtros.produto) {
       return dadosRelatorio;
     }
 
@@ -1133,86 +1133,239 @@ export default function Relatorios() {
         </Button>
       </div>
 
-      {/* Gráficos */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <GraficoModerno
-          titulo="Evolução de Vendas"
-          tipo="linha"
-          dados={{
-            labels: (dadosGraficos || dadosRelatorio)!.vendas.map(v => v.mes),
-            valores: (dadosGraficos || dadosRelatorio)!.vendas.map(v => v.valor),
-          }}
-          feedback={feedback}
-        />
+      {/* Gráficos Dinâmicos baseados no tipo de relatório */}
+      {filtros.tipoRelatorio === "geral" && (
+        <>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <GraficoModerno
+              titulo="Evolução de Vendas"
+              tipo="linha"
+              dados={{
+                labels: (dadosGraficos || dadosRelatorio)!.vendas.map(v => v.mes),
+                valores: (dadosGraficos || dadosRelatorio)!.vendas.map(v => v.valor),
+              }}
+              feedback={feedback}
+            />
 
-        <GraficoModerno
-          titulo="Vendas por Produto"
-          tipo="pizza"
-          dados={{
-            labels: (dadosGraficos || dadosRelatorio)!.produtos.map(p => p.nome),
-            valores: (dadosGraficos || dadosRelatorio)!.produtos.map(p => p.valor),
-          }}
-        />
-      </div>
+            <GraficoModerno
+              titulo="Vendas por Produto"
+              tipo="pizza"
+              dados={{
+                labels: (dadosGraficos || dadosRelatorio)!.produtos.map(p => p.nome),
+                valores: (dadosGraficos || dadosRelatorio)!.produtos.map(p => p.valor),
+              }}
+            />
+          </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <GraficoModerno
-          titulo="Receitas x Despesas"
-          tipo="barra"
-          dados={{
-            labels: (dadosGraficos || dadosRelatorio)!.receitas.map(r => r.mes),
-            valores: (dadosGraficos || dadosRelatorio)!.receitas.map(r => r.valor),
-            comparacao: (dadosGraficos || dadosRelatorio)!.despesas.map(d => d.valor),
-          }}
-        />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <GraficoModerno
+              titulo="Receitas x Despesas"
+              tipo="barra"
+              dados={{
+                labels: (dadosGraficos || dadosRelatorio)!.receitas.map(r => r.mes),
+                valores: (dadosGraficos || dadosRelatorio)!.receitas.map(r => r.valor),
+                comparacao: (dadosGraficos || dadosRelatorio)!.despesas.map(d => d.valor),
+              }}
+            />
 
-        <GraficoModerno
-          titulo="Evolução de Lucros"
-          tipo="linha"
-          dados={{
-            labels: (dadosGraficos || dadosRelatorio)!.lucros.map(l => l.mes),
-            valores: (dadosGraficos || dadosRelatorio)!.lucros.map(l => l.valor),
-          }}
-        />
+            <GraficoModerno
+              titulo="Evolução de Lucros"
+              tipo="linha"
+              dados={{
+                labels: (dadosGraficos || dadosRelatorio)!.lucros.map(l => l.mes),
+                valores: (dadosGraficos || dadosRelatorio)!.lucros.map(l => l.valor),
+              }}
+            />
 
-        <GraficoModerno
-          titulo="Despesas por Período"
-          tipo="barra"
-          dados={{
-            labels: (dadosGraficos || dadosRelatorio)!.despesas.map(d => d.mes),
-            valores: (dadosGraficos || dadosRelatorio)!.despesas.map(d => d.valor),
-          }}
-        />
-      </div>
+            <GraficoModerno
+              titulo="Despesas por Período"
+              tipo="barra"
+              dados={{
+                labels: (dadosGraficos || dadosRelatorio)!.despesas.map(d => d.mes),
+                valores: (dadosGraficos || dadosRelatorio)!.despesas.map(d => d.valor),
+              }}
+            />
+          </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <GraficoModerno
-          titulo="Desempenho por Funcionário"
-          tipo="barra"
-          dados={{
-            labels: (dadosGraficos || dadosRelatorio)!.funcionarios.map(f => f.nome.split(" ")[0]),
-            valores: (dadosGraficos || dadosRelatorio)!.funcionarios.map(f => f.comissao),
-          }}
-        />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <GraficoModerno
+              titulo="Desempenho por Funcionário"
+              tipo="barra"
+              dados={{
+                labels: (dadosGraficos || dadosRelatorio)!.funcionarios.map(f => f.nome.split(" ")[0]),
+                valores: (dadosGraficos || dadosRelatorio)!.funcionarios.map(f => f.comissao),
+              }}
+            />
 
-        <GraficoModerno
-          titulo="Vendas por Fornecedor"
-          tipo="barra"
-          dados={{
-            labels: (dadosGraficos || dadosRelatorio)!.fornecedores.map(f => f.nome.replace("Banco ", "")),
-            valores: (dadosGraficos || dadosRelatorio)!.fornecedores.map(f => f.valor),
-          }}
-        />
+            <GraficoModerno
+              titulo="Vendas por Fornecedor"
+              tipo="barra"
+              dados={{
+                labels: (dadosGraficos || dadosRelatorio)!.fornecedores.map(f => f.nome.replace("Banco ", "")),
+                valores: (dadosGraficos || dadosRelatorio)!.fornecedores.map(f => f.valor),
+              }}
+            />
 
-        <GraficoModerno
-          titulo="Top 10 Clientes"
-          tipo="barra"
-          dados={{
-            labels: (dadosGraficos || dadosRelatorio)!.clientes.map(c => c.nome.split(" ")[0]),
-            valores: (dadosGraficos || dadosRelatorio)!.clientes.map(c => c.valor),
-          }}
-        />
-      </div>
+            <GraficoModerno
+              titulo="Top 10 Clientes"
+              tipo="barra"
+              dados={{
+                labels: (dadosGraficos || dadosRelatorio)!.clientes.map(c => c.nome.split(" ")[0]),
+                valores: (dadosGraficos || dadosRelatorio)!.clientes.map(c => c.valor),
+              }}
+            />
+          </div>
+        </>
+      )}
+
+      {filtros.tipoRelatorio === "vendas" && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <GraficoModerno
+            titulo="Evolução de Vendas"
+            tipo="linha"
+            dados={{
+              labels: (dadosGraficos || dadosRelatorio)!.vendas.map(v => v.mes),
+              valores: (dadosGraficos || dadosRelatorio)!.vendas.map(v => v.valor),
+            }}
+            feedback={feedback}
+          />
+          <GraficoModerno
+            titulo="Quantidade de Vendas"
+            tipo="barra"
+            dados={{
+              labels: (dadosGraficos || dadosRelatorio)!.vendas.map(v => v.mes),
+              valores: (dadosGraficos || dadosRelatorio)!.vendas.map(v => v.quantidade),
+            }}
+          />
+        </div>
+      )}
+
+      {filtros.tipoRelatorio === "receitas" && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <GraficoModerno
+            titulo="Evolução de Receitas"
+            tipo="linha"
+            dados={{
+              labels: (dadosGraficos || dadosRelatorio)!.receitas.map(r => r.mes),
+              valores: (dadosGraficos || dadosRelatorio)!.receitas.map(r => r.valor),
+            }}
+          />
+          <GraficoModerno
+            titulo="Receitas x Despesas"
+            tipo="barra"
+            dados={{
+              labels: (dadosGraficos || dadosRelatorio)!.receitas.map(r => r.mes),
+              valores: (dadosGraficos || dadosRelatorio)!.receitas.map(r => r.valor),
+              comparacao: (dadosGraficos || dadosRelatorio)!.despesas.map(d => d.valor),
+            }}
+          />
+        </div>
+      )}
+
+      {filtros.tipoRelatorio === "despesas" && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <GraficoModerno
+            titulo="Evolução de Despesas"
+            tipo="linha"
+            dados={{
+              labels: (dadosGraficos || dadosRelatorio)!.despesas.map(d => d.mes),
+              valores: (dadosGraficos || dadosRelatorio)!.despesas.map(d => d.valor),
+            }}
+          />
+          <GraficoModerno
+            titulo="Despesas por Período"
+            tipo="barra"
+            dados={{
+              labels: (dadosGraficos || dadosRelatorio)!.despesas.map(d => d.mes),
+              valores: (dadosGraficos || dadosRelatorio)!.despesas.map(d => d.valor),
+            }}
+          />
+        </div>
+      )}
+
+      {filtros.tipoRelatorio === "lucros" && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <GraficoModerno
+            titulo="Evolução de Lucros"
+            tipo="linha"
+            dados={{
+              labels: (dadosGraficos || dadosRelatorio)!.lucros.map(l => l.mes),
+              valores: (dadosGraficos || dadosRelatorio)!.lucros.map(l => l.valor),
+            }}
+          />
+          <GraficoModerno
+            titulo="Análise de Lucros"
+            tipo="barra"
+            dados={{
+              labels: (dadosGraficos || dadosRelatorio)!.lucros.map(l => l.mes),
+              valores: (dadosGraficos || dadosRelatorio)!.lucros.map(l => l.valor),
+            }}
+          />
+        </div>
+      )}
+
+      {filtros.tipoRelatorio === "funcionarios" && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <GraficoModerno
+            titulo="Comissões por Funcionário"
+            tipo="barra"
+            dados={{
+              labels: (dadosGraficos || dadosRelatorio)!.funcionarios.map(f => f.nome.split(" ")[0]),
+              valores: (dadosGraficos || dadosRelatorio)!.funcionarios.map(f => f.comissao),
+            }}
+          />
+          <GraficoModerno
+            titulo="Vendas por Funcionário"
+            tipo="pizza"
+            dados={{
+              labels: (dadosGraficos || dadosRelatorio)!.funcionarios.map(f => f.nome.split(" ")[0]),
+              valores: (dadosGraficos || dadosRelatorio)!.funcionarios.map(f => f.vendas),
+            }}
+          />
+        </div>
+      )}
+
+      {filtros.tipoRelatorio === "produtos" && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <GraficoModerno
+            titulo="Vendas por Produto"
+            tipo="pizza"
+            dados={{
+              labels: (dadosGraficos || dadosRelatorio)!.produtos.map(p => p.nome),
+              valores: (dadosGraficos || dadosRelatorio)!.produtos.map(p => p.valor),
+            }}
+          />
+          <GraficoModerno
+            titulo="Top Produtos"
+            tipo="barra"
+            dados={{
+              labels: (dadosGraficos || dadosRelatorio)!.produtos.map(p => p.nome),
+              valores: (dadosGraficos || dadosRelatorio)!.produtos.map(p => p.valor),
+            }}
+          />
+        </div>
+      )}
+
+      {filtros.tipoRelatorio === "fornecedores" && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <GraficoModerno
+            titulo="Vendas por Fornecedor"
+            tipo="barra"
+            dados={{
+              labels: (dadosGraficos || dadosRelatorio)!.fornecedores.map(f => f.nome.replace("Banco ", "")),
+              valores: (dadosGraficos || dadosRelatorio)!.fornecedores.map(f => f.valor),
+            }}
+          />
+          <GraficoModerno
+            titulo="Distribuição por Fornecedor"
+            tipo="pizza"
+            dados={{
+              labels: (dadosGraficos || dadosRelatorio)!.fornecedores.map(f => f.nome.replace("Banco ", "")),
+              valores: (dadosGraficos || dadosRelatorio)!.fornecedores.map(f => f.valor),
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }
