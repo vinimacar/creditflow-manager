@@ -93,8 +93,8 @@ export default function Despesas() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editando, setEditando] = useState<Despesa | null>(null);
   const [despesaParaDeletar, setDespesaParaDeletar] = useState<string | null>(null);
-  const [filtroMes, setFiltroMes] = useState<string>("");
-  const [filtroAno, setFiltroAno] = useState<string>(new Date().getFullYear().toString());
+  const [filtroMes, setFiltroMes] = useState<string>("todos");
+  const [filtroAno, setFiltroAno] = useState<string>("todos");
   
   const [formData, setFormData] = useState({
     descricao: "",
@@ -283,19 +283,19 @@ export default function Despesas() {
     const mes = dataVencimento.getMonth() + 1;
     const ano = dataVencimento.getFullYear();
     
-    if (filtroAno && ano.toString() !== filtroAno) return false;
-    if (filtroMes && mes.toString() !== filtroMes) return false;
+    if (filtroAno !== "todos" && ano.toString() !== filtroAno) return false;
+    if (filtroMes !== "todos" && mes.toString() !== filtroMes) return false;
     
     return true;
   });
 
   const folhasFiltradas = folhasPagamento.filter(f => {
-    if (!filtroAno && !filtroMes) return true;
+    if (filtroAno === "todos" && filtroMes === "todos") return true;
     
     const [ano, mes] = f.mesReferencia.split("-");
     
-    if (filtroAno && ano !== filtroAno) return false;
-    if (filtroMes && mes !== filtroMes.padStart(2, '0')) return false;
+    if (filtroAno !== "todos" && ano !== filtroAno) return false;
+    if (filtroMes !== "todos" && mes !== filtroMes.padStart(2, '0')) return false;
     
     return true;
   });
@@ -346,7 +346,7 @@ export default function Despesas() {
                 <SelectValue placeholder="Todos os anos" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todos os anos</SelectItem>
+                <SelectItem value="todos">Todos os anos</SelectItem>
                 {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map(ano => (
                   <SelectItem key={ano} value={ano.toString()}>{ano}</SelectItem>
                 ))}
@@ -360,7 +360,7 @@ export default function Despesas() {
                 <SelectValue placeholder="Todos os meses" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todos os meses</SelectItem>
+                <SelectItem value="todos">Todos os meses</SelectItem>
                 <SelectItem value="1">Janeiro</SelectItem>
                 <SelectItem value="2">Fevereiro</SelectItem>
                 <SelectItem value="3">Março</SelectItem>
@@ -378,7 +378,7 @@ export default function Despesas() {
           </div>
           <Button 
             variant="outline" 
-            onClick={() => { setFiltroMes(""); setFiltroAno(new Date().getFullYear().toString()); }}
+            onClick={() => { setFiltroMes("todos"); setFiltroAno("todos"); }}
           >
             Limpar Filtros
           </Button>
