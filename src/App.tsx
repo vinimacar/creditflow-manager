@@ -28,6 +28,10 @@ import ComissoesPagar from "./pages/ComissoesPagar";
 import MetasPerformance from "./pages/MetasPerformance";
 import Auditoria from "./pages/Auditoria";
 import Notificacoes from "./pages/Notificacoes";
+import AnaliseRentabilidade from "./pages/AnaliseRentabilidade";
+import Backup from "./pages/Backup";
+import AnaliseRentabilidade from "./pages/AnaliseRentabilidade";
+import Backup from "./pages/Backup";
 
 const queryClient = new QueryClient();
 
@@ -220,6 +224,26 @@ function AppRoutes() {
         element={
           <AppLayout>
             <Notificacoes />
+          </AppLayout>
+        }
+      />
+      <Route
+        path="/rentabilidade"
+        element={
+          <AppLayout>
+            <ProtectedRoute allowedRoles={["admin", "gerente"]}>
+              <AnaliseRentabilidade />
+            </ProtectedRoute>
+          </AppLayout>
+        }
+      />
+      <Route
+        path="/backup"
+        element={
+          <AppLayout>
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <Backup />
+            </ProtectedRoute>
           </AppLayout>
         }
       />

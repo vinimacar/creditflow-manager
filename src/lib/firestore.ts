@@ -728,3 +728,21 @@ export async function getCategoriasProdutos(): Promise<CategoriaProduto[]> {
     return [];
   }
 }
+
+// ========== FOLHA DE PAGAMENTO ==========
+const folhasPagamentoCollection = "folhas_pagamento";
+
+export async function getFolhasPagamento(): Promise<any[]> {
+  try {
+    const querySnapshot = await getDocs(
+      query(collection(db, folhasPagamentoCollection), orderBy("ano", "desc"), orderBy("mes", "desc"))
+    );
+    return querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+  } catch (error) {
+    console.error("Erro ao buscar folhas de pagamento:", error);
+    return [];
+  }
+}

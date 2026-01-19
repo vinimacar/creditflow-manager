@@ -23,6 +23,8 @@ import {
   Target,
   UserCheck,
   FileText,
+  PieChart,
+  Database,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -41,6 +43,7 @@ const menuItems = [
   { icon: ArrowDownCircle, label: "Comissões a Receber", path: "/comissoes-receber", roles: ["admin", "gerente"] },
   { icon: ArrowUpCircle, label: "Comissões a Pagar", path: "/comissoes-pagar", roles: ["admin", "gerente"] },
   { icon: Target, label: "Metas", path: "/metas", roles: ["admin", "gerente"] },
+  { icon: PieChart, label: "Rentabilidade", path: "/rentabilidade", roles: ["admin", "gerente"] },
   { icon: ShoppingCart, label: "PDV", path: "/pdv", roles: ["admin", "gerente", "agente", "atendente"] },
   { icon: FileBarChart, label: "Relatórios", path: "/relatorios", roles: ["admin", "gerente"] },
   { icon: Scale, label: "Conciliação", path: "/conciliacao", roles: ["admin", "gerente"] },
@@ -48,6 +51,7 @@ const menuItems = [
 
 const bottomMenuItems = [
   { icon: FileText, label: "Auditoria", path: "/auditoria", roles: ["admin"] },
+  { icon: Database, label: "Backup", path: "/backup", roles: ["admin"] },
   { icon: UserCheck, label: "Usuários", path: "/usuarios", roles: ["admin"] },
   { icon: Settings, label: "Configurações", path: "/configuracoes", roles: ["admin", "gerente", "agente", "atendente"] },
 ];
