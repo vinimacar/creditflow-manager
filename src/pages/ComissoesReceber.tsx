@@ -39,7 +39,7 @@ import { ptBR } from "date-fns/locale";
 import { CalendarIcon, CheckCircle, Clock, AlertTriangle, X } from "lucide-react";
 import { toast } from "sonner";
 import { getVendas, getFornecedores, getProdutos, getFuncionarios, getClientes } from "@/lib/firestore";
-import { collection, addDoc, updateDoc, doc, getDocs, Timestamp } from "firebase/firestore";
+import { collection, addDoc, updateDoc, deleteDoc, doc, getDocs, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { ComissaoReceber } from "@/types/financeiro";
 import { calcularComissoes } from "@/lib/calculos-comissoes";
@@ -102,15 +102,29 @@ export default function ComissoesReceber() {
 
         const comissoes = calcularComissoes(venda, produto);
         
+        // VALIDAÇÃO CRÍTICA: Verificar se há comissão configurada no produto
+        const temComissao = comissoes.comissaoFornecedor > 0 || comissoes.comissaoFornecedorPercentual > 0;
+        
+        // Verificar se já existe registro desta venda
+        let comissao = comissoesExistentes.get(venda.id!);
+        
+        // LIMPEZA: Se existe comissão mas o produto não tem mais comissão configurada, deletar
+        if (comissao && !temComissao) {
+          try {
+            await deleteDoc(doc(db, "comissoesReceber", comissao.id!));
+            console.log(`Comissão zerada deletada: ${comissao.id}`);
+            continue;
+          } catch (error) {
+            console.error("Erro ao deletar comissão zerada:", error);
+          }
+        }
+        
         // OTIMIZAÇÃO: Não criar comissão se o valor for zero
-        // (produto sem comissão cadastrada)
-        if (comissoes.comissaoFornecedor === 0 && comissoes.comissaoFornecedorPercentual === 0) {
+        if (!temComissao) {
           continue;
         }
         
         const dataVenda = venda.createdAt?.toDate?.() || new Date(venda.createdAt);
-
-        let comissao = comissoesExistentes.get(venda.id!);
 
         if (!comissao) {
           // Criar nova comissão a receber

@@ -18,7 +18,7 @@ import { ptBR } from "date-fns/locale";
 import { CalendarIcon, CheckCircle, Clock, AlertTriangle, DollarSign } from "lucide-react";
 import { toast } from "sonner";
 import { getVendas, getProdutos, getFuncionarios, getClientes } from "@/lib/firestore";
-import { collection, addDoc, updateDoc, doc, getDocs, Timestamp } from "firebase/firestore";
+import { collection, addDoc, updateDoc, deleteDoc, doc, getDocs, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { ComissaoPagar } from "@/types/financeiro";
 import { calcularComissoes } from "@/lib/calculos-comissoes";
@@ -78,15 +78,29 @@ export default function ComissoesPagar() {
 
         const comissoes = calcularComissoes(venda, produto);
         
+        // VALIDAÇÃO CRÍTICA: Verificar se há comissão configurada no produto
+        const temComissao = comissoes.comissaoAgente > 0 || comissoes.comissaoAgentePercentual > 0;
+        
+        // Verificar se já existe registro desta venda
+        let comissao = comissoesExistentes.get(venda.id!);
+        
+        // LIMPEZA: Se existe comissão mas o produto não tem mais comissão configurada, deletar
+        if (comissao && !temComissao) {
+          try {
+            await deleteDoc(doc(db, "comissoesPagar", comissao.id!));
+            console.log(`Comissão zerada deletada: ${comissao.id}`);
+            continue;
+          } catch (error) {
+            console.error("Erro ao deletar comissão zerada:", error);
+          }
+        }
+        
         // OTIMIZAÇÃO: Não criar comissão se o valor for zero
-        // (produto sem comissão cadastrada ou funcionário com salário fixo)
-        if (comissoes.comissaoAgente === 0 && comissoes.comissaoAgentePercentual === 0) {
+        if (!temComissao) {
           continue;
         }
         
         const dataVenda = venda.createdAt?.toDate?.() || new Date(venda.createdAt);
-
-        let comissao = comissoesExistentes.get(venda.id!);
 
         if (!comissao) {
           const novaComissao: ComissaoPagar = {
