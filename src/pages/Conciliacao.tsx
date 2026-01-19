@@ -141,10 +141,14 @@ export default function Conciliacao() {
         comissao?: number;
         comissaoPercentual?: number;
         prazo?: number;
-        status?: string;
+        status?: "aprovada" | "pendente" | "em_analise" | "recusada";
         observacoes?: string;
         createdAt?: Date;
         criadoPor: string;
+        comissaoAgente?: number;
+        comissaoAgentePercentual?: number;
+        comissaoFornecedor?: number;
+        comissaoFornecedorPercentual?: number;
       }
 
       const dadosFormatados: DadosExcel[] = vendas.map((venda: VendaFirestore) => {

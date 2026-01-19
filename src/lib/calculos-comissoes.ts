@@ -20,11 +20,11 @@ export interface ComissoesCalculadas {
  * REGRA: Sempre priorizar valores salvos na venda (são os valores reais negociados)
  * Se não houver valores salvos, calcular baseado no produto
  * 
- * @param venda - Dados da venda
+ * @param venda - Dados da venda (parcial para compatibilidade)
  * @param produto - Dados do produto (opcional, usado apenas se a venda não tiver comissões salvas)
  * @returns Objeto com todas as comissões calculadas
  */
-export function calcularComissoes(venda: Venda, produto?: Produto): ComissoesCalculadas {
+export function calcularComissoes(venda: Partial<Venda> & { valorContrato: number }, produto?: Produto): ComissoesCalculadas {
   const valorContrato = venda.valorContrato || 0;
 
   // ==========================================
