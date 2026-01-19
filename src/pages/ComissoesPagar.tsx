@@ -30,7 +30,7 @@ export default function ComissoesPagar() {
   const [loading, setLoading] = useState(true);
   const [comissoes, setComissoes] = useState<(ComissaoPagar & { funcionarioNome: string; clienteNome: string; produtoNome: string })[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [comissaoSelecionada, setComissaoSelecionada] = useState<any>(null);
+  const [comissaoSelecionada, setComissaoSelecionada] = useState<(ComissaoPagar & { funcionarioNome: string; clienteNome: string; produtoNome: string }) | null>(null);
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
   const [selecionadas, setSelecionadas] = useState<Set<string>>(new Set());
 
@@ -65,7 +65,7 @@ export default function ComissoesPagar() {
         ])
       );
 
-      const comissoesCompletas: any[] = [];
+      const comissoesCompletas: (ComissaoPagar & { funcionarioNome: string; clienteNome: string; produtoNome: string })[] = [];
 
       for (const venda of vendas) {
         if (venda.status !== "aprovada") continue;
@@ -196,7 +196,7 @@ export default function ComissoesPagar() {
     });
   };
 
-  const abrirDialogPagamento = (comissao: any) => {
+  const abrirDialogPagamento = (comissao: ComissaoPagar & { funcionarioNome: string; clienteNome: string; produtoNome: string }) => {
     setComissaoSelecionada(comissao);
     setFormData({
       dataPagamento: comissao.dataPagamento || new Date(),

@@ -27,6 +27,7 @@ import ComissoesReceber from "./pages/ComissoesReceber";
 import ComissoesPagar from "./pages/ComissoesPagar";
 import MetasPerformance from "./pages/MetasPerformance";
 import Auditoria from "./pages/Auditoria";
+import Notificacoes from "./pages/Notificacoes";
 
 const queryClient = new QueryClient();
 
@@ -211,6 +212,14 @@ function AppRoutes() {
             <ProtectedRoute allowedRoles={["admin"]}>
               <Auditoria />
             </ProtectedRoute>
+          </AppLayout>
+        }
+      />
+      <Route
+        path="/notificacoes"
+        element={
+          <AppLayout>
+            <Notificacoes />
           </AppLayout>
         }
       />

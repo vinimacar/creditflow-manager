@@ -32,7 +32,7 @@ export default function Auditoria() {
     try {
       setLoading(true);
       
-      let q = query(
+      const q = query(
         collection(db, "auditLogs"),
         orderBy("timestamp", "desc"),
         limit(100)

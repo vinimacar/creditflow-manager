@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -39,11 +39,7 @@ export default function FluxoCaixa() {
   const [mesAtual, setMesAtual] = useState(new Date());
   const [saldoAtual, setSaldoAtual] = useState(0);
 
-  useEffect(() => {
-    carregarDados();
-  }, [mesAtual]);
-
-  const carregarDados = async () => {
+  const carregarDados = useCallback(async () => {
     try {
       setLoading(true);
 
@@ -160,7 +156,11 @@ export default function FluxoCaixa() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [mesAtual]);
+
+  useEffect(() => {
+    carregarDados();
+  }, [carregarDados]);
 
   const mesAnterior = () => setMesAtual(prev => subMonths(prev, 1));
   const proximoMes = () => setMesAtual(prev => addMonths(prev, 1));

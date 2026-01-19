@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -35,11 +35,7 @@ export default function MetasPerformance() {
     premiacao: "",
   });
 
-  useEffect(() => {
-    carregarDados();
-  }, [periodoSelecionado]);
-
-  const carregarDados = async () => {
+  const carregarDados = useCallback(async () => {
     try {
       setLoading(true);
 
@@ -113,7 +109,11 @@ export default function MetasPerformance() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [periodoSelecionado]);
+
+  useEffect(() => {
+    carregarDados();
+  }, [carregarDados]);
 
   const criarMeta = async () => {
     if (!formData.valorMeta) {
@@ -325,7 +325,7 @@ export default function MetasPerformance() {
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>Tipo de Meta *</Label>
-              <Select value={formData.tipo} onValueChange={(value: any) => setFormData(prev => ({ ...prev, tipo: value }))}>
+              <Select value={formData.tipo} onValueChange={(value: "vendas" | "comissoes" | "clientes" | "ticket_medio") => setFormData(prev => ({ ...prev, tipo: value }))}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
