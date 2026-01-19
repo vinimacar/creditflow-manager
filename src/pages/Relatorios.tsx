@@ -420,6 +420,7 @@ export default function Relatorios() {
 
     // Recalcular vendas por mês com dados filtrados
     const vendasPorMes: Array<{ mes: string; valor: number; quantidade: number }> = [];
+    const despesasPorMes: Array<{ mes: string; valor: number; quantidade: number }> = [];
     const receitasPorMes: Array<{ mes: string; valor: number }> = [];
     const lucrosPorMes: Array<{ mes: string; valor: number }> = [];
     const agora = new Date();
@@ -446,6 +447,12 @@ export default function Relatorios() {
         mes: format(mesData, "MMM", { locale: ptBR }),
         valor: valorVendas,
         quantidade: vendasDoMes.length,
+      });
+
+      despesasPorMes.push({
+        mes: format(mesData, "MMM", { locale: ptBR }),
+        valor: valorDespesas,
+        quantidade: despesasDoMes.length,
       });
 
       receitasPorMes.push({
@@ -547,7 +554,7 @@ export default function Relatorios() {
       produtos: produtosData,
       fornecedores: dadosRelatorio.fornecedores,
       clientes: clientesData,
-      despesas: dadosRelatorio.despesas,
+      despesas: despesasPorMes,
       receitas: receitasPorMes,
       lucros: lucrosPorMes,
     };
