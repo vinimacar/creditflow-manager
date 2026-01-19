@@ -617,8 +617,8 @@ export default function Relatorios() {
     const totalAnterior = dados.vendas.slice(0, -1).reduce((sum, v) => sum + v.valor, 0);
     const crescimento = totalAnterior > 0 ? ((totalVendas - totalAnterior) / totalAnterior) * 100 : 0;
     
-    // Receita Bruta = soma das comissões pagas pelos fornecedores
-    const totalComissoes = dados.funcionarios.reduce((sum, f) => sum + (f.comissaoFornecedor || 0), 0);
+    // Receita Bruta = soma das comissões pagas pelos fornecedores (de TODAS as vendas filtradas)
+    const totalComissoes = calcularTotalComissoesFornecedor(vendasCompletas, produtosCompletos);
     
     const totalDespesas = dados.despesas.reduce((sum, d) => sum + d.valor, 0);
     const totalReceitas = dados.receitas.reduce((sum, r) => sum + r.valor, 0);
@@ -639,7 +639,7 @@ export default function Relatorios() {
       lucroTotal,
       margemLucro,
     };
-  }, [dadosGraficos, dadosRelatorio]);
+  }, [dadosGraficos, dadosRelatorio, vendasCompletas, produtosCompletos]);
 
   const gerarFeedback = () => {
     if (!estatisticas) return { tipo: "neutro" as const, mensagem: "Carregando dados..." };

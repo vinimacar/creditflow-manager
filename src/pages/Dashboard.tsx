@@ -11,7 +11,7 @@ import { StatCard } from "@/components/dashboard/StatCard";
 import { RecentSalesTable } from "@/components/dashboard/RecentSalesTable";
 import { SalesChart } from "@/components/dashboard/SalesChart";
 import { TopAgentsCard } from "@/components/dashboard/TopAgentsCard";
-import { getVendas, getClientes, type Venda } from "@/lib/firestore";
+import { getVendas, getClientes, getProdutos, type Venda } from "@/lib/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { calcularTotalComissoesFornecedor } from "@/lib/calculos-comissoes";
@@ -35,9 +35,10 @@ export default function Dashboard() {
 
   const carregarDados = async () => {
     try {
-      const [vendas, clientes] = await Promise.all([
+      const [vendas, clientes, produtos] = await Promise.all([
         getVendas(),
         getClientes(),
+        getProdutos(),
       ]);
 
       // Datas para comparação
@@ -61,10 +62,10 @@ export default function Dashboard() {
 
       // Calcular totais usando função centralizada
       const vendasMes = vendasMesAtual.reduce((sum, v) => sum + v.valorContrato, 0);
-      const comissoesMes = calcularTotalComissoesFornecedor(vendasMesAtual);
+      const comissoesMes = calcularTotalComissoesFornecedor(vendasMesAtual, produtos);
       
       const vendasMesAnteriorTotal = vendasMesAnterior.reduce((sum, v) => sum + v.valorContrato, 0);
-      const comissoesMesAnteriorTotal = calcularTotalComissoesFornecedor(vendasMesAnterior);
+      const comissoesMesAnteriorTotal = calcularTotalComissoesFornecedor(vendasMesAnterior, produtos);
 
       console.log("Vendas do mês atual:", vendasMesAtual);
       console.log("Total de comissões dos fornecedores (calculado centralizadamente):", comissoesMes);

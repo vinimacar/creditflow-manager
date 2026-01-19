@@ -159,8 +159,8 @@ export default function Conciliacao() {
 
         // Usar função centralizada para garantir consistência com Dashboard e Relatórios
         const comissoesCalculadas = calcularComissoes(venda, produto);
-        const valorComissao = comissoesCalculadas.comissaoAgente;
-        const comissaoPercentual = comissoesCalculadas.comissaoAgentePercentual;
+        const valorComissao = comissoesCalculadas.comissaoFornecedor; // Usar comissão do fornecedor (o que a empresa recebe)
+        const comissaoPercentual = comissoesCalculadas.comissaoFornecedorPercentual;
 
         return {
           contrato: venda.id || "",
