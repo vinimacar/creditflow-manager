@@ -302,6 +302,8 @@ export default function Despesas() {
 
   const totalDespesas = despesasFiltradas.reduce((sum, d) => sum + d.valor, 0);
   const totalPago = despesasFiltradas.filter(d => d.status === "Pago").reduce((sum, d) => sum + d.valor, 0);
+  const totalFolhasPagas = folhasFiltradas.filter(f => f.status === "paga").reduce((sum, f) => sum + f.salarioLiquido, 0);
+  const totalPagoGeral = totalPago + totalFolhasPagas;
   const totalPendente = despesasFiltradas.filter(d => d.status === "Pendente").reduce((sum, d) => sum + d.valor, 0);
   const totalAtrasado = despesasFiltradas.filter(d => d.status === "Atrasado").reduce((sum, d) => sum + d.valor, 0);
   const totalFolhas = folhasFiltradas.reduce((sum, f) => sum + f.salarioLiquido, 0);
@@ -427,7 +429,7 @@ export default function Despesas() {
             <div>
               <p className="text-sm font-medium text-muted-foreground">Pagas</p>
               <h3 className="text-2xl font-bold mt-2 text-green-600">
-                R$ {totalPago.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                R$ {totalPagoGeral.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
               </h3>
             </div>
             <TrendingDown className="w-8 h-8 text-green-600" />
