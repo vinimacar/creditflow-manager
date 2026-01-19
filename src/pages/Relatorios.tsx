@@ -38,7 +38,10 @@ import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { getVendas, getFuncionarios, getProdutos, getFornecedores, getClientes, getDespesas, type Venda, type Funcionario, type Produto, type Fornecedor, type Cliente, type Despesa } from "@/lib/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
-import { calcularComissoes } from "@/lib/calculos-comissoes";
+import { calcularComissoes, calcularTotalComissoesFornecedor } from "@/lib/calculos-comissoes";
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { FolhaPagamento } from "@/types/folhaPagamento";
 
 interface DadosRelatorio {
   vendas: Array<{ mes: string; valor: number; quantidade: number }>;
@@ -90,19 +93,29 @@ export default function Relatorios() {
 
   const carregarDados = async (mounted = true) => {
     try {
-      const [vendas, funcionarios, produtos, fornecedores, clientes, despesas] = await Promise.all([
+      const [vendas, funcionarios, produtos, fornecedores, clientes, despesas, folhasSnapshot] = await Promise.all([
         getVendas(),
         getFuncionarios(),
         getProdutos(),
         getFornecedores(),
         getClientes(),
         getDespesas(),
+        getDocs(collection(db, "folhaPagamento")),
       ]).catch(err => {
         console.error("Erro ao buscar dados:", err);
         throw err;
       });
 
       if (!mounted) return;
+
+      // Processar folhas de pagamento
+      const folhasPagamento = folhasSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+        criadoEm: doc.data().criadoEm?.toDate(),
+        atualizadoEm: doc.data().atualizadoEm?.toDate(),
+        dataPagamento: doc.data().dataPagamento?.toDate(),
+      })) as FolhaPagamento[];
 
       // Armazenar dados completos para filtragem
       setVendasCompletas(vendas);
@@ -133,8 +146,20 @@ export default function Relatorios() {
           return dataDespesa >= inicioMes && dataDespesa <= fimMes;
         });
 
+        // Incluir folhas de pagamento do mês nas despesas
+        const folhasDoMes = folhasPagamento.filter((f) => {
+          const mesRef = f.mesReferencia + "-01";
+          const dataFolha = new Date(mesRef);
+          return dataFolha >= inicioMes && dataFolha <= fimMes;
+        });
+
         const valorVendas = vendasDoMes.reduce((sum, v) => sum + v.valorContrato, 0);
         const valorDespesas = despesasDoMes.reduce((sum, d) => sum + d.valor, 0);
+        const valorFolhas = folhasDoMes.reduce((sum, f) => sum + f.salarioLiquido, 0);
+        const valorDespesasTotal = valorDespesas + valorFolhas;
+        
+        // Calcular comissões de fornecedores usando função centralizada
+        const comissoesFornecedorMes = calcularTotalComissoesFornecedor(vendasDoMes, produtos);
         
         vendasPorMes.push({
           mes: format(mesData, "MMM", { locale: ptBR }),
@@ -144,18 +169,18 @@ export default function Relatorios() {
 
         despesasPorMes.push({
           mes: format(mesData, "MMM", { locale: ptBR }),
-          valor: valorDespesas,
-          quantidade: despesasDoMes.length,
+          valor: valorDespesasTotal,
+          quantidade: despesasDoMes.length + folhasDoMes.length,
         });
 
         receitasPorMes.push({
           mes: format(mesData, "MMM", { locale: ptBR }),
-          valor: valorVendas,
+          valor: comissoesFornecedorMes,
         });
 
         lucrosPorMes.push({
           mes: format(mesData, "MMM", { locale: ptBR }),
-          valor: valorVendas - valorDespesas,
+          valor: comissoesFornecedorMes - valorDespesasTotal,
         });
       }
 
@@ -828,7 +853,7 @@ export default function Relatorios() {
               <h3 className="text-2xl font-bold mt-2 text-blue-700 dark:text-blue-300">
                 R$ {estatisticas!.totalVendas.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
               </h3>
-              <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">Valor negociado pelos agentes</p>
+              <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">Valor total dos contratos</p>
             </div>
             <DollarSign className="w-8 h-8 text-blue-600 dark:text-blue-400" />
           </div>
@@ -854,7 +879,7 @@ export default function Relatorios() {
               <h3 className="text-2xl font-bold mt-2 text-red-700 dark:text-red-300">
                 R$ {estatisticas!.totalDespesas.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
               </h3>
-              <p className="text-xs text-red-700 dark:text-red-300 mt-1">Despesas lançadas no sistema</p>
+              <p className="text-xs text-red-700 dark:text-red-300 mt-1">Despesas + Folhas de Pagamento</p>
             </div>
             <DollarSign className="w-8 h-8 text-red-600 dark:text-red-400" />
           </div>
