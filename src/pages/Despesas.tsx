@@ -93,6 +93,8 @@ export default function Despesas() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editando, setEditando] = useState<Despesa | null>(null);
   const [despesaParaDeletar, setDespesaParaDeletar] = useState<string | null>(null);
+  const [filtroMes, setFiltroMes] = useState<string>("");
+  const [filtroAno, setFiltroAno] = useState<string>(new Date().getFullYear().toString());
   
   const [formData, setFormData] = useState({
     descricao: "",
@@ -275,11 +277,35 @@ export default function Despesas() {
     }
   };
 
-  const totalDespesas = despesas.reduce((sum, d) => sum + d.valor, 0);
-  const totalPago = despesas.filter(d => d.status === "Pago").reduce((sum, d) => sum + d.valor, 0);
-  const totalPendente = despesas.filter(d => d.status === "Pendente").reduce((sum, d) => sum + d.valor, 0);
-  const totalAtrasado = despesas.filter(d => d.status === "Atrasado").reduce((sum, d) => sum + d.valor, 0);
-  const totalFolhas = folhasPagamento.reduce((sum, f) => sum + f.salarioLiquido, 0);
+  // Filtrar despesas e folhas por mês/ano
+  const despesasFiltradas = despesas.filter(d => {
+    const dataVencimento = new Date(d.dataVencimento);
+    const mes = dataVencimento.getMonth() + 1;
+    const ano = dataVencimento.getFullYear();
+    
+    if (filtroAno && ano.toString() !== filtroAno) return false;
+    if (filtroMes && mes.toString() !== filtroMes) return false;
+    
+    return true;
+  });
+
+  const folhasFiltradas = folhasPagamento.filter(f => {
+    if (!filtroAno && !filtroMes) return true;
+    
+    const [ano, mes] = f.mesReferencia.split("-");
+    
+    if (filtroAno && ano !== filtroAno) return false;
+    if (filtroMes && mes !== filtroMes.padStart(2, '0')) return false;
+    
+    return true;
+  });
+
+  const totalDespesas = despesasFiltradas.reduce((sum, d) => sum + d.valor, 0);
+  const totalPago = despesasFiltradas.filter(d => d.status === "Pago").reduce((sum, d) => sum + d.valor, 0);
+  const totalPendente = despesasFiltradas.filter(d => d.status === "Pendente").reduce((sum, d) => sum + d.valor, 0);
+  const totalAtrasado = despesasFiltradas.filter(d => d.status === "Atrasado").reduce((sum, d) => sum + d.valor, 0);
+  const totalFolhas = folhasFiltradas.reduce((sum, f) => sum + f.salarioLiquido, 0);
+  const totalGeral = totalDespesas + totalFolhas;
 
   const getStatusBadge = (status: typeof statusPagamento[number]) => {
     const variants: Record<typeof statusPagamento[number], "default" | "secondary" | "destructive"> = {
@@ -310,12 +336,72 @@ export default function Despesas() {
         description="Controle e organize todas as despesas da empresa"
       />
 
+      {/* Filtros */}
+      <Card className="p-6">
+        <div className="flex flex-wrap gap-4 items-end">
+          <div className="flex-1 min-w-[200px] space-y-2">
+            <Label htmlFor="filtroAno">Ano</Label>
+            <Select value={filtroAno} onValueChange={setFiltroAno}>
+              <SelectTrigger id="filtroAno">
+                <SelectValue placeholder="Todos os anos" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Todos os anos</SelectItem>
+                {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map(ano => (
+                  <SelectItem key={ano} value={ano.toString()}>{ano}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex-1 min-w-[200px] space-y-2">
+            <Label htmlFor="filtroMes">Mês</Label>
+            <Select value={filtroMes} onValueChange={setFiltroMes}>
+              <SelectTrigger id="filtroMes">
+                <SelectValue placeholder="Todos os meses" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Todos os meses</SelectItem>
+                <SelectItem value="1">Janeiro</SelectItem>
+                <SelectItem value="2">Fevereiro</SelectItem>
+                <SelectItem value="3">Março</SelectItem>
+                <SelectItem value="4">Abril</SelectItem>
+                <SelectItem value="5">Maio</SelectItem>
+                <SelectItem value="6">Junho</SelectItem>
+                <SelectItem value="7">Julho</SelectItem>
+                <SelectItem value="8">Agosto</SelectItem>
+                <SelectItem value="9">Setembro</SelectItem>
+                <SelectItem value="10">Outubro</SelectItem>
+                <SelectItem value="11">Novembro</SelectItem>
+                <SelectItem value="12">Dezembro</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <Button 
+            variant="outline" 
+            onClick={() => { setFiltroMes(""); setFiltroAno(new Date().getFullYear().toString()); }}
+          >
+            Limpar Filtros
+          </Button>
+        </div>
+      </Card>
+
       {/* Cartões de Resumo */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+        <Card className="p-6 md:col-span-2 bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-purple-700">Total Geral (Despesas + Folhas)</p>
+              <h3 className="text-3xl font-bold mt-2 text-purple-900">
+                R$ {totalGeral.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+              </h3>
+            </div>
+            <Receipt className="w-10 h-10 text-purple-600" />
+          </div>
+        </Card>
         <Card className="p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-muted-foreground">Total de Despesas</p>
+              <p className="text-sm font-medium text-muted-foreground">Despesas Operacionais</p>
               <h3 className="text-2xl font-bold mt-2">
                 R$ {totalDespesas.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
               </h3>
@@ -379,7 +465,7 @@ export default function Despesas() {
           <div>
             <h3 className="text-lg font-semibold">Despesas Cadastradas</h3>
             <p className="text-sm text-muted-foreground">
-              {despesas.length} {despesas.length === 1 ? "despesa" : "despesas"} cadastradas
+              Exibindo {despesasFiltradas.length} de {despesas.length} {despesas.length === 1 ? "despesa" : "despesas"}
             </p>
           </div>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -567,14 +653,14 @@ export default function Despesas() {
                     Carregando despesas...
                   </TableCell>
                 </TableRow>
-              ) : despesas.length === 0 ? (
+              ) : despesasFiltradas.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                    Nenhuma despesa cadastrada
+                    Nenhuma despesa encontrada para o período selecionado
                   </TableCell>
                 </TableRow>
               ) : (
-                despesas.map((despesa) => (
+                despesasFiltradas.map((despesa) => (
                   <TableRow key={despesa.id}>
                     <TableCell className="font-medium">{despesa.descricao}</TableCell>
                     <TableCell>{despesa.categoria}</TableCell>
@@ -634,7 +720,7 @@ export default function Despesas() {
           <div>
             <h3 className="text-lg font-semibold">Folhas de Pagamento</h3>
             <p className="text-sm text-muted-foreground">
-              {folhasPagamento.length} {folhasPagamento.length === 1 ? "folha" : "folhas"} geradas
+              Exibindo {folhasFiltradas.length} de {folhasPagamento.length} {folhasPagamento.length === 1 ? "folha" : "folhas"}
             </p>
           </div>
           <Button onClick={importarFolhasParaDespesas} variant="outline" className="gap-2">
@@ -663,14 +749,14 @@ export default function Despesas() {
                     Carregando folhas de pagamento...
                   </TableCell>
                 </TableRow>
-              ) : folhasPagamento.length === 0 ? (
+              ) : folhasFiltradas.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                    Nenhuma folha de pagamento gerada
+                    Nenhuma folha de pagamento encontrada para o período selecionado
                   </TableCell>
                 </TableRow>
               ) : (
-                folhasPagamento.map((folha) => (
+                folhasFiltradas.map((folha) => (
                   <TableRow key={folha.id}>
                     <TableCell className="font-medium">{folha.funcionarioNome}</TableCell>
                     <TableCell>

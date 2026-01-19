@@ -14,6 +14,7 @@ import { TopAgentsCard } from "@/components/dashboard/TopAgentsCard";
 import { getVendas, getClientes, type Venda } from "@/lib/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { startOfMonth, endOfMonth, subMonths } from "date-fns";
+import { calcularTotalComissoesFornecedor } from "@/lib/calculos-comissoes";
 
 interface DashboardStats {
   vendasMes: number;
@@ -58,16 +59,16 @@ export default function Dashboard() {
         return dataVenda >= inicioMesAnterior && dataVenda <= fimMesAnterior;
       });
 
-      // Calcular totais
+      // Calcular totais usando função centralizada
       const vendasMes = vendasMesAtual.reduce((sum, v) => sum + v.valorContrato, 0);
-      const comissoesMes = vendasMesAtual.reduce((sum, v) => sum + (v.comissaoFornecedor || 0), 0);
+      const comissoesMes = calcularTotalComissoesFornecedor(vendasMesAtual);
       
       const vendasMesAnteriorTotal = vendasMesAnterior.reduce((sum, v) => sum + v.valorContrato, 0);
-      const comissoesMesAnteriorTotal = vendasMesAnterior.reduce((sum, v) => sum + (v.comissaoFornecedor || 0), 0);
+      const comissoesMesAnteriorTotal = calcularTotalComissoesFornecedor(vendasMesAnterior);
 
       console.log("Vendas do mês atual:", vendasMesAtual);
-      console.log("Total de comissões dos fornecedores:", comissoesMes);
-      console.log("Vendas com comissão fornecedor:", vendasMesAtual.filter(v => (v.comissaoFornecedor || 0) > 0));
+      console.log("Total de comissões dos fornecedores (calculado centralizadamente):", comissoesMes);
+      console.log("Total de vendas:", vendasMesAtual.length);
 
       // Calcular crescimento
       const crescimentoVendas = vendasMesAnteriorTotal > 0

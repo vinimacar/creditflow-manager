@@ -321,12 +321,6 @@ export function FuncionarioForm({ onSuccess, initialData }: FuncionarioFormProps
         </div>
 
         <div>
-          <Label htmlFor="dataNascimento">Data de Nascimento *</Label>
-          <Input id="dataNascimento" type="date" {...register("dataNascimento")} />
-          {errors.dataNascimento && <p className="text-sm text-destructive mt-1">{errors.dataNascimento.message}</p>}
-        </div>
-
-        <div>
           <Label htmlFor="dataAdmissao">Data de Admissão *</Label>
           <Input id="dataAdmissao" type="date" {...register("dataAdmissao")} />
           {errors.dataAdmissao && <p className="text-sm text-destructive mt-1">{errors.dataAdmissao.message}</p>}

@@ -38,10 +38,11 @@ import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { getVendas, getFuncionarios, getProdutos, getFornecedores, getClientes, getDespesas, type Venda, type Funcionario, type Produto, type Fornecedor, type Cliente, type Despesa } from "@/lib/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
+import { calcularComissoes } from "@/lib/calculos-comissoes";
 
 interface DadosRelatorio {
   vendas: Array<{ mes: string; valor: number; quantidade: number }>;
-  funcionarios: Array<{ nome: string; vendas: number; comissao: number }>;
+  funcionarios: Array<{ nome: string; vendas: number; comissao: number; comissaoFornecedor: number }>;
   produtos: Array<{ nome: string; valor: number }>;
   fornecedores: Array<{ nome: string; valor: number }>;
   clientes: Array<{ nome: string; vendas: number; valor: number }>;
@@ -158,31 +159,19 @@ export default function Relatorios() {
         });
       }
 
-      // Calcular vendas por funcionário
+      // Calcular vendas por funcionário usando função centralizada
       const vendaPorFunc = new Map<string, { vendas: number; comissao: number; comissaoFornecedor: number }>();
       vendas.forEach((venda) => {
         const produto = produtos.find(p => p.id === venda.produtoId);
         
-        // Comissão do agente - importar da venda (priority 1) ou calcular do produto
-        let comissaoCalculada = venda.comissaoAgente || venda.comissao || 0;
-        if (!comissaoCalculada && produto) {
-          const comissaoPercentual = venda.comissaoAgentePercentual || venda.comissaoPercentual || produto?.comissaoAgente || produto?.comissao || 0;
-          comissaoCalculada = venda.valorContrato * (comissaoPercentual / 100);
-        }
-        
-        // Comissão do fornecedor - sempre importar da venda (dados reais salvos)
-        let comissaoFornecedorCalculada = venda.comissaoFornecedor || 0;
-        if (!comissaoFornecedorCalculada && venda.comissaoFornecedorPercentual) {
-          comissaoFornecedorCalculada = venda.valorContrato * (venda.comissaoFornecedorPercentual / 100);
-        } else if (!comissaoFornecedorCalculada && produto?.comissaoFornecedor) {
-          comissaoFornecedorCalculada = venda.valorContrato * (produto.comissaoFornecedor / 100);
-        }
+        // Usar função centralizada para garantir consistência
+        const comissoesCalculadas = calcularComissoes(venda, produto);
         
         const current = vendaPorFunc.get(venda.funcionarioId) || { vendas: 0, comissao: 0, comissaoFornecedor: 0 };
         vendaPorFunc.set(venda.funcionarioId, {
           vendas: current.vendas + 1,
-          comissao: current.comissao + comissaoCalculada,
-          comissaoFornecedor: current.comissaoFornecedor + comissaoFornecedorCalculada,
+          comissao: current.comissao + comissoesCalculadas.comissaoAgente,
+          comissaoFornecedor: current.comissaoFornecedor + comissoesCalculadas.comissaoFornecedor,
         });
       });
 
