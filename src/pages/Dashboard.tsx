@@ -148,7 +148,7 @@ export default function Dashboard() {
           iconColor="primary"
         />
         <StatCard
-          title="Receita (Comissão Fornecedores)"
+          title="Receita (Comissões)"
           value={`R$ ${stats!.comissoesMes.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`}
           change={`${stats!.crescimentoComissoes > 0 ? "+" : ""}${stats!.crescimentoComissoes.toFixed(1)}% vs mês anterior`}
           changeType={stats!.crescimentoComissoes >= 0 ? "positive" : "negative"}
@@ -158,7 +158,7 @@ export default function Dashboard() {
         <StatCard
           title="Total de Vendas"
           value={stats!.totalVendas.toString()}
-          change={`${stats!.totalVendas} vendas este mês`}
+          change={`${stats!.totalVendas} ${stats!.totalVendas === 1 ? 'venda' : 'vendas'} este mês`}
           changeType="positive"
           icon={ShoppingCart}
           iconColor="accent"
@@ -166,7 +166,7 @@ export default function Dashboard() {
         <StatCard
           title="Clientes Ativos"
           value={stats!.clientesAtivos.toString()}
-          change="Base de clientes"
+          change={`${stats!.clientesAtivos} ${stats!.clientesAtivos === 1 ? 'cliente ativo' : 'clientes ativos'}`}
           changeType="positive"
           icon={Users}
           iconColor="warning"
