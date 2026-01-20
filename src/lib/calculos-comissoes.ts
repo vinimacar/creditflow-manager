@@ -43,8 +43,13 @@ export function calcularComissoes(venda: Partial<Venda> & { valorContrato: numbe
   let comissaoAgente = 0;
   let comissaoAgentePercentual = 0;
 
+  // VERIFICAÇÃO: Se o produto tem comissaoAtiva=false, não calcula comissão
+  if (produto && produto.comissaoAtiva === false) {
+    comissaoAgente = 0;
+    comissaoAgentePercentual = 0;
+  }
   // 1. Prioridade: comissão salva na venda (valor em R$)
-  if (venda.comissaoAgente !== undefined && venda.comissaoAgente !== null) {
+  else if (venda.comissaoAgente !== undefined && venda.comissaoAgente !== null) {
     comissaoAgente = venda.comissaoAgente;
     comissaoAgentePercentual = valorContrato > 0 ? (comissaoAgente / valorContrato) * 100 : 0;
   }

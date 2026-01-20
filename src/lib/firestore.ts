@@ -324,6 +324,7 @@ export interface Produto {
   comissaoFornecedor?: number; // Comissão que o fornecedor paga (%)
   comissaoAgente?: number; // Comissão que o agente receberá (%)
   comissao?: number; // Mantido para compatibilidade (usar comissaoAgente)
+  comissaoAtiva?: boolean; // Se true, paga comissão ao funcionário. Se false, não paga.
   taxaJuros?: number;
   fornecedorId?: string; // ID do fornecedor (Banco) vinculado ao produto
   bancoId?: string; // ID do banco vinculado ao produto

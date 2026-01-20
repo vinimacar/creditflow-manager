@@ -29,6 +29,7 @@ interface ProdutoDisplay {
   tipoTabela: string;
   comissao: number;
   comissaoFornecedor?: number;
+  comissaoAtiva?: boolean;
   status: "ativo" | "inativo";
 }
 
@@ -74,16 +75,30 @@ const columns = [
   {
     key: "comissao",
     header: "Comissão Funcionário",
-    render: (produto: ProdutoDisplay) => (
-      <div>
-        <span className={`font-medium ${produto.comissao > 0 ? 'text-success' : 'text-muted-foreground'}`}>
-          {produto.comissao > 0 ? `${produto.comissao}%` : "Sem comissão"}
-        </span>
-        {produto.comissao > 0 && (
-          <p className="text-xs text-muted-foreground">Paga ao vendedor</p>
-        )}
-      </div>
-    ),
+    render: (produto: ProdutoDisplay) => {
+      const comissaoDesativada = produto.comissaoAtiva === false;
+      return (
+        <div>
+          {comissaoDesativada ? (
+            <>
+              <span className="font-medium text-red-600">
+                Desativada
+              </span>
+              <p className="text-xs text-muted-foreground">Não paga comissão</p>
+            </>
+          ) : (
+            <>
+              <span className={`font-medium ${produto.comissao > 0 ? 'text-success' : 'text-muted-foreground'}`}>
+                {produto.comissao > 0 ? `${produto.comissao}%` : "Sem comissão"}
+              </span>
+              {produto.comissao > 0 && (
+                <p className="text-xs text-muted-foreground">Paga ao vendedor</p>
+              )}
+            </>
+          )}
+        </div>
+      );
+    },
   },
   {
     key: "status",
@@ -130,6 +145,7 @@ export default function Produtos() {
         tipoTabela: p.tipoTabela,
         comissao: p.comissao,
         comissaoFornecedor: p.comissaoFornecedor,
+        comissaoAtiva: p.comissaoAtiva !== false, // default true para compatibilidade
         status: p.status as "ativo" | "inativo"
       }));
       setProdutos(displayData);

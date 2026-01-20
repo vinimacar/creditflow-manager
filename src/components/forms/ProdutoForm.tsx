@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -51,6 +52,7 @@ export function ProdutoForm({ onSuccess, initialData }: ProdutoFormProps) {
     taxaNegociada: initialData?.taxaNegociada || 0,
     comissaoFornecedor: initialData?.comissaoFornecedor || 0,
     comissaoAgente: initialData?.comissaoAgente || initialData?.comissao || 0,
+    comissaoAtiva: initialData?.comissaoAtiva !== false, // Default true
     fornecedorId: initialData?.fornecedorId || "",
     bancoId: initialData?.bancoId || "",
     status: (initialData?.status as "ativo" | "inativo") || "ativo",
@@ -365,11 +367,33 @@ export function ProdutoForm({ onSuccess, initialData }: ProdutoFormProps) {
               step="0.1"
               placeholder="0 = Sem comissão (salário fixo)"
               className="bg-white dark:bg-gray-950"
+              disabled={!formData.comissaoAtiva}
             />
             <p className="text-xs text-muted-foreground">
               {formData.comissaoAgente > 0 
                 ? `Funcionário receberá ${formData.comissaoAgente}% por venda`
                 : "Deixe em 0 para funcionários com salário fixo"}
+            </p>
+            
+            {/* Switch para ativar/desativar comissão */}
+            <div className="flex items-center gap-3 pt-2 border-t">
+              <Switch
+                id="comissaoAtiva"
+                checked={formData.comissaoAtiva !== false}
+                onCheckedChange={(checked) => handleChange("comissaoAtiva", checked)}
+              />
+              <Label htmlFor="comissaoAtiva" className="cursor-pointer text-sm">
+                {formData.comissaoAtiva !== false ? (
+                  <span className="text-green-600 font-medium">✓ Comissão Ativa</span>
+                ) : (
+                  <span className="text-red-600 font-medium">✗ Comissão Desativada</span>
+                )}
+              </Label>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {formData.comissaoAtiva !== false 
+                ? "Vendas deste produto pagarão comissão ao funcionário"
+                : "⚠️ Vendas deste produto NÃO pagarão comissão (salário fixo)"}
             </p>
           </div>
         </div>
