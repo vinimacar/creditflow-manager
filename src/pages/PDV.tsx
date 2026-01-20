@@ -80,7 +80,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 export default function PDV() {
-  const { userProfile } = useAuth();
+  const { user: userProfile } = useAuth();
   
   // Debug: verificar role do usuário
   console.log('PDV - userProfile:', userProfile);
@@ -274,7 +274,9 @@ export default function PDV() {
   };
 
   const podeEditarOuEstornar = () => {
-    return userProfile?.role === "gerente" || userProfile?.role === "admin";
+    const temPermissao = userProfile?.role === "gerente" || userProfile?.role === "admin";
+    console.log('podeEditarOuEstornar - role:', userProfile?.role, '- temPermissao:', temPermissao);
+    return temPermissao;
   };
 
   const handleAbrirEditar = (venda: Venda) => {
