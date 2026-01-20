@@ -287,6 +287,13 @@ export default function PDV() {
       return;
     }
     
+    console.log('=== ABRINDO EDIÇÃO ===');
+    console.log('Venda objeto completo:', venda);
+    console.log('ID da venda:', venda.id);
+    console.log('Tipo do ID:', typeof venda.id);
+    console.log('vendaId (visual):', venda.vendaId);
+    console.log('======================');
+    
     setVendaSelecionada(venda);
     setEditClienteId(venda.clienteId);
     setEditProdutoId(venda.produtoId);
@@ -297,7 +304,13 @@ export default function PDV() {
   };
 
   const handleSalvarEdicao = async () => {
+    console.log('=== INICIANDO SALVAMENTO ===');
+    console.log('vendaSelecionada:', vendaSelecionada);
+    console.log('vendaSelecionada.id:', vendaSelecionada?.id);
+    console.log('Tipo do ID:', typeof vendaSelecionada?.id);
+    
     if (!vendaSelecionada || !vendaSelecionada.id) {
+      console.error('ERRO: Venda não encontrada ou sem ID');
       toast.error("Venda não encontrada");
       return;
     }
@@ -311,12 +324,15 @@ export default function PDV() {
       const comissaoFornecedorPerc = produtoSelecionado?.comissaoFornecedor || 0;
       const comissaoFornecedorValor = (valorContratoNum * comissaoFornecedorPerc) / 100;
 
-      console.log('Atualizando venda - ID do documento:', vendaSelecionada.id);
-      console.log('Venda completa:', vendaSelecionada);
+      console.log('Tentando atualizar documento Firestore...');
+      console.log('Collection: vendas');
+      console.log('Document ID:', vendaSelecionada.id);
       
       const vendaRef = doc(db, "vendas", vendaSelecionada.id);
+      console.log('Referência criada:', vendaRef);
+      console.log('Path da referência:', vendaRef.path);
       
-      await updateDoc(vendaRef, {
+      const dadosParaAtualizar = {
         clienteId: editClienteId,
         produtoId: editProdutoId,
         funcionarioId: editFuncionarioId,
@@ -332,15 +348,22 @@ export default function PDV() {
         comissaoFornecedor: comissaoFornecedorValor,
         comissaoFornecedorPercentual: comissaoFornecedorPerc,
         updatedAt: Timestamp.now(),
-      });
+      };
+      
+      console.log('Dados para atualizar:', dadosParaAtualizar);
+      
+      await updateDoc(vendaRef, dadosParaAtualizar);
 
+      console.log('✅ Venda atualizada com sucesso!');
       toast.success("Venda atualizada com sucesso!");
       setEditarVendaOpen(false);
       await carregarDados();
     } catch (error: any) {
-      console.error("Erro ao atualizar venda:", error);
+      console.error("❌ ERRO COMPLETO:", error);
+      console.error("Nome do erro:", error?.name);
       console.error("Código do erro:", error?.code);
       console.error("Mensagem do erro:", error?.message);
+      console.error("Stack do erro:", error?.stack);
       
       if (error?.code === 'not-found' || error?.message?.includes('No document to update')) {
         toast.error("Esta venda não existe mais no banco de dados");

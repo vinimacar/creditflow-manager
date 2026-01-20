@@ -119,10 +119,19 @@ export async function getVendas(): Promise<Venda[]> {
     const querySnapshot = await getDocs(
       query(collection(db, vendasCollection), orderBy("createdAt", "desc"))
     );
-    return querySnapshot.docs.map((doc) => ({
+    const vendas = querySnapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
     })) as Venda[];
+    
+    console.log(`📊 getVendas: Carregadas ${vendas.length} vendas`);
+    if (vendas.length > 0) {
+      console.log('Primeira venda:', vendas[0]);
+      console.log('ID da primeira venda:', vendas[0].id);
+      console.log('Tipo do ID:', typeof vendas[0].id);
+    }
+    
+    return vendas;
   } catch (error) {
     console.error("Erro ao buscar vendas:", error);
     return [];
