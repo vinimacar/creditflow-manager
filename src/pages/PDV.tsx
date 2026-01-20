@@ -66,12 +66,13 @@ import {
   Edit,
   XCircle,
   Shield,
+  Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { getClientes, getProdutos, getFuncionarios, getVendas, getFornecedores, getBancos, getCategoriasProdutos, addBanco, addCategoriaProduto, type Cliente, type Produto, type Funcionario, type Venda, type Fornecedor, type Banco, type CategoriaProduto } from "@/lib/firestore";
 import { BANCOS_BRASIL, buscarBancoPorCodigo } from "@/lib/bancos-brasil";
-import { collection, addDoc, Timestamp, updateDoc, doc } from "firebase/firestore";
+import { collection, addDoc, Timestamp, updateDoc, doc, deleteDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import jsPDF from "jspdf";
@@ -97,6 +98,7 @@ export default function PDV() {
   const [valorContrato, setValorContrato] = useState<string>("");
   const [numeroContrato, setNumeroContrato] = useState<string>("");
   const [prazo, setPrazo] = useState<string>("");
+  const [dataVenda, setDataVenda] = useState<string>(format(new Date(), "yyyy-MM-dd"));
   const [processando, setProcessando] = useState(false);
   
   // Estados para diálogos de cadastro rápido
@@ -110,6 +112,7 @@ export default function PDV() {
   const [vendaSelecionada, setVendaSelecionada] = useState<Venda | null>(null);
   const [editarVendaOpen, setEditarVendaOpen] = useState(false);
   const [estornarConfirmOpen, setEstornarConfirmOpen] = useState(false);
+  const [excluirConfirmOpen, setExcluirConfirmOpen] = useState(false);
   
   // Estados para edição
   const [editValorContrato, setEditValorContrato] = useState<string>("");
@@ -196,7 +199,7 @@ export default function PDV() {
   const comissaoAgenteValor = comissaoValor;
   
   // Verificar se pode visualizar comissões
-  const podeVisualizarComissoes = userProfile?.papel === "Gerente" || userProfile?.papel === "Administrador";
+  const podeVisualizarComissoes = userProfile?.role === "gerente" || userProfile?.role === "admin";
 
   const handleFinalizarVenda = async () => {
     if (!selectedCliente || !selectedProduto || !selectedFuncionario || !valorContrato || !prazo) {
@@ -214,6 +217,10 @@ export default function PDV() {
       const comissaoCalculadaAgente = calcularComissao(valorContratoNum, produtoSelecionado);
       const comissaoFornecedorPerc = produtoSelecionado?.comissaoFornecedor || 0;
       const comissaoFornecedorValor = (valorContratoNum * comissaoFornecedorPerc) / 100;
+      
+      // Converter a data selecionada para Timestamp
+      const dataVendaDate = new Date(dataVenda + "T00:00:00");
+      const dataVendaTimestamp = Timestamp.fromDate(dataVendaDate);
       
       await addDoc(collection(db, "vendas"), {
         id: vendaId,
@@ -234,7 +241,7 @@ export default function PDV() {
         comissaoAgentePercentual: comissaoCalculadaAgente.percentual,
         status: "aprovada",
         criadoPor: userProfile?.uid || "",
-        createdAt: Timestamp.now(),
+        createdAt: dataVendaTimestamp,
       });
 
       toast.success(`Venda registrada com sucesso! ID: ${vendaId}`);
@@ -252,6 +259,7 @@ export default function PDV() {
       setValorContrato("");
       setNumeroContrato("");
       setPrazo("");
+      setDataVenda(format(new Date(), "yyyy-MM-dd"));
     } catch (error) {
       console.error("Erro ao registrar venda:", error);
       toast.error("Erro ao registrar venda");
@@ -261,7 +269,7 @@ export default function PDV() {
   };
 
   const podeEditarOuEstornar = () => {
-    return userProfile?.papel === "Gerente" || userProfile?.papel === "Administrador";
+    return userProfile?.role === "gerente" || userProfile?.role === "admin";
   };
 
   const handleAbrirEditar = (venda: Venda) => {
@@ -350,6 +358,36 @@ export default function PDV() {
     } catch (error) {
       console.error("Erro ao estornar venda:", error);
       toast.error("Erro ao estornar venda");
+    }
+  };
+
+  const handleAbrirExcluir = (venda: Venda) => {
+    if (!podeEditarOuEstornar()) {
+      toast.error("Apenas Gerentes e Administradores podem excluir vendas");
+      return;
+    }
+    
+    setVendaSelecionada(venda);
+    setExcluirConfirmOpen(true);
+  };
+
+  const handleExcluirVenda = async () => {
+    if (!vendaSelecionada || !vendaSelecionada.id) {
+      toast.error("Venda não encontrada");
+      return;
+    }
+
+    try {
+      const vendaRef = doc(db, "vendas", vendaSelecionada.id);
+      await deleteDoc(vendaRef);
+
+      toast.success("Venda excluída com sucesso!");
+      setExcluirConfirmOpen(false);
+      setVendaSelecionada(null);
+      await carregarDados();
+    } catch (error) {
+      console.error("Erro ao excluir venda:", error);
+      toast.error("Erro ao excluir venda");
     }
   };
 
@@ -830,6 +868,18 @@ export default function PDV() {
                 </p>
               </div>
               <div>
+                <Label>Data da Venda *</Label>
+                <Input
+                  type="date"
+                  value={dataVenda}
+                  onChange={(e) => setDataVenda(e.target.value)}
+                  max={format(new Date(), "yyyy-MM-dd")}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Data em que a venda foi realizada
+                </p>
+              </div>
+              <div>
                 <Label>Agente Responsável *</Label>
                 <Select value={selectedFuncionario} onValueChange={setSelectedFuncionario}>
                   <SelectTrigger>
@@ -989,7 +1039,7 @@ export default function PDV() {
               {podeEditarOuEstornar() && (
                 <Badge variant="outline" className="ml-2">
                   <Shield className="w-3 h-3 mr-1" />
-                  {userProfile?.papel}
+                  {userProfile?.role === "admin" ? "Administrador" : "Gerente"}
                 </Badge>
               )}
             </DialogTitle>
@@ -1059,6 +1109,7 @@ export default function PDV() {
                                       size="sm"
                                       variant="outline"
                                       onClick={() => handleAbrirEditar(venda)}
+                                      title="Editar venda"
                                     >
                                       <Edit className="w-4 h-4" />
                                     </Button>
@@ -1066,11 +1117,21 @@ export default function PDV() {
                                       size="sm"
                                       variant="destructive"
                                       onClick={() => handleAbrirEstornar(venda)}
+                                      title="Estornar venda (cancelar)"
                                     >
                                       <XCircle className="w-4 h-4" />
                                     </Button>
                                   </>
                                 )}
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="border-red-600 text-red-600 hover:bg-red-50 hover:text-red-700"
+                                  onClick={() => handleAbrirExcluir(venda)}
+                                  title="Excluir venda permanentemente"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
                               </div>
                             </TableCell>
                           )}
@@ -1221,6 +1282,62 @@ export default function PDV() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Confirmar Estorno
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Dialog Confirmar Exclusão */}
+      <AlertDialog open={excluirConfirmOpen} onOpenChange={setExcluirConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Trash2 className="w-5 h-5 text-destructive" />
+              Confirmar Exclusão de Venda
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              <p className="text-destructive font-bold text-base mb-4">
+                ⚠️ ATENÇÃO: Esta ação irá EXCLUIR PERMANENTEMENTE a venda!
+              </p>
+              <p className="mb-4">
+                A venda será removida completamente do sistema e não poderá ser recuperada.
+              </p>
+              <div className="mt-4 p-4 bg-muted rounded-lg space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">ID:</span>
+                  <span className="font-mono font-semibold">{vendaSelecionada?.id}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Cliente:</span>
+                  <span className="font-semibold">
+                    {clientes.find(c => c.id === vendaSelecionada?.clienteId)?.nome}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Valor:</span>
+                  <span className="font-semibold">
+                    R$ {Number(vendaSelecionada?.valorContrato || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Status:</span>
+                  <span className="font-semibold">
+                    {vendaSelecionada?.status || "aprovada"}
+                  </span>
+                </div>
+              </div>
+              <p className="mt-4 text-destructive font-bold">
+                Esta ação é IRREVERSÍVEL! Tem certeza que deseja continuar?
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleExcluirVenda}
+              className="bg-red-600 text-white hover:bg-red-700"
+            >
+              Sim, Excluir Permanentemente
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
