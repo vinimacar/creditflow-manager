@@ -67,6 +67,8 @@ import {
   XCircle,
   Shield,
   Trash2,
+  Download,
+  FileSpreadsheet,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -76,6 +78,8 @@ import { collection, addDoc, Timestamp, updateDoc, doc, deleteDoc } from "fireba
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import * as XLSX from "xlsx";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -706,6 +710,159 @@ export default function PDV() {
     toast.success("Controle de Venda impresso com sucesso!");
   };
 
+  const handleExportarExcel = () => {
+    if (vendas.length === 0) {
+      toast.error("Não há vendas para exportar");
+      return;
+    }
+
+    // Preparar dados para exportação
+    const dadosExportacao = vendas.map((venda) => {
+      const cliente = clientes.find(c => c.id === venda.clienteId);
+      const produto = produtos.find(p => p.id === venda.produtoId);
+      const funcionario = funcionarios.find(f => f.id === venda.funcionarioId);
+      const fornecedor = fornecedores.find(f => f.id === venda.fornecedorId);
+      const banco = bancos.find(b => b.id === venda.bancoId);
+
+      return {
+        'ID Venda': venda.vendaId || venda.id,
+        'Data': venda.createdAt?.toDate ? format(venda.createdAt.toDate(), "dd/MM/yyyy HH:mm", { locale: ptBR }) : "-",
+        'Cliente': cliente?.nome || "-",
+        'CPF Cliente': cliente?.cpf || "-",
+        'Produto': produto?.nome || "-",
+        'Banco': banco?.nome || fornecedor?.nomeFantasia || "-",
+        'Agente': funcionario?.nome || "-",
+        'Valor Contrato': venda.valorContrato,
+        'Prazo (meses)': venda.prazo,
+        'Comissão Agente (%)': venda.comissaoAgentePercentual || venda.comissaoPercentual || 0,
+        'Comissão Agente (R$)': venda.comissaoAgente || venda.comissao || 0,
+        'Comissão Fornecedor (%)': venda.comissaoFornecedorPercentual || 0,
+        'Comissão Fornecedor (R$)': venda.comissaoFornecedor || 0,
+        'Nº Contrato': venda.numeroContrato || "-",
+        'Status': venda.status || "aprovada",
+      };
+    });
+
+    // Criar planilha
+    const ws = XLSX.utils.json_to_sheet(dadosExportacao);
+    
+    // Ajustar largura das colunas
+    const colWidths = [
+      { wch: 15 }, // ID Venda
+      { wch: 18 }, // Data
+      { wch: 30 }, // Cliente
+      { wch: 15 }, // CPF
+      { wch: 25 }, // Produto
+      { wch: 25 }, // Banco
+      { wch: 25 }, // Agente
+      { wch: 15 }, // Valor Contrato
+      { wch: 12 }, // Prazo
+      { wch: 18 }, // Comissão Agente %
+      { wch: 18 }, // Comissão Agente R$
+      { wch: 20 }, // Comissão Fornecedor %
+      { wch: 20 }, // Comissão Fornecedor R$
+      { wch: 15 }, // Nº Contrato
+      { wch: 12 }, // Status
+    ];
+    ws['!cols'] = colWidths;
+
+    // Criar workbook
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Vendas");
+
+    // Gerar arquivo
+    const fileName = `vendas_${format(new Date(), "dd-MM-yyyy_HH-mm")}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+
+    toast.success(`${vendas.length} vendas exportadas para Excel com sucesso!`);
+  };
+
+  const handleExportarPDF = () => {
+    if (vendas.length === 0) {
+      toast.error("Não há vendas para exportar");
+      return;
+    }
+
+    const doc = new jsPDF('l', 'mm', 'a4'); // Orientação landscape
+    
+    // Cabeçalho
+    doc.setFontSize(18);
+    doc.setFont("helvetica", "bold");
+    doc.text("RELATÓRIO DE VENDAS", doc.internal.pageSize.width / 2, 15, { align: "center" });
+    
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Gerado em: ${format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}`, doc.internal.pageSize.width / 2, 22, { align: "center" });
+    doc.text(`Total de vendas: ${vendas.length}`, doc.internal.pageSize.width / 2, 27, { align: "center" });
+
+    // Preparar dados da tabela
+    const dadosTabela = vendas.map((venda) => {
+      const cliente = clientes.find(c => c.id === venda.clienteId);
+      const produto = produtos.find(p => p.id === venda.produtoId);
+      const funcionario = funcionarios.find(f => f.id === venda.funcionarioId);
+
+      return [
+        venda.vendaId || venda.id?.substring(0, 8) || "-",
+        venda.createdAt?.toDate ? format(venda.createdAt.toDate(), "dd/MM/yyyy", { locale: ptBR }) : "-",
+        cliente?.nome || "-",
+        produto?.nome || "-",
+        funcionario?.nome || "-",
+        `R$ ${Number(venda.valorContrato).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
+        `${venda.prazo}m`,
+        `R$ ${Number(venda.comissaoAgente || venda.comissao || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
+        venda.status || "aprovada",
+      ];
+    });
+
+    // Adicionar tabela
+    autoTable(doc, {
+      head: [['ID', 'Data', 'Cliente', 'Produto', 'Agente', 'Valor', 'Prazo', 'Comissão', 'Status']],
+      body: dadosTabela,
+      startY: 35,
+      theme: 'grid',
+      styles: { 
+        fontSize: 8,
+        cellPadding: 2,
+      },
+      headStyles: {
+        fillColor: [41, 128, 185],
+        fontStyle: 'bold',
+        halign: 'center',
+      },
+      columnStyles: {
+        0: { cellWidth: 20 },  // ID
+        1: { cellWidth: 22 },  // Data
+        2: { cellWidth: 45 },  // Cliente
+        3: { cellWidth: 40 },  // Produto
+        4: { cellWidth: 40 },  // Agente
+        5: { cellWidth: 25, halign: 'right' },  // Valor
+        6: { cellWidth: 15, halign: 'center' },  // Prazo
+        7: { cellWidth: 25, halign: 'right' },  // Comissão
+        8: { cellWidth: 20, halign: 'center' },  // Status
+      },
+      margin: { top: 35 },
+    });
+
+    // Rodapé
+    const pageCount = (doc as any).internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "italic");
+      doc.text(
+        `Página ${i} de ${pageCount}`,
+        doc.internal.pageSize.width / 2,
+        doc.internal.pageSize.height - 10,
+        { align: "center" }
+      );
+    }
+
+    const fileName = `vendas_${format(new Date(), "dd-MM-yyyy_HH-mm")}.pdf`;
+    doc.save(fileName);
+
+    toast.success(`${vendas.length} vendas exportadas para PDF com sucesso!`);
+  };
+
   return (
     <div>
       <PageHeader
@@ -1093,6 +1250,27 @@ export default function PDV() {
                 <List className="w-5 h-5" />
                 Consultar Vendas
               </Button>
+              
+              <div className="grid grid-cols-2 gap-2">
+                <Button 
+                  variant="outline" 
+                  className="gap-2 text-green-600 border-green-600 hover:bg-green-50"
+                  onClick={handleExportarExcel}
+                  disabled={vendas.length === 0}
+                >
+                  <FileSpreadsheet className="w-4 h-4" />
+                  Excel
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="gap-2 text-red-600 border-red-600 hover:bg-red-50"
+                  onClick={handleExportarPDF}
+                  disabled={vendas.length === 0}
+                >
+                  <Download className="w-4 h-4" />
+                  PDF
+                </Button>
+              </div>
             </div>
           </Card>
         </div>
