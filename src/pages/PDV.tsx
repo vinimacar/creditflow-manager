@@ -81,6 +81,11 @@ import { ptBR } from "date-fns/locale";
 
 export default function PDV() {
   const { userProfile } = useAuth();
+  
+  // Debug: verificar role do usuário
+  console.log('PDV - userProfile:', userProfile);
+  console.log('PDV - role:', userProfile?.role);
+  
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [funcionarios, setFuncionarios] = useState<Funcionario[]>([]);
@@ -1057,13 +1062,13 @@ export default function PDV() {
                   <TableHead>Prazo</TableHead>
                   <TableHead>Comissão</TableHead>
                   <TableHead>Status</TableHead>
-                  {podeEditarOuEstornar() && <TableHead>Ações</TableHead>}
+                  <TableHead>Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {vendas.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={podeEditarOuEstornar() ? 9 : 8} className="text-center text-muted-foreground">
+                    <TableCell colSpan={9} className="text-center text-muted-foreground">
                       Nenhuma venda encontrada
                     </TableCell>
                   </TableRow>
@@ -1100,8 +1105,8 @@ export default function PDV() {
                               {venda.status || "aprovada"}
                             </Badge>
                           </TableCell>
-                          {podeEditarOuEstornar() && (
-                            <TableCell>
+                          <TableCell>
+                            {podeEditarOuEstornar() ? (
                               <div className="flex gap-2">
                                 {venda.status !== "cancelada" && (
                                   <>
@@ -1133,8 +1138,10 @@ export default function PDV() {
                                   <Trash2 className="w-4 h-4" />
                                 </Button>
                               </div>
-                            </TableCell>
-                          )}
+                            ) : (
+                              <span className="text-xs text-muted-foreground">Sem permissão</span>
+                            )}
+                          </TableCell>
                         </TableRow>
                       );
                     })
