@@ -118,7 +118,16 @@ export default function Configuracoes() {
   const [populandoCategorias, setPopulandoCategorias] = useState(false);
   
   // Estados para personalização
-  const [empresaConfig, setEmpresaConfig] = useState<EmpresaConfig | null>(null);
+  const [empresaConfig, setEmpresaConfig] = useState<EmpresaConfig>({
+    nomeEmpresa: "",
+    logoUrl: "",
+    cnpj: "",
+    telefone: "",
+    email: "",
+    endereco: "",
+    corPrimaria: "#3b82f6",
+    corSecundaria: "#64748b"
+  });
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [logoPreview, setLogoPreview] = useState<string>("");
   
@@ -316,7 +325,16 @@ export default function Configuracoes() {
     try {
       const config = await getEmpresaConfig();
       if (config) {
-        setEmpresaConfig(config);
+        setEmpresaConfig({
+          nomeEmpresa: config.nomeEmpresa || "",
+          logoUrl: config.logoUrl || "",
+          cnpj: config.cnpj || "",
+          telefone: config.telefone || "",
+          email: config.email || "",
+          endereco: config.endereco || "",
+          corPrimaria: config.corPrimaria || "#3b82f6",
+          corSecundaria: config.corSecundaria || "#64748b"
+        });
         setLogoPreview(config.logoUrl || "");
       }
     } catch (error) {
@@ -344,8 +362,8 @@ export default function Configuracoes() {
     try {
       const logoUrl = await uploadLogo(file);
       
-      const updatedConfig: Partial<EmpresaConfig> = {
-        ...(empresaConfig || {}),
+      const updatedConfig: EmpresaConfig = {
+        ...empresaConfig,
         logoUrl
       };
       
@@ -362,8 +380,6 @@ export default function Configuracoes() {
   };
 
   const handleSalvarPersonalizacao = async () => {
-    if (!empresaConfig) return;
-    
     setSalvando(true);
     try {
       await updateEmpresaConfig(empresaConfig);
@@ -717,9 +733,9 @@ export default function Configuracoes() {
                     <Input
                       id="nome-empresa"
                       placeholder="Ex: Crédito Gestor LTDA"
-                      value={empresaConfig?.nomeEmpresa || ""}
+                      value={empresaConfig.nomeEmpresa}
                       onChange={(e) => setEmpresaConfig({
-                        ...(empresaConfig || {} as EmpresaConfig),
+                        ...empresaConfig,
                         nomeEmpresa: e.target.value
                       })}
                     />
@@ -730,9 +746,9 @@ export default function Configuracoes() {
                     <Input
                       id="cnpj-empresa"
                       placeholder="00.000.000/0000-00"
-                      value={empresaConfig?.cnpj || ""}
+                      value={empresaConfig.cnpj}
                       onChange={(e) => setEmpresaConfig({
-                        ...(empresaConfig || {} as EmpresaConfig),
+                        ...empresaConfig,
                         cnpj: e.target.value
                       })}
                     />
@@ -743,9 +759,9 @@ export default function Configuracoes() {
                     <Input
                       id="telefone-empresa"
                       placeholder="(00) 00000-0000"
-                      value={empresaConfig?.telefone || ""}
+                      value={empresaConfig.telefone}
                       onChange={(e) => setEmpresaConfig({
-                        ...(empresaConfig || {} as EmpresaConfig),
+                        ...empresaConfig,
                         telefone: e.target.value
                       })}
                     />
@@ -757,9 +773,9 @@ export default function Configuracoes() {
                       id="email-empresa"
                       type="email"
                       placeholder="contato@empresa.com.br"
-                      value={empresaConfig?.email || ""}
+                      value={empresaConfig.email}
                       onChange={(e) => setEmpresaConfig({
-                        ...(empresaConfig || {} as EmpresaConfig),
+                        ...empresaConfig,
                         email: e.target.value
                       })}
                     />
@@ -770,9 +786,9 @@ export default function Configuracoes() {
                     <Input
                       id="endereco-empresa"
                       placeholder="Rua, número, bairro, cidade - UF"
-                      value={empresaConfig?.endereco || ""}
+                      value={empresaConfig.endereco}
                       onChange={(e) => setEmpresaConfig({
-                        ...(empresaConfig || {} as EmpresaConfig),
+                        ...empresaConfig,
                         endereco: e.target.value
                       })}
                     />
@@ -799,9 +815,9 @@ export default function Configuracoes() {
                         id="cor-primaria"
                         type="color"
                         className="w-20 h-10 cursor-pointer"
-                        value={empresaConfig?.corPrimaria || "#3b82f6"}
+                        value={empresaConfig.corPrimaria}
                         onChange={(e) => setEmpresaConfig({
-                          ...(empresaConfig || {} as EmpresaConfig),
+                          ...empresaConfig,
                           corPrimaria: e.target.value
                         })}
                       />
@@ -809,9 +825,9 @@ export default function Configuracoes() {
                         type="text"
                         placeholder="#3b82f6"
                         className="flex-1"
-                        value={empresaConfig?.corPrimaria || "#3b82f6"}
+                        value={empresaConfig.corPrimaria}
                         onChange={(e) => setEmpresaConfig({
-                          ...(empresaConfig || {} as EmpresaConfig),
+                          ...empresaConfig,
                           corPrimaria: e.target.value
                         })}
                       />
@@ -825,9 +841,9 @@ export default function Configuracoes() {
                         id="cor-secundaria"
                         type="color"
                         className="w-20 h-10 cursor-pointer"
-                        value={empresaConfig?.corSecundaria || "#64748b"}
+                        value={empresaConfig.corSecundaria}
                         onChange={(e) => setEmpresaConfig({
-                          ...(empresaConfig || {} as EmpresaConfig),
+                          ...empresaConfig,
                           corSecundaria: e.target.value
                         })}
                       />
@@ -835,9 +851,9 @@ export default function Configuracoes() {
                         type="text"
                         placeholder="#64748b"
                         className="flex-1"
-                        value={empresaConfig?.corSecundaria || "#64748b"}
+                        value={empresaConfig.corSecundaria}
                         onChange={(e) => setEmpresaConfig({
-                          ...(empresaConfig || {} as EmpresaConfig),
+                          ...empresaConfig,
                           corSecundaria: e.target.value
                         })}
                       />
