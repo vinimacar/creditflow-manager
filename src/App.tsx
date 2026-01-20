@@ -30,9 +30,8 @@ import Auditoria from "./pages/Auditoria";
 import Notificacoes from "./pages/Notificacoes";
 import AnaliseRentabilidade from "./pages/AnaliseRentabilidade";
 import Backup from "./pages/Backup";
-import AnaliseRentabilidade from "./pages/AnaliseRentabilidade";
-import Backup from "./pages/Backup";
 
+// Build version: 2026-01-20T21:45:00Z - Fix DataTable undefined variant
 const queryClient = new QueryClient();
 
 function AppRoutes() {

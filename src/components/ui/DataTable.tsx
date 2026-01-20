@@ -104,7 +104,9 @@ export function DataTable<T extends { id: string | number }>({
                           Editar
                         </DropdownMenuItem>
                       )}
-                      {customActions && customActions.filter(action => action != null).map((action, index) => (
+                      {customActions && customActions
+                        .filter((action) => action != null && action !== undefined)
+                        .map((action, index) => (
                         <DropdownMenuItem
                           key={index}
                           onClick={() => action.onClick(item)}
