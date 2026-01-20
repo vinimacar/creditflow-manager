@@ -81,10 +81,16 @@ export function PermissoesFuncionarioEditor({
           Personalize as permissões de acesso para funcionários específicos
         </p>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <Label>Selecionar Funcionário</Label>
-            <Select value={funcionarioSelecionado} onValueChange={setFuncionarioSelecionado}>
+        {funcionarios.length === 0 && (
+          <Alert className="mb-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              Nenhum funcionário encontrado. Cadastre funcionários primeiro na aba "Usuários".
+            </AlertDescription>
+          </Alert>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">\n          <div>\n            <Label>Selecionar Funcionário</Label>\n            <Select value={funcionarioSelecionado} onValueChange={setFuncionarioSelecionado}>
               <SelectTrigger>
                 <SelectValue placeholder="Escolha um funcionário" />
               </SelectTrigger>
