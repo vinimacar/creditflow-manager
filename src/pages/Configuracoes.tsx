@@ -26,6 +26,8 @@ import {
   Download,
   Upload,
   RefreshCw,
+  Image as ImageIcon,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { collection, getDocs, doc, setDoc, getDoc, addDoc, Timestamp } from "firebase/firestore";
@@ -33,6 +35,8 @@ import { db, auth } from "@/lib/firebase";
 import { Skeleton } from "@/components/ui/skeleton";
 import { updatePassword } from "firebase/auth";
 import { popularCategoriasInicial } from "@/lib/seed-categorias";
+import { getEmpresaConfig, updateEmpresaConfig, type EmpresaConfig } from "@/lib/firestore";
+import { uploadLogo } from "@/lib/storage";
 import {
   Select,
   SelectContent,
@@ -112,6 +116,11 @@ export default function Configuracoes() {
   const [importando, setImportando] = useState(false);
   const [exportando, setExportando] = useState(false);
   const [populandoCategorias, setPopulandoCategorias] = useState(false);
+  
+  // Estados para personalização
+  const [empresaConfig, setEmpresaConfig] = useState<EmpresaConfig | null>(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [logoPreview, setLogoPreview] = useState<string>("");
   
   // Estados para permissões
   const [cargoSelecionado, setCargoSelecionado] = useState<UserRole>("agente");
@@ -300,7 +309,72 @@ export default function Configuracoes() {
   useEffect(() => {
     carregarUsuarios();
     carregarConfiguracoes();
+    carregarEmpresaConfig();
   }, []);
+
+  const carregarEmpresaConfig = async () => {
+    try {
+      const config = await getEmpresaConfig();
+      if (config) {
+        setEmpresaConfig(config);
+        setLogoPreview(config.logoUrl || "");
+      }
+    } catch (error) {
+      console.error("Erro ao carregar configurações da empresa:", error);
+    }
+  };
+
+  const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validar tipo de arquivo
+    if (!file.type.startsWith('image/')) {
+      toast.error("Por favor, selecione uma imagem válida");
+      return;
+    }
+
+    // Validar tamanho (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("A imagem deve ter no máximo 2MB");
+      return;
+    }
+
+    setUploadingLogo(true);
+    try {
+      const logoUrl = await uploadLogo(file);
+      
+      const updatedConfig: Partial<EmpresaConfig> = {
+        ...(empresaConfig || {}),
+        logoUrl
+      };
+      
+      await updateEmpresaConfig(updatedConfig);
+      await carregarEmpresaConfig();
+      
+      toast.success("Logo atualizada com sucesso!");
+    } catch (error) {
+      console.error("Erro ao fazer upload da logo:", error);
+      toast.error("Erro ao fazer upload da logo");
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
+  const handleSalvarPersonalizacao = async () => {
+    if (!empresaConfig) return;
+    
+    setSalvando(true);
+    try {
+      await updateEmpresaConfig(empresaConfig);
+      toast.success("Configurações salvas com sucesso!");
+    } catch (error) {
+      console.error("Erro ao salvar configurações:", error);
+      toast.error("Erro ao salvar configurações");
+    } finally {
+      setSalvando(false);
+    }
+  };
 
   const handleBackupDados = async () => {
     setExportando(true);
@@ -448,10 +522,14 @@ export default function Configuracoes() {
       />
 
       <Tabs defaultValue="empresa" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4 lg:grid-cols-7 h-auto p-1">
+        <TabsList className="grid w-full grid-cols-4 lg:grid-cols-8 h-auto p-1">
           <TabsTrigger value="empresa" className="gap-2 py-2">
             <Building2 className="w-4 h-4" />
             <span className="hidden sm:inline">Empresa</span>
+          </TabsTrigger>
+          <TabsTrigger value="personalizacao" className="gap-2 py-2">
+            <ImageIcon className="w-4 h-4" />
+            <span className="hidden sm:inline">Personalização</span>
           </TabsTrigger>
           <TabsTrigger value="usuarios" className="gap-2 py-2">
             <Users className="w-4 h-4" />
@@ -536,6 +614,248 @@ export default function Configuracoes() {
               <Button onClick={handleSaveEmpresa} disabled={salvando}>
                 {salvando ? "Salvando..." : "Salvar Alterações"}
               </Button>
+            </div>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="personalizacao">
+          <Card className="p-6">
+            <h3 className="text-lg font-semibold mb-4">Personalização da Empresa</h3>
+            <p className="text-sm text-muted-foreground mb-6">
+              Configure a identidade visual da sua empresa nos relatórios e documentos.
+            </p>
+
+            <div className="space-y-6">
+              {/* Logo da Empresa */}
+              <div className="space-y-4">
+                <div>
+                  <Label className="text-base font-semibold">Logo da Empresa</Label>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Recomendamos imagens em formato PNG ou JPG com fundo transparente (máx. 2MB)
+                  </p>
+                </div>
+
+                <div className="flex items-start gap-6">
+                  {/* Preview da Logo */}
+                  <div className="flex-shrink-0">
+                    {logoPreview ? (
+                      <div className="relative group">
+                        <div className="w-32 h-32 rounded-lg border-2 border-dashed border-border overflow-hidden bg-muted flex items-center justify-center">
+                          <img 
+                            src={logoPreview} 
+                            alt="Logo da empresa" 
+                            className="max-w-full max-h-full object-contain"
+                          />
+                        </div>
+                        <Button
+                          variant="destructive"
+                          size="icon"
+                          className="absolute -top-2 -right-2 h-8 w-8 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={async () => {
+                            try {
+                              await updateEmpresaConfig({ logoUrl: "" });
+                              await carregarEmpresaConfig();
+                              toast.success("Logo removida com sucesso!");
+                            } catch (error) {
+                              toast.error("Erro ao remover logo");
+                            }
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="w-32 h-32 rounded-lg border-2 border-dashed border-border flex items-center justify-center bg-muted">
+                        <ImageIcon className="w-12 h-12 text-muted-foreground" />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Upload Button */}
+                  <div className="flex-1 space-y-3">
+                    <input
+                      type="file"
+                      id="logo-upload"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleLogoUpload}
+                      disabled={uploadingLogo}
+                    />
+                    <Button
+                      variant="outline"
+                      onClick={() => document.getElementById('logo-upload')?.click()}
+                      disabled={uploadingLogo}
+                      className="w-full sm:w-auto"
+                    >
+                      {uploadingLogo ? (
+                        <>
+                          <span className="mr-2">Enviando...</span>
+                        </>
+                      ) : (
+                        <>
+                          <ImageIcon className="w-4 h-4 mr-2" />
+                          {logoPreview ? "Alterar Logo" : "Fazer Upload da Logo"}
+                        </>
+                      )}
+                    </Button>
+                    <p className="text-xs text-muted-foreground">
+                      A logo será exibida em relatórios, PDFs e documentos gerados pelo sistema.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Informações da Empresa */}
+              <div className="space-y-4">
+                <Label className="text-base font-semibold">Informações da Empresa</Label>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="nome-empresa">Nome da Empresa</Label>
+                    <Input
+                      id="nome-empresa"
+                      placeholder="Ex: Crédito Gestor LTDA"
+                      value={empresaConfig?.nomeEmpresa || ""}
+                      onChange={(e) => setEmpresaConfig({
+                        ...(empresaConfig || {} as EmpresaConfig),
+                        nomeEmpresa: e.target.value
+                      })}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="cnpj-empresa">CNPJ</Label>
+                    <Input
+                      id="cnpj-empresa"
+                      placeholder="00.000.000/0000-00"
+                      value={empresaConfig?.cnpj || ""}
+                      onChange={(e) => setEmpresaConfig({
+                        ...(empresaConfig || {} as EmpresaConfig),
+                        cnpj: e.target.value
+                      })}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="telefone-empresa">Telefone</Label>
+                    <Input
+                      id="telefone-empresa"
+                      placeholder="(00) 00000-0000"
+                      value={empresaConfig?.telefone || ""}
+                      onChange={(e) => setEmpresaConfig({
+                        ...(empresaConfig || {} as EmpresaConfig),
+                        telefone: e.target.value
+                      })}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="email-empresa">E-mail</Label>
+                    <Input
+                      id="email-empresa"
+                      type="email"
+                      placeholder="contato@empresa.com.br"
+                      value={empresaConfig?.email || ""}
+                      onChange={(e) => setEmpresaConfig({
+                        ...(empresaConfig || {} as EmpresaConfig),
+                        email: e.target.value
+                      })}
+                    />
+                  </div>
+
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="endereco-empresa">Endereço Completo</Label>
+                    <Input
+                      id="endereco-empresa"
+                      placeholder="Rua, número, bairro, cidade - UF"
+                      value={empresaConfig?.endereco || ""}
+                      onChange={(e) => setEmpresaConfig({
+                        ...(empresaConfig || {} as EmpresaConfig),
+                        endereco: e.target.value
+                      })}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Cores Personalizadas */}
+              <div className="space-y-4">
+                <div>
+                  <Label className="text-base font-semibold">Cores Personalizadas</Label>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Personalize as cores dos relatórios para combinar com a identidade da sua empresa.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="cor-primaria">Cor Primária</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="cor-primaria"
+                        type="color"
+                        className="w-20 h-10 cursor-pointer"
+                        value={empresaConfig?.corPrimaria || "#3b82f6"}
+                        onChange={(e) => setEmpresaConfig({
+                          ...(empresaConfig || {} as EmpresaConfig),
+                          corPrimaria: e.target.value
+                        })}
+                      />
+                      <Input
+                        type="text"
+                        placeholder="#3b82f6"
+                        className="flex-1"
+                        value={empresaConfig?.corPrimaria || "#3b82f6"}
+                        onChange={(e) => setEmpresaConfig({
+                          ...(empresaConfig || {} as EmpresaConfig),
+                          corPrimaria: e.target.value
+                        })}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="cor-secundaria">Cor Secundária</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="cor-secundaria"
+                        type="color"
+                        className="w-20 h-10 cursor-pointer"
+                        value={empresaConfig?.corSecundaria || "#64748b"}
+                        onChange={(e) => setEmpresaConfig({
+                          ...(empresaConfig || {} as EmpresaConfig),
+                          corSecundaria: e.target.value
+                        })}
+                      />
+                      <Input
+                        type="text"
+                        placeholder="#64748b"
+                        className="flex-1"
+                        value={empresaConfig?.corSecundaria || "#64748b"}
+                        onChange={(e) => setEmpresaConfig({
+                          ...(empresaConfig || {} as EmpresaConfig),
+                          corSecundaria: e.target.value
+                        })}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Botão Salvar */}
+              <div className="flex justify-end pt-4">
+                <Button 
+                  onClick={handleSalvarPersonalizacao} 
+                  disabled={salvando}
+                  size="lg"
+                >
+                  {salvando ? "Salvando..." : "Salvar Configurações"}
+                </Button>
+              </div>
             </div>
           </Card>
         </TabsContent>

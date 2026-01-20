@@ -119,10 +119,43 @@
   body {
     @apply bg-background text-foreground font-sans antialiased;
     font-family: 'Inter', system-ui, sans-serif;
+    /* Melhor legibilidade com tamanho de fonte maior */
+    font-size: 15px;
+    line-height: 1.6;
   }
 
   h1, h2, h3, h4, h5, h6 {
     @apply font-semibold tracking-tight;
+    /* Melhor contraste para títulos */
+    color: hsl(var(--foreground));
+  }
+
+  /* Melhorar legibilidade de labels e textos */
+  label {
+    font-size: 14px;
+    font-weight: 500;
+    color: hsl(var(--foreground));
+  }
+
+  /* Inputs com melhor visibilidade */
+  input, select, textarea {
+    font-size: 15px;
+  }
+
+  /* Botões com melhor legibilidade */
+  button {
+    font-size: 15px;
+    font-weight: 500;
+  }
+
+  /* Tabelas com melhor espaçamento */
+  table {
+    font-size: 14px;
+  }
+
+  /* Cards com melhor contraste */
+  .card {
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
   }
 }
 

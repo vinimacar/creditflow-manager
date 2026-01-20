@@ -746,3 +746,69 @@ export async function getFolhasPagamento(): Promise<any[]> {
     return [];
   }
 }
+
+// ========== CONFIGURAÇÕES DA EMPRESA ==========
+export interface EmpresaConfig {
+  id?: string;
+  nomeEmpresa: string;
+  logoUrl?: string;
+  cnpj?: string;
+  telefone?: string;
+  email?: string;
+  endereco?: string;
+  cidade?: string;
+  estado?: string;
+  cep?: string;
+  corPrimaria?: string;
+  corSecundaria?: string;
+  updatedAt?: any;
+}
+
+const empresaConfigCollection = "empresa_config";
+const EMPRESA_CONFIG_ID = "config_principal";
+
+export async function getEmpresaConfig(): Promise<EmpresaConfig | null> {
+  try {
+    const docRef = doc(db, empresaConfigCollection, EMPRESA_CONFIG_ID);
+    const docSnap = await getDoc(docRef);
+    
+    if (docSnap.exists()) {
+      return { id: docSnap.id, ...docSnap.data() } as EmpresaConfig;
+    }
+    
+    // Retorna configuração padrão se não existir
+    return {
+      id: EMPRESA_CONFIG_ID,
+      nomeEmpresa: "CréditoGestor",
+      corPrimaria: "#2563eb",
+      corSecundaria: "#1e40af",
+    };
+  } catch (error) {
+    console.error("Erro ao buscar configurações da empresa:", error);
+    return null;
+  }
+}
+
+export async function updateEmpresaConfig(config: Partial<EmpresaConfig>) {
+  try {
+    const docRef = doc(db, empresaConfigCollection, EMPRESA_CONFIG_ID);
+    const docSnap = await getDoc(docRef);
+    
+    const dados = {
+      ...config,
+      updatedAt: Timestamp.now(),
+    };
+    
+    if (docSnap.exists()) {
+      await updateDoc(docRef, dados);
+    } else {
+      await addDoc(collection(db, empresaConfigCollection), {
+        ...dados,
+        id: EMPRESA_CONFIG_ID,
+      });
+    }
+  } catch (error) {
+    console.error("Erro ao atualizar configurações da empresa:", error);
+    throw error;
+  }
+}

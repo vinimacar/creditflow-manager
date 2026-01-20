@@ -72,7 +72,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { getClientes, getProdutos, getFuncionarios, getVendas, getFornecedores, getBancos, getCategoriasProdutos, addBanco, addCategoriaProduto, type Cliente, type Produto, type Funcionario, type Venda, type Fornecedor, type Banco, type CategoriaProduto } from "@/lib/firestore";
+import { getClientes, getProdutos, getFuncionarios, getVendas, getFornecedores, getBancos, getCategoriasProdutos, addBanco, addCategoriaProduto, getEmpresaConfig, type Cliente, type Produto, type Funcionario, type Venda, type Fornecedor, type Banco, type CategoriaProduto } from "@/lib/firestore";
 import { BANCOS_BRASIL, buscarBancoPorCodigo } from "@/lib/bancos-brasil";
 import { collection, addDoc, Timestamp, updateDoc, doc, deleteDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -749,90 +749,161 @@ export default function PDV() {
     toast.success(`${vendas.length} vendas exportadas para Excel com sucesso!`);
   };
 
-  const handleExportarPDF = () => {
+  const handleExportarPDF = async () => {
     if (vendas.length === 0) {
       toast.error("Não há vendas para exportar");
       return;
     }
 
-    const doc = new jsPDF('l', 'mm', 'a4'); // Orientação landscape
-    
-    // Cabeçalho
-    doc.setFontSize(18);
-    doc.setFont("helvetica", "bold");
-    doc.text("RELATÓRIO DE VENDAS", doc.internal.pageSize.width / 2, 15, { align: "center" });
-    
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.text(`Gerado em: ${format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}`, doc.internal.pageSize.width / 2, 22, { align: "center" });
-    doc.text(`Total de vendas: ${vendas.length}`, doc.internal.pageSize.width / 2, 27, { align: "center" });
+    try {
+      // Buscar configurações da empresa
+      const empresaConfig = await getEmpresaConfig();
 
-    // Preparar dados da tabela
-    const dadosTabela = vendas.map((venda) => {
-      const cliente = clientes.find(c => c.id === venda.clienteId);
-      const produto = produtos.find(p => p.id === venda.produtoId);
-      const funcionario = funcionarios.find(f => f.id === venda.funcionarioId);
+      const doc = new jsPDF('l', 'mm', 'a4'); // Orientação landscape
+      
+      let yPos = 15;
 
-      return [
-        venda.vendaId || venda.id?.substring(0, 8) || "-",
-        venda.createdAt?.toDate ? format(venda.createdAt.toDate(), "dd/MM/yyyy", { locale: ptBR }) : "-",
-        cliente?.nome || "-",
-        produto?.nome || "-",
-        funcionario?.nome || "-",
-        `R$ ${Number(venda.valorContrato).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
-        `${venda.prazo}m`,
-        `R$ ${Number(venda.comissaoAgente || venda.comissao || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
-        venda.status || "aprovada",
-      ];
-    });
+      // Logo da empresa (se disponível)
+      if (empresaConfig?.logoUrl) {
+        try {
+          // Criar imagem temporária para obter as dimensões
+          const img = new Image();
+          img.crossOrigin = "anonymous";
+          img.src = empresaConfig.logoUrl;
+          
+          await new Promise((resolve, reject) => {
+            img.onload = resolve;
+            img.onerror = reject;
+          });
 
-    // Adicionar tabela
-    autoTable(doc, {
-      head: [['ID', 'Data', 'Cliente', 'Produto', 'Agente', 'Valor', 'Prazo', 'Comissão', 'Status']],
-      body: dadosTabela,
-      startY: 35,
-      theme: 'grid',
-      styles: { 
-        fontSize: 8,
-        cellPadding: 2,
-      },
-      headStyles: {
-        fillColor: [41, 128, 185],
-        fontStyle: 'bold',
-        halign: 'center',
-      },
-      columnStyles: {
-        0: { cellWidth: 20 },  // ID
-        1: { cellWidth: 22 },  // Data
-        2: { cellWidth: 45 },  // Cliente
-        3: { cellWidth: 40 },  // Produto
-        4: { cellWidth: 40 },  // Agente
-        5: { cellWidth: 25, halign: 'right' },  // Valor
-        6: { cellWidth: 15, halign: 'center' },  // Prazo
-        7: { cellWidth: 25, halign: 'right' },  // Comissão
-        8: { cellWidth: 20, halign: 'center' },  // Status
-      },
-      margin: { top: 35 },
-    });
+          // Dimensões da logo (máximo 30mm de altura)
+          const logoHeight = 25;
+          const logoWidth = (img.width / img.height) * logoHeight;
+          
+          doc.addImage(empresaConfig.logoUrl, 'PNG', 15, yPos - 5, logoWidth, logoHeight);
+        } catch (error) {
+          console.error("Erro ao carregar logo:", error);
+        }
+      }
 
-    // Rodapé
-    const pageCount = (doc as any).internal.getNumberOfPages();
-    for (let i = 1; i <= pageCount; i++) {
-      doc.setPage(i);
-      doc.setFontSize(8);
-      doc.setFont("helvetica", "italic");
-      doc.text(
-        `Página ${i} de ${pageCount}`,
-        doc.internal.pageSize.width / 2,
-        doc.internal.pageSize.height - 10,
-        { align: "center" }
-      );
+      // Cabeçalho
+      doc.setFontSize(18);
+      doc.setFont("helvetica", "bold");
+      doc.text("RELATÓRIO DE VENDAS", doc.internal.pageSize.width / 2, yPos, { align: "center" });
+      yPos += 7;
+      
+      // Nome da empresa
+      if (empresaConfig?.nomeEmpresa) {
+        doc.setFontSize(11);
+        doc.setFont("helvetica", "normal");
+        doc.text(empresaConfig.nomeEmpresa, doc.internal.pageSize.width / 2, yPos, { align: "center" });
+        yPos += 5;
+      }
+
+      doc.setFontSize(10);
+      doc.text(`Gerado em: ${format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}`, doc.internal.pageSize.width / 2, yPos, { align: "center" });
+      yPos += 5;
+      doc.text(`Total de vendas: ${vendas.length}`, doc.internal.pageSize.width / 2, yPos, { align: "center" });
+
+      // Preparar dados da tabela
+      const dadosTabela = vendas.map((venda) => {
+        const cliente = clientes.find(c => c.id === venda.clienteId);
+        const produto = produtos.find(p => p.id === venda.produtoId);
+        const funcionario = funcionarios.find(f => f.id === venda.funcionarioId);
+
+        return [
+          venda.vendaId || venda.id?.substring(0, 8) || "-",
+          venda.createdAt?.toDate ? format(venda.createdAt.toDate(), "dd/MM/yyyy", { locale: ptBR }) : "-",
+          cliente?.nome || "-",
+          produto?.nome || "-",
+          funcionario?.nome || "-",
+          `R$ ${Number(venda.valorContrato).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
+          `${venda.prazo}m`,
+          `R$ ${Number(venda.comissaoAgente || venda.comissao || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
+          venda.status || "aprovada",
+        ];
+      });
+
+      // Cor primária da empresa ou azul padrão
+      const corPrimaria = empresaConfig?.corPrimaria || "#2980b9";
+      const rgbPrimaria = hexToRgb(corPrimaria);
+
+      // Adicionar tabela
+      autoTable(doc, {
+        head: [['ID', 'Data', 'Cliente', 'Produto', 'Agente', 'Valor', 'Prazo', 'Comissão', 'Status']],
+        body: dadosTabela,
+        startY: yPos + 5,
+        theme: 'grid',
+        styles: { 
+          fontSize: 9,
+          cellPadding: 3,
+          lineColor: [200, 200, 200],
+          lineWidth: 0.1,
+        },
+        headStyles: {
+          fillColor: rgbPrimaria,
+          fontStyle: 'bold',
+          halign: 'center',
+          fontSize: 10,
+        },
+        columnStyles: {
+          0: { cellWidth: 20 },  // ID
+          1: { cellWidth: 22 },  // Data
+          2: { cellWidth: 45 },  // Cliente
+          3: { cellWidth: 40 },  // Produto
+          4: { cellWidth: 40 },  // Agente
+          5: { cellWidth: 25, halign: 'right' },  // Valor
+          6: { cellWidth: 15, halign: 'center' },  // Prazo
+          7: { cellWidth: 25, halign: 'right' },  // Comissão
+          8: { cellWidth: 20, halign: 'center' },  // Status
+        },
+        margin: { top: yPos + 5 },
+      });
+
+      // Rodapé com informações da empresa
+      const pageCount = (doc as any).internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "normal");
+        
+        const footerY = doc.internal.pageSize.height - 10;
+        
+        // Informações da empresa no rodapé
+        if (empresaConfig?.cnpj || empresaConfig?.telefone || empresaConfig?.email) {
+          const footerInfo = [];
+          if (empresaConfig.cnpj) footerInfo.push(`CNPJ: ${empresaConfig.cnpj}`);
+          if (empresaConfig.telefone) footerInfo.push(`Tel: ${empresaConfig.telefone}`);
+          if (empresaConfig.email) footerInfo.push(empresaConfig.email);
+          
+          doc.text(footerInfo.join(" | "), 15, footerY);
+        }
+        
+        doc.setFont("helvetica", "italic");
+        doc.text(
+          `Página ${i} de ${pageCount}`,
+          doc.internal.pageSize.width - 15,
+          footerY,
+          { align: "right" }
+        );
+      }
+
+      const fileName = `vendas_${format(new Date(), "dd-MM-yyyy_HH-mm")}.pdf`;
+      doc.save(fileName);
+
+      toast.success(`${vendas.length} vendas exportadas para PDF com sucesso!`);
+    } catch (error) {
+      console.error("Erro ao exportar PDF:", error);
+      toast.error("Erro ao exportar PDF");
     }
+  };
 
-    const fileName = `vendas_${format(new Date(), "dd-MM-yyyy_HH-mm")}.pdf`;
-    doc.save(fileName);
-
-    toast.success(`${vendas.length} vendas exportadas para PDF com sucesso!`);
+  // Função auxiliar para converter hex para RGB
+  const hexToRgb = (hex: string): [number, number, number] => {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result 
+      ? [parseInt(result[1], 16), parseInt(result[2], 16), parseInt(result[3], 16)]
+      : [41, 128, 185]; // Azul padrão
   };
 
   return (
