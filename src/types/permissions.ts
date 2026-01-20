@@ -60,7 +60,7 @@ export const PERMISSOES_PADRAO: Record<UserRole, Permissoes> = {
     produtos: ["visualizar", "criar", "editar", "exportar"],
     funcionarios: ["visualizar", "criar", "editar"],
     fornecedores: ["visualizar", "criar", "editar", "exportar"],
-    pdv: ["visualizar", "criar", "editar"],
+    pdv: ["visualizar", "criar", "editar", "excluir"],
     conciliacao: ["visualizar", "criar", "editar", "exportar"],
     relatorios: ["visualizar", "exportar"],
     configuracoes: ["visualizar"],
