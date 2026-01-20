@@ -1079,15 +1079,29 @@ export default function PDV() {
       <Dialog open={consultarVendasOpen} onOpenChange={setConsultarVendasOpen}>
         <DialogContent className="max-w-6xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <List className="w-5 h-5" />
-              Consultar Vendas
-              {podeEditarOuEstornar() && (
-                <Badge variant="outline" className="ml-2">
-                  <Shield className="w-3 h-3 mr-1" />
-                  {userProfile?.role === "admin" ? "Administrador" : "Gerente"}
-                </Badge>
-              )}
+            <DialogTitle className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <List className="w-5 h-5" />
+                Consultar Vendas
+                {podeEditarOuEstornar() && (
+                  <Badge variant="outline" className="ml-2">
+                    <Shield className="w-3 h-3 mr-1" />
+                    {userProfile?.role === "admin" ? "Administrador" : "Gerente"}
+                  </Badge>
+                )}
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={async () => {
+                  toast.loading("Atualizando vendas...");
+                  await carregarDados();
+                  toast.dismiss();
+                  toast.success(`${vendas.length} vendas carregadas do banco de dados`);
+                }}
+              >
+                Atualizar Lista
+              </Button>
             </DialogTitle>
           </DialogHeader>
           
@@ -1189,6 +1203,12 @@ export default function PDV() {
                 )}
               </TableBody>
             </Table>
+          </div>
+          
+          <div className="mt-4 p-3 bg-muted rounded-lg">
+            <p className="text-sm text-muted-foreground text-center">
+              📊 Exibindo <span className="font-semibold text-foreground">{vendas.length}</span> {vendas.length === 1 ? 'venda' : 'vendas'} carregada(s) do banco de dados
+            </p>
           </div>
         </DialogContent>
       </Dialog>
