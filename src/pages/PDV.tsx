@@ -227,8 +227,8 @@ export default function PDV() {
       const dataVendaDate = new Date(dataVenda + "T00:00:00");
       const dataVendaTimestamp = Timestamp.fromDate(dataVendaDate);
       
-      await addDoc(collection(db, "vendas"), {
-        id: vendaId,
+      const docRef = await addDoc(collection(db, "vendas"), {
+        vendaId: vendaId, // ID visual da venda (VND-XXXXXX)
         clienteId: selectedCliente,
         produtoId: selectedProduto,
         funcionarioId: selectedFuncionario,
@@ -248,6 +248,8 @@ export default function PDV() {
         criadoPor: userProfile?.uid || "",
         createdAt: dataVendaTimestamp,
       });
+      
+      console.log('Venda criada com docId:', docRef.id, 'e vendaId:', vendaId);
 
       toast.success(`Venda registrada com sucesso! ID: ${vendaId}`);
       
@@ -309,6 +311,7 @@ export default function PDV() {
       const comissaoFornecedorPerc = produtoSelecionado?.comissaoFornecedor || 0;
       const comissaoFornecedorValor = (valorContratoNum * comissaoFornecedorPerc) / 100;
 
+      console.log('Atualizando venda com ID do documento:', vendaSelecionada.id);
       const vendaRef = doc(db, "vendas", vendaSelecionada.id);
       await updateDoc(vendaRef, {
         clienteId: editClienteId,
@@ -353,6 +356,7 @@ export default function PDV() {
     }
 
     try {
+      console.log('Estornando venda com ID do documento:', vendaSelecionada.id);
       const vendaRef = doc(db, "vendas", vendaSelecionada.id);
       await updateDoc(vendaRef, {
         status: "cancelada",
@@ -385,6 +389,7 @@ export default function PDV() {
     }
 
     try {
+      console.log('Excluindo venda com ID do documento:', vendaSelecionada.id);
       const vendaRef = doc(db, "vendas", vendaSelecionada.id);
       await deleteDoc(vendaRef);
 
@@ -1087,7 +1092,7 @@ export default function PDV() {
                       
                       return (
                         <TableRow key={venda.id}>
-                          <TableCell className="font-mono text-xs">{venda.id}</TableCell>
+                          <TableCell className="font-mono text-xs">{venda.vendaId || venda.id}</TableCell>
                           <TableCell>
                             {venda.createdAt?.toDate
                               ? format(venda.createdAt.toDate(), "dd/MM/yyyy", { locale: ptBR })
@@ -1264,7 +1269,7 @@ export default function PDV() {
               <div className="mt-4 p-4 bg-muted rounded-lg space-y-2">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">ID:</span>
-                  <span className="font-mono font-semibold">{vendaSelecionada?.id}</span>
+                  <span className="font-mono font-semibold">{vendaSelecionada?.vendaId || vendaSelecionada?.id}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Cliente:</span>
@@ -1314,7 +1319,7 @@ export default function PDV() {
               <div className="mt-4 p-4 bg-muted rounded-lg space-y-2">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">ID:</span>
-                  <span className="font-mono font-semibold">{vendaSelecionada?.id}</span>
+                  <span className="font-mono font-semibold">{vendaSelecionada?.vendaId || vendaSelecionada?.id}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Cliente:</span>
