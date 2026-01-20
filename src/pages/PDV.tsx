@@ -72,7 +72,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { getClientes, getProdutos, getFuncionarios, getVendas, getFornecedores, getBancos, getCategoriasProdutos, addBanco, addCategoriaProduto, type Cliente, type Produto, type Funcionario, type Venda, type Fornecedor, type Banco, type CategoriaProduto } from "@/lib/firestore";
 import { BANCOS_BRASIL, buscarBancoPorCodigo } from "@/lib/bancos-brasil";
-import { collection, addDoc, Timestamp, updateDoc, doc, deleteDoc } from "firebase/firestore";
+import { collection, addDoc, Timestamp, updateDoc, doc, deleteDoc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import jsPDF from "jspdf";
@@ -313,6 +313,16 @@ export default function PDV() {
 
       console.log('Atualizando venda com ID do documento:', vendaSelecionada.id);
       const vendaRef = doc(db, "vendas", vendaSelecionada.id);
+      
+      // Verificar se o documento existe antes de atualizar
+      const vendaDoc = await getDoc(vendaRef);
+      if (!vendaDoc.exists()) {
+        toast.error("Esta venda não existe mais no banco de dados");
+        setEditarVendaOpen(false);
+        await carregarDados();
+        return;
+      }
+      
       await updateDoc(vendaRef, {
         clienteId: editClienteId,
         produtoId: editProdutoId,
@@ -328,6 +338,7 @@ export default function PDV() {
         comissaoAgentePercentual: comissaoCalculada.percentual,
         comissaoFornecedor: comissaoFornecedorValor,
         comissaoFornecedorPercentual: comissaoFornecedorPerc,
+        updatedAt: Timestamp.now(),
       });
 
       toast.success("Venda atualizada com sucesso!");
@@ -358,8 +369,20 @@ export default function PDV() {
     try {
       console.log('Estornando venda com ID do documento:', vendaSelecionada.id);
       const vendaRef = doc(db, "vendas", vendaSelecionada.id);
+      
+      // Verificar se o documento existe antes de estornar
+      const vendaDoc = await getDoc(vendaRef);
+      if (!vendaDoc.exists()) {
+        toast.error("Esta venda não existe mais no banco de dados");
+        setEstornarConfirmOpen(false);
+        setVendaSelecionada(null);
+        await carregarDados();
+        return;
+      }
+      
       await updateDoc(vendaRef, {
         status: "cancelada",
+        updatedAt: Timestamp.now(),
       });
 
       toast.success("Venda estornada com sucesso!");
@@ -391,6 +414,17 @@ export default function PDV() {
     try {
       console.log('Excluindo venda com ID do documento:', vendaSelecionada.id);
       const vendaRef = doc(db, "vendas", vendaSelecionada.id);
+      
+      // Verificar se o documento existe antes de excluir
+      const vendaDoc = await getDoc(vendaRef);
+      if (!vendaDoc.exists()) {
+        toast.error("Esta venda não existe mais no banco de dados");
+        setExcluirConfirmOpen(false);
+        setVendaSelecionada(null);
+        await carregarDados();
+        return;
+      }
+      
       await deleteDoc(vendaRef);
 
       toast.success("Venda excluída com sucesso!");
