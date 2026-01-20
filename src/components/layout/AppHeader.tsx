@@ -1,4 +1,4 @@
-import { Search, User } from "lucide-react";
+import { Search, User, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -14,7 +14,12 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Badge } from "@/components/ui/badge";
 import { NotificationBell } from "./NotificationBell";
 
-export function AppHeader() {
+interface AppHeaderProps {
+  onMenuClick: () => void;
+  sidebarCollapsed: boolean;
+}
+
+export function AppHeader({ onMenuClick, sidebarCollapsed }: AppHeaderProps) {
   const { user, signOut } = useAuth();
 
   const getRoleBadge = (role: string) => {
@@ -28,45 +33,64 @@ export function AppHeader() {
   };
 
   const roleInfo = user ? getRoleBadge(user.role) : null;
+  
   return (
-    <header className="h-16 border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-30 flex items-center justify-between px-6">
-      {/* Search */}
-      <div className="relative w-96">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input
-          placeholder="Buscar clientes, produtos, vendas..."
-          className="pl-9 bg-background border-border/50"
-        />
+    <header className="h-16 border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md sticky top-0 z-30 flex items-center justify-between px-4 md:px-6 shadow-sm">
+      {/* Left section */}
+      <div className="flex items-center gap-3 md:gap-4 flex-1">
+        {/* Mobile menu button */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="lg:hidden"
+          onClick={onMenuClick}
+        >
+          <Menu className="w-5 h-5" />
+        </Button>
+
+        {/* Search */}
+        <div className="relative w-full max-w-md hidden sm:block">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <Input
+            placeholder="Buscar clientes, produtos, vendas..."
+            className="pl-9 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-900 transition-colors"
+          />
+        </div>
       </div>
 
       {/* Right section */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 md:gap-3">
+        {/* Search button for mobile */}
+        <Button variant="ghost" size="icon" className="sm:hidden">
+          <Search className="w-5 h-5" />
+        </Button>
+
         {/* Notifications */}
         <NotificationBell />
 
         {/* User menu */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="flex items-center gap-2 px-2">
-              <Avatar className="w-8 h-8">
+            <Button variant="ghost" className="flex items-center gap-2 px-2 hover:bg-slate-100 dark:hover:bg-slate-800">
+              <Avatar className="w-8 h-8 border-2 border-blue-500 shadow-sm">
                 <AvatarImage src={user?.photoURL} />
-                <AvatarFallback className="bg-primary text-primary-foreground text-xs">
+                <AvatarFallback className="bg-gradient-to-br from-blue-600 to-blue-700 text-white text-xs font-semibold">
                   {user?.displayName?.split(" ").map(n => n[0]).join("").slice(0, 2) || "U"}
                 </AvatarFallback>
               </Avatar>
-              <div className="text-left hidden md:block">
-                <p className="text-sm font-medium">{user?.displayName || "Usuário"}</p>
-                <p className="text-xs text-muted-foreground">{roleInfo?.label}</p>
+              <div className="text-left hidden lg:block">
+                <p className="text-sm font-medium text-slate-900 dark:text-white">{user?.displayName || "Usuário"}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">{roleInfo?.label}</p>
               </div>
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuContent align="end" className="w-64">
             <DropdownMenuLabel>
-              <div className="flex flex-col space-y-1">
-                <p className="text-sm font-medium">{user?.displayName}</p>
-                <p className="text-xs text-muted-foreground">{user?.email}</p>
+              <div className="flex flex-col space-y-2">
+                <p className="text-sm font-semibold text-slate-900 dark:text-white">{user?.displayName}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 break-all">{user?.email}</p>
                 {roleInfo && (
-                  <Badge variant={roleInfo.variant} className="w-fit mt-1">
+                  <Badge variant={roleInfo.variant} className="w-fit">
                     {roleInfo.label}
                   </Badge>
                 )}
@@ -75,10 +99,10 @@ export function AppHeader() {
             <DropdownMenuSeparator />
             <DropdownMenuItem>
               <User className="w-4 h-4 mr-2" />
-              Perfil
+              Meu Perfil
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={signOut} className="text-destructive focus:text-destructive">
-              Sair
+            <DropdownMenuItem onClick={signOut} className="text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-900/20">
+              Sair do Sistema
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
