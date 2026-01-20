@@ -25,13 +25,13 @@ import { Shield, User, Lock, Unlock, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface PermissoesFuncionarioEditorProps {
-  funcionarios: UserProfile[];
+  funcionarios?: UserProfile[];
   onSalvar: (funcionarioId: string, permissoes: Permissoes, usarPadrao: boolean) => void;
   salvando: boolean;
 }
 
 export function PermissoesFuncionarioEditor({
-  funcionarios,
+  funcionarios = [],
   onSalvar,
   salvando,
 }: PermissoesFuncionarioEditorProps) {
@@ -39,7 +39,7 @@ export function PermissoesFuncionarioEditor({
   const [usarPermissoesCargo, setUsarPermissoesCargo] = useState(true);
   const [permissoesCustomizadas, setPermissoesCustomizadas] = useState<Permissoes>({});
 
-  const funcionario = funcionarios.find((f) => f.uid === funcionarioSelecionado);
+  const funcionario = funcionarios?.find((f) => f.uid === funcionarioSelecionado);
   const modulos = Object.keys(MODULOS_LABELS) as Modulo[];
   const acoesPossiveis: Acao[] = ["visualizar", "criar", "editar", "excluir", "exportar"];
 
@@ -81,7 +81,7 @@ export function PermissoesFuncionarioEditor({
           Personalize as permissões de acesso para funcionários específicos
         </p>
 
-        {funcionarios.length === 0 && (
+        {funcionarios?.length === 0 && (
           <Alert className="mb-4">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
@@ -95,7 +95,7 @@ export function PermissoesFuncionarioEditor({
                 <SelectValue placeholder="Escolha um funcionário" />
               </SelectTrigger>
               <SelectContent>
-                {funcionarios.map((func) => (
+                {funcionarios?.map((func) => (
                   <SelectItem key={func.uid} value={func.uid}>
                     <div className="flex items-center gap-2">
                       <span>{func.displayName}</span>
