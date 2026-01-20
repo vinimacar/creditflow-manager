@@ -636,7 +636,7 @@ export default function Configuracoes() {
 
               <TabsContent value="porFuncionario" className="space-y-4 mt-6">
                 <PermissoesFuncionarioEditor
-                  usuarios={usuarios}
+                  funcionarios={usuarios}
                   onSalvar={handleSavePermissoesFuncionario}
                   salvando={salvandoPermissoes}
                 />

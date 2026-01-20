@@ -43,6 +43,10 @@ export function PermissoesFuncionarioEditor({
   const modulos = Object.keys(MODULOS_LABELS) as Modulo[];
   const acoesPossiveis: Acao[] = ["visualizar", "criar", "editar", "excluir", "exportar"];
 
+  // Debug: verificar se funcionários estão sendo carregados
+  console.log('PermissoesFuncionarioEditor - funcionarios:', funcionarios);
+  console.log('PermissoesFuncionarioEditor - total funcionarios:', funcionarios?.length);
+
   useEffect(() => {
     if (funcionario && usarPermissoesCargo) {
       setPermissoesCustomizadas(PERMISSOES_PADRAO[funcionario.role || "atendente"]);
@@ -90,7 +94,10 @@ export function PermissoesFuncionarioEditor({
           </Alert>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">\n          <div>\n            <Label>Selecionar Funcionário</Label>\n            <Select value={funcionarioSelecionado} onValueChange={setFuncionarioSelecionado}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <Label>Selecionar Funcionário</Label>
+            <Select value={funcionarioSelecionado} onValueChange={setFuncionarioSelecionado}>
               <SelectTrigger>
                 <SelectValue placeholder="Escolha um funcionário" />
               </SelectTrigger>
