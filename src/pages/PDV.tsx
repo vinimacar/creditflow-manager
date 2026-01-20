@@ -72,7 +72,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { getClientes, getProdutos, getFuncionarios, getVendas, getFornecedores, getBancos, getCategoriasProdutos, addBanco, addCategoriaProduto, type Cliente, type Produto, type Funcionario, type Venda, type Fornecedor, type Banco, type CategoriaProduto } from "@/lib/firestore";
 import { BANCOS_BRASIL, buscarBancoPorCodigo } from "@/lib/bancos-brasil";
-import { collection, addDoc, Timestamp, updateDoc, doc, deleteDoc, getDoc } from "firebase/firestore";
+import { collection, addDoc, Timestamp, updateDoc, doc, deleteDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import jsPDF from "jspdf";
@@ -311,17 +311,10 @@ export default function PDV() {
       const comissaoFornecedorPerc = produtoSelecionado?.comissaoFornecedor || 0;
       const comissaoFornecedorValor = (valorContratoNum * comissaoFornecedorPerc) / 100;
 
-      console.log('Atualizando venda com ID do documento:', vendaSelecionada.id);
-      const vendaRef = doc(db, "vendas", vendaSelecionada.id);
+      console.log('Atualizando venda - ID do documento:', vendaSelecionada.id);
+      console.log('Venda completa:', vendaSelecionada);
       
-      // Verificar se o documento existe antes de atualizar
-      const vendaDoc = await getDoc(vendaRef);
-      if (!vendaDoc.exists()) {
-        toast.error("Esta venda não existe mais no banco de dados");
-        setEditarVendaOpen(false);
-        await carregarDados();
-        return;
-      }
+      const vendaRef = doc(db, "vendas", vendaSelecionada.id);
       
       await updateDoc(vendaRef, {
         clienteId: editClienteId,
@@ -344,9 +337,18 @@ export default function PDV() {
       toast.success("Venda atualizada com sucesso!");
       setEditarVendaOpen(false);
       await carregarDados();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao atualizar venda:", error);
-      toast.error("Erro ao atualizar venda");
+      console.error("Código do erro:", error?.code);
+      console.error("Mensagem do erro:", error?.message);
+      
+      if (error?.code === 'not-found' || error?.message?.includes('No document to update')) {
+        toast.error("Esta venda não existe mais no banco de dados");
+        setEditarVendaOpen(false);
+        await carregarDados();
+      } else {
+        toast.error("Erro ao atualizar venda: " + (error?.message || "Erro desconhecido"));
+      }
     }
   };
 
@@ -370,16 +372,6 @@ export default function PDV() {
       console.log('Estornando venda com ID do documento:', vendaSelecionada.id);
       const vendaRef = doc(db, "vendas", vendaSelecionada.id);
       
-      // Verificar se o documento existe antes de estornar
-      const vendaDoc = await getDoc(vendaRef);
-      if (!vendaDoc.exists()) {
-        toast.error("Esta venda não existe mais no banco de dados");
-        setEstornarConfirmOpen(false);
-        setVendaSelecionada(null);
-        await carregarDados();
-        return;
-      }
-      
       await updateDoc(vendaRef, {
         status: "cancelada",
         updatedAt: Timestamp.now(),
@@ -389,9 +381,18 @@ export default function PDV() {
       setEstornarConfirmOpen(false);
       setVendaSelecionada(null);
       await carregarDados();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao estornar venda:", error);
-      toast.error("Erro ao estornar venda");
+      console.error("Código do erro:", error?.code);
+      
+      if (error?.code === 'not-found' || error?.message?.includes('No document to update')) {
+        toast.error("Esta venda não existe mais no banco de dados");
+        setEstornarConfirmOpen(false);
+        setVendaSelecionada(null);
+        await carregarDados();
+      } else {
+        toast.error("Erro ao estornar venda: " + (error?.message || "Erro desconhecido"));
+      }
     }
   };
 
@@ -415,25 +416,24 @@ export default function PDV() {
       console.log('Excluindo venda com ID do documento:', vendaSelecionada.id);
       const vendaRef = doc(db, "vendas", vendaSelecionada.id);
       
-      // Verificar se o documento existe antes de excluir
-      const vendaDoc = await getDoc(vendaRef);
-      if (!vendaDoc.exists()) {
-        toast.error("Esta venda não existe mais no banco de dados");
-        setExcluirConfirmOpen(false);
-        setVendaSelecionada(null);
-        await carregarDados();
-        return;
-      }
-      
       await deleteDoc(vendaRef);
 
       toast.success("Venda excluída com sucesso!");
       setExcluirConfirmOpen(false);
       setVendaSelecionada(null);
       await carregarDados();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao excluir venda:", error);
-      toast.error("Erro ao excluir venda");
+      console.error("Código do erro:", error?.code);
+      
+      if (error?.code === 'not-found' || error?.message?.includes('No document to update')) {
+        toast.error("Esta venda não existe mais no banco de dados");
+        setExcluirConfirmOpen(false);
+        setVendaSelecionada(null);
+        await carregarDados();
+      } else {
+        toast.error("Erro ao excluir venda: " + (error?.message || "Erro desconhecido"));
+      }
     }
   };
 
