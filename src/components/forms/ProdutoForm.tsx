@@ -510,6 +510,7 @@ export function ProdutoForm({ onSuccess, initialData }: ProdutoFormProps) {
                       max="100"
                       step="0.1"
                       placeholder="0 = Sem comissão"
+                      disabled={!formData.comissaoAtiva}
                     />
                   </div>
                 </div>

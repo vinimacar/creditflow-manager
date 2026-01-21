@@ -264,7 +264,6 @@ export function ClienteForm({ onSuccess, initialData }: ClienteFormProps) {
               )}
             </Button>
           </div>
-          <Input id="senhaINSS" type="password" {...register("senhaINSS")} placeholder="••••••" />
         </div>
       </div>
 
