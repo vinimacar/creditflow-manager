@@ -87,6 +87,7 @@ export default function ComissoesReceber() {
   const handleImportarRelatorioFornecedor = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    let conferidos = 0;
     try {
       const text = await file.text();
       // Suporte básico: CSV com colunas [vendaId, valorComissao, status]
@@ -96,7 +97,8 @@ export default function ComissoesReceber() {
       const idxVenda = cabecalho.findIndex(h => h.toLowerCase().includes("venda"));
       const idxValor = cabecalho.findIndex(h => h.toLowerCase().includes("valor"));
       const idxStatus = cabecalho.findIndex(h => h.toLowerCase().includes("status"));
-      let conferidos = 0;
+      // Coletar todas as atualizações em um array de promessas
+      const updates = [];
       for (let i = 1; i < linhas.length; i++) {
         const cols = linhas[i].split(",");
         if (cols.length < Math.max(idxVenda, idxValor, idxStatus) + 1) continue;
@@ -105,20 +107,24 @@ export default function ComissoesReceber() {
         const status = cols[idxStatus]?.toLowerCase();
         const comissao = comissoes.find(c => c.vendaId === vendaId);
         if (comissao && Math.abs(comissao.valorComissao - valor) < 0.01) {
-          // Atualiza status para conferido/recebido se bater
-          await updateDoc(doc(db, "comissoesReceber", comissao.id!), {
-            status: status === "recebido" ? "recebido" : "conferido",
-            atualizadoEm: Timestamp.fromDate(new Date()),
-          });
-          conferidos++;
+          updates.push(
+            updateDoc(doc(db, "comissoesReceber", comissao.id!), {
+              status: status === "recebido" ? "recebido" : "conferido",
+              atualizadoEm: Timestamp.fromDate(new Date()),
+            })
+              .then(() => { conferidos++; })
+              .catch(() => {/* erro individual ignorado para não travar lote */})
+          );
         }
       }
+      await Promise.all(updates);
       toast.success(`${conferidos} comissões conferidas automaticamente!`);
       await carregarComissoes();
     } catch (error) {
       toast.error("Erro ao importar/conferir relatório");
+    } finally {
+      setImportDialogOpen(false);
     }
-    setImportDialogOpen(false);
   };
 
   useEffect(() => {
