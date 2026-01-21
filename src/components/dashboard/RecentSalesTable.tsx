@@ -102,7 +102,7 @@ export function RecentSalesTable() {
             </TableRow>
           ) : (
             vendas.map((venda) => {
-              const status = statusConfig[venda.status as keyof typeof statusConfig];
+              const status = statusConfig[venda.status as keyof typeof statusConfig] || statusConfig.pendente;
               const dataVenda = venda.createdAt?.toDate?.() || new Date(venda.createdAt);
               return (
                 <TableRow key={venda.id} className="cursor-pointer">
