@@ -130,7 +130,7 @@ export default function ComissoesReceber() {
     try {
       setLoading(true);
 
-      const [vendas, fornecedores, produtos, funcionarios, clientes, comissoesSnapshot] = await Promise.all([
+      const [vendas, fornecedoresList, produtos, funcionarios, clientes, comissoesSnapshot] = await Promise.all([
         getVendas(),
         getFornecedores(),
         getProdutos(),
@@ -154,7 +154,7 @@ export default function ComissoesReceber() {
         if (venda.status !== "aprovada") continue;
 
         const produto = produtos.find(p => p.id === venda.produtoId);
-        const fornecedor = fornecedores.find(f => f.id === produto?.fornecedorId);
+        const fornecedor = fornecedoresList.find(f => f.id === produto?.fornecedorId);
         const funcionario = funcionarios.find(f => f.id === venda.funcionarioId);
         const cliente = clientes.find(c => c.id === venda.clienteId);
 
