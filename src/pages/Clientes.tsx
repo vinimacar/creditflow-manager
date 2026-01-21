@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/ui/PageHeader";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import { DataTable } from "@/components/ui/DataTable";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -131,6 +133,55 @@ const clienteTemplateColumns = [
 
 export default function Clientes() {
   const [isFormOpen, setIsFormOpen] = useState(false);
+    // Imprimir lista de clientes
+    const handleImprimirListaClientes = () => {
+      const doc = new jsPDF();
+      doc.setFontSize(16);
+      doc.text("Lista de Clientes", 14, 18);
+      autoTable(doc, {
+        startY: 24,
+        head: [["Nome", "CPF", "Email", "Telefone", "Cidade", "Estado", "Nascimento", "Status"]],
+        body: clientes.map(c => [
+          c.nome,
+          c.cpf,
+          c.email,
+          c.telefone,
+          c.cidade,
+          c.estado,
+          formatarDataBR(c.dataNascimento),
+          c.status === "ativo" ? "Ativo" : "Inativo"
+        ]),
+        theme: "striped",
+        headStyles: { fillColor: [59,130,246] },
+        styles: { fontSize: 10 },
+      });
+      doc.save("clientes_lista.pdf");
+    };
+
+    // Imprimir histórico do cliente selecionado
+    const handleImprimirHistorico = () => {
+      if (!selectedCliente) return;
+      const doc = new jsPDF();
+      doc.setFontSize(16);
+      doc.text(`Histórico de ${selectedCliente.nome}`, 14, 18);
+      autoTable(doc, {
+        startY: 24,
+        head: [["Produto", "Vendedor", "Valor", "Prazo", "Comissão", "Data", "Status"]],
+        body: historico.map(v => [
+          getNomeProduto(v.produtoId),
+          getNomeFuncionario(v.funcionarioId),
+          formatarMoeda(v.valorContrato),
+          `${v.prazo} meses`,
+          `${formatarMoeda(v.comissao)} (${v.comissaoPercentual}%)`,
+          formatarData(v.createdAt),
+          getStatusLabel(v.status)
+        ]),
+        theme: "striped",
+        headStyles: { fillColor: [59,130,246] },
+        styles: { fontSize: 10 },
+      });
+      doc.save(`historico_${selectedCliente.nome}.pdf`);
+    };
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isHistoricoOpen, setIsHistoricoOpen] = useState(false);
   const [clientes, setClientes] = useState<Cliente[]>([]);
@@ -274,10 +325,16 @@ export default function Clientes() {
           onClick: () => setIsFormOpen(true),
         }}
       >
-        <Button variant="outline" className="gap-2" onClick={() => setIsImportOpen(true)}>
-          <Upload className="w-4 h-4" />
-          Importar
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" className="gap-2" onClick={() => setIsImportOpen(true)}>
+            <Upload className="w-4 h-4" />
+            Importar
+          </Button>
+          <Button variant="outline" className="gap-2" onClick={handleImprimirListaClientes}>
+            <History className="w-4 h-4" />
+            Imprimir lista de clientes
+          </Button>
+        </div>
       </PageHeader>
 
       <DataTable
@@ -325,6 +382,9 @@ export default function Clientes() {
             <DialogTitle className="flex items-center gap-2">
               <History className="w-5 h-5" />
               Histórico de Vendas
+              <Button variant="outline" size="sm" className="ml-2" onClick={handleImprimirHistorico} disabled={historico.length === 0}>
+                <History className="w-4 h-4" /> Imprimir histórico
+              </Button>
             </DialogTitle>
             <DialogDescription>
               {selectedCliente && (
