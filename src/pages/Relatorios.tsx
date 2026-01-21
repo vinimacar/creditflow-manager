@@ -967,7 +967,7 @@ export default function Relatorios() {
                       R$ {despesa.valor.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                     </TableCell>
                     <TableCell className="text-center">
-                      <Badge variant={despesa.status === "pago" ? "default" : despesa.status === "pendente" ? "secondary" : "destructive"}>
+                      <Badge variant={despesa.status === "Pago" ? "default" : despesa.status === "Pendente" ? "secondary" : "destructive"}>
                         {despesa.status}
                       </Badge>
                     </TableCell>
