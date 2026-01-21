@@ -779,7 +779,7 @@ export default function Relatorios() {
         y += 10;
         autoTable(doc, {
           startY: y,
-          head: [["Data", "Cliente", "Produto", "Valor Contrato", "Comissão Fornecedor", "Comissão Agente"]],
+          head: [["Data", "Cliente", "Produto", "Valor Contrato", "Comissão Fornecedor", "Comissão Funcionário"]],
           body: dadosFiltrados.map(v => [
             format(v.data, "dd/MM/yyyy", { locale: ptBR }),
             v.cliente,
@@ -1000,11 +1000,11 @@ export default function Relatorios() {
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger className="flex items-center justify-end gap-1 w-full">
-                          Comissão Agente (%)
+                          Comissão Funcionário (%)
                           <HelpCircle className="w-3 h-3" />
                         </TooltipTrigger>
                         <TooltipContent>
-                          <p>Percentual da comissão do agente/vendedor</p>
+                          <p>Percentual da comissão do funcionário/vendedor</p>
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
@@ -1013,11 +1013,11 @@ export default function Relatorios() {
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger className="flex items-center justify-end gap-1 w-full">
-                          Comissão Agente (R$)
+                          Comissão Funcionário (R$)
                           <HelpCircle className="w-3 h-3" />
                         </TooltipTrigger>
                         <TooltipContent>
-                          <p>Valor em reais da comissão do agente/vendedor</p>
+                          <p>Valor em reais da comissão do funcionário/vendedor</p>
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>

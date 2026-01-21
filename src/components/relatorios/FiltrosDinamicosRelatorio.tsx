@@ -176,8 +176,8 @@ export function FiltrosDinamicosRelatorio({
           </Select>
         </div>
 
-        {/* Fornecedor (condicional) */}
-        {filtros.tipoRelatorio !== "fornecedores" && fornecedores.length > 0 && (
+        {/* Fornecedor */}
+        {fornecedores.length > 0 && (
           <div className="space-y-2">
             <Label>Fornecedor</Label>
             <Select
@@ -204,8 +204,8 @@ export function FiltrosDinamicosRelatorio({
           </div>
         )}
 
-        {/* Funcionário (condicional) */}
-        {filtros.tipoRelatorio !== "funcionarios" && funcionarios.length > 0 && (
+        {/* Funcionário */}
+        {funcionarios.length > 0 && (
           <div className="space-y-2">
             <Label>Funcionário</Label>
             <Select
@@ -232,8 +232,8 @@ export function FiltrosDinamicosRelatorio({
           </div>
         )}
 
-        {/* Produto (condicional) */}
-        {filtros.tipoRelatorio !== "produtos" && produtos.length > 0 && (
+        {/* Produto */}
+        {produtos.length > 0 && (
           <div className="space-y-2">
             <Label>Produto</Label>
             <Select
