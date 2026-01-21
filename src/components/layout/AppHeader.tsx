@@ -1,6 +1,5 @@
-import { Search, User, Menu } from "lucide-react";
+import { User, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,6 +12,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { Badge } from "@/components/ui/badge";
 import { NotificationBell } from "./NotificationBell";
+import { GlobalSearch } from "./GlobalSearch";
 
 interface AppHeaderProps {
   onMenuClick: () => void;
@@ -49,21 +49,11 @@ export function AppHeader({ onMenuClick, sidebarCollapsed }: AppHeaderProps) {
         </Button>
 
         {/* Search */}
-        <div className="relative w-full max-w-md hidden sm:block">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <Input
-            placeholder="Buscar clientes, produtos, vendas..."
-            className="pl-9 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-900 transition-colors"
-          />
-        </div>
+        <GlobalSearch />
       </div>
 
       {/* Right section */}
       <div className="flex items-center gap-2 md:gap-3">
-        {/* Search button for mobile */}
-        <Button variant="ghost" size="icon" className="sm:hidden">
-          <Search className="w-5 h-5" />
-        </Button>
 
         {/* Notifications */}
         <NotificationBell />
