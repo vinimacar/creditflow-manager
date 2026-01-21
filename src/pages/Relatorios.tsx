@@ -240,6 +240,55 @@ export default function Relatorios() {
     };
   }, [vendasFiltradas, despesasCompletas, folhasPagamento, filtros.periodo]);
 
+  // Despesas filtradas por período
+  const despesasFiltradas = useMemo(() => {
+    let despesas = despesasCompletas;
+    
+    if (filtros.periodo?.from) {
+      despesas = despesas.filter(d => {
+        const dataDespesa = new Date(d.dataVencimento);
+        const from = filtros.periodo!.from!;
+        const to = filtros.periodo!.to || from;
+        return dataDespesa >= from && dataDespesa <= to;
+      });
+    }
+    
+    return despesas.sort((a, b) => 
+      new Date(b.dataVencimento).getTime() - new Date(a.dataVencimento).getTime()
+    );
+  }, [despesasCompletas, filtros.periodo]);
+
+  // Vendas por funcionário
+  const vendasPorFuncionario = useMemo(() => {
+    const vendas = vendasFiltradas;
+    const funcMap = new Map<string, {
+      nome: string;
+      vendas: VendaDetalhada[];
+      totalVendas: number;
+      totalComissao: number;
+      quantidadeVendas: number;
+    }>();
+    
+    vendas.forEach(v => {
+      const current = funcMap.get(v.funcionario) || {
+        nome: v.funcionario,
+        vendas: [],
+        totalVendas: 0,
+        totalComissao: 0,
+        quantidadeVendas: 0,
+      };
+      
+      current.vendas.push(v);
+      current.totalVendas += v.valorContrato;
+      current.totalComissao += v.comissaoFuncionario;
+      current.quantidadeVendas += 1;
+      
+      funcMap.set(v.funcionario, current);
+    });
+    
+    return Array.from(funcMap.values()).sort((a, b) => b.totalComissao - a.totalComissao);
+  }, [vendasFiltradas]);
+
   // Dados para gráficos
   const dadosGraficos = useMemo(() => {
     const vendas = vendasFiltradas;
@@ -877,6 +926,128 @@ export default function Relatorios() {
                 ))}
               </TableBody>
             </Table>
+          </div>
+        </Card>
+      )}
+
+      {/* Tabela de Despesas do Período */}
+      {despesasFiltradas.length > 0 && (
+        <Card>
+          <div className="p-6 border-b">
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <TrendingDown className="w-5 h-5 text-red-500" />
+              Despesas do Período
+            </h3>
+            <p className="text-sm text-muted-foreground mt-1">
+              {despesasFiltradas.length} {despesasFiltradas.length === 1 ? 'despesa' : 'despesas'} • Total: R$ {despesasFiltradas.reduce((sum, d) => sum + d.valor, 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/50">
+                  <TableHead className="w-[120px]">Data Venc.</TableHead>
+                  <TableHead>Descrição</TableHead>
+                  <TableHead>Categoria</TableHead>
+                  <TableHead className="text-right">Valor</TableHead>
+                  <TableHead className="text-center">Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {despesasFiltradas.map((despesa) => (
+                  <TableRow key={despesa.id} className="hover:bg-muted/50">
+                    <TableCell className="whitespace-nowrap font-mono text-xs">
+                      {format(new Date(despesa.dataVencimento), "dd/MM/yyyy", { locale: ptBR })}
+                    </TableCell>
+                    <TableCell className="font-medium">{despesa.descricao}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{despesa.categoria}</Badge>
+                    </TableCell>
+                    <TableCell className="text-right font-semibold text-red-700 dark:text-red-400">
+                      R$ {despesa.valor.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Badge variant={despesa.status === "pago" ? "default" : despesa.status === "pendente" ? "secondary" : "destructive"}>
+                        {despesa.status}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </Card>
+      )}
+
+      {/* Tabela de Vendas por Funcionário */}
+      {vendasPorFuncionario.length > 0 && (
+        <Card>
+          <div className="p-6 border-b">
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <Users className="w-5 h-5 text-blue-500" />
+              Vendas por Funcionário
+            </h3>
+            <p className="text-sm text-muted-foreground mt-1">
+              Desempenho individual com detalhamento de vendas
+            </p>
+          </div>
+          <div className="space-y-4 p-6">
+            {vendasPorFuncionario.map((func, idx) => (
+              <div key={func.nome} className="border rounded-lg overflow-hidden">
+                <div className="bg-muted/50 p-4 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center font-bold text-blue-700 dark:text-blue-300">
+                      {idx + 1}º
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-lg">{func.nome}</h4>
+                      <p className="text-sm text-muted-foreground">
+                        {func.quantidadeVendas} {func.quantidadeVendas === 1 ? 'venda' : 'vendas'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm text-muted-foreground">Total Vendido</p>
+                    <p className="text-lg font-bold text-blue-700 dark:text-blue-400">
+                      R$ {func.totalVendas.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                    </p>
+                    <p className="text-sm text-green-600 dark:text-green-400 font-semibold">
+                      Comissão: R$ {func.totalComissao.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/30">
+                        <TableHead className="w-[100px]">Data</TableHead>
+                        <TableHead>Cliente</TableHead>
+                        <TableHead>Produto</TableHead>
+                        <TableHead className="text-right">Valor</TableHead>
+                        <TableHead className="text-right">Comissão</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {func.vendas.map((venda) => (
+                        <TableRow key={venda.id}>
+                          <TableCell className="whitespace-nowrap text-xs font-mono">
+                            {format(venda.data, "dd/MM/yy", { locale: ptBR })}
+                          </TableCell>
+                          <TableCell>{venda.cliente}</TableCell>
+                          <TableCell className="max-w-[200px] truncate">{venda.produto}</TableCell>
+                          <TableCell className="text-right font-semibold">
+                            R$ {venda.valorContrato.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                          </TableCell>
+                          <TableCell className="text-right font-semibold text-green-600 dark:text-green-400">
+                            R$ {venda.comissaoFuncionario.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            ))}
           </div>
         </Card>
       )}
