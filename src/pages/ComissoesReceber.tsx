@@ -332,9 +332,10 @@ export default function ComissoesReceber() {
       ? comissoesFiltradas
       : comissoesFiltradas.filter(c => c.fornecedorNome === fornecedores.find(f => f.id === filtroFornecedor)?.nomeFantasia);
 
-  const totalPendente = comissoes.filter(c => c.status === 'pendente').reduce((sum, c) => sum + c.valorComissao, 0);
-  const totalRecebido = comissoes.filter(c => c.status === 'recebido').reduce((sum, c) => sum + c.valorComissao, 0);
-  const totalAtrasado = comissoes.filter(c => c.status === 'atrasado').reduce((sum, c) => sum + c.valorComissao, 0);
+  // Totais baseados nos filtros aplicados
+  const totalPendente = comissoesFornecedorFiltradas.filter(c => c.status === 'pendente').reduce((sum, c) => sum + c.valorComissao, 0);
+  const totalRecebido = comissoesFornecedorFiltradas.filter(c => c.status === 'recebido').reduce((sum, c) => sum + c.valorComissao, 0);
+  const totalAtrasado = comissoesFornecedorFiltradas.filter(c => c.status === 'atrasado').reduce((sum, c) => sum + c.valorComissao, 0);
 
   return (
     <div className="space-y-6">
@@ -418,20 +419,9 @@ export default function ComissoesReceber() {
           </Select>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => setImportDialogOpen(true)}>
-            Importar relatório do fornecedor
+          <Button variant="outline" onClick={async () => { setLoading(true); await carregarComissoes(); setLoading(false); toast.success('Dados atualizados do banco de dados!'); }}>
+            Importar dados do fornecedor
           </Button>
-          {importDialogOpen && (
-            <input type="file" accept=".csv" style={{ display: 'none' }} id="input-relatorio-fornecedor" onChange={handleImportarRelatorioFornecedor} />
-          )}
-          {importDialogOpen && (
-            <Button variant="secondary" size="sm" onClick={() => document.getElementById('input-relatorio-fornecedor')?.click()}>
-              Selecionar arquivo CSV
-            </Button>
-          )}
-          {importDialogOpen && (
-            <Button variant="outline" size="sm" onClick={() => setImportDialogOpen(false)}>Cancelar</Button>
-          )}
         </div>
       </Card>
 
