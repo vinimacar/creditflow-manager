@@ -336,22 +336,31 @@ export default function Relatorios() {
       
       // Se não houver comissão salva, calcular usando tabela de faixas ou percentual fixo
       if (!comissaoCalculada && produto) {
-        if (produto.comissoes && produto.comissoes.length > 0) {
-          const faixaAplicavel = produto.comissoes.find(
-            faixa => v.valorContrato >= faixa.valorMin && v.valorContrato <= faixa.valorMax
-          );
-          
-          if (faixaAplicavel) {
-            comissaoPercentual = faixaAplicavel.percentual;
-          } else {
-            const ultimaFaixa = produto.comissoes[produto.comissoes.length - 1];
-            comissaoPercentual = ultimaFaixa.percentual;
-          }
-        } else {
-          comissaoPercentual = produto.comissaoAgente || produto.comissao || 0;
-        }
+        // Verificar se comissão está ativa no produto
+        const comissaoAtiva = produto.comissaoAtiva !== false;
         
-        comissaoCalculada = v.valorContrato * (comissaoPercentual / 100);
+        if (comissaoAtiva) {
+          if (produto.comissoes && produto.comissoes.length > 0) {
+            const faixaAplicavel = produto.comissoes.find(
+              faixa => v.valorContrato >= faixa.valorMin && v.valorContrato <= faixa.valorMax && faixa.ativa !== false
+            );
+            
+            if (faixaAplicavel) {
+              comissaoPercentual = faixaAplicavel.percentual;
+            } else {
+              // Se não há faixa aplicável ativa, comissão é zero
+              comissaoPercentual = 0;
+            }
+          } else {
+            comissaoPercentual = produto.comissaoAgente || produto.comissao || 0;
+          }
+          
+          comissaoCalculada = v.valorContrato * (comissaoPercentual / 100);
+        } else {
+          // Comissão desativada no produto
+          comissaoPercentual = 0;
+          comissaoCalculada = 0;
+        }
       }
       
       // Calcular comissão do fornecedor (valor a receber) - usar valor salvo ou calcular
@@ -474,8 +483,15 @@ export default function Relatorios() {
       // Comissão do agente - importar da venda (priority 1) ou calcular do produto
       let comissaoCalculada = venda.comissaoAgente || venda.comissao || 0;
       if (!comissaoCalculada && produto) {
-        const comissaoPercentual = venda.comissaoAgentePercentual || venda.comissaoPercentual || produto?.comissaoAgente || produto?.comissao || 0;
-        comissaoCalculada = venda.valorContrato * (comissaoPercentual / 100);
+        // Verificar se comissão está ativa no produto
+        const comissaoAtiva = produto.comissaoAtiva !== false;
+        
+        if (comissaoAtiva) {
+          const comissaoPercentual = venda.comissaoAgentePercentual || venda.comissaoPercentual || produto?.comissaoAgente || produto?.comissao || 0;
+          comissaoCalculada = venda.valorContrato * (comissaoPercentual / 100);
+        } else {
+          comissaoCalculada = 0;
+        }
       }
       
       // Comissão do fornecedor - sempre importar da venda (dados reais salvos)
