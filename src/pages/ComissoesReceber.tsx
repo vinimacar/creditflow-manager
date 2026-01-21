@@ -65,52 +65,65 @@ export default function ComissoesReceber() {
     observacoes: "",
   });
 
+  // Move carregarFornecedores above useEffect so it is declared before use
+  const carregarFornecedores = async () => {
+    try {
+      const fornecedoresData = await getFornecedores();
+      setFornecedores(
+        fornecedoresData
+          .filter(f => !!f.id && !!f.nomeFantasia && !!f.razaoSocial)
+          .map(f => ({
+            id: f.id!,
+            nomeFantasia: f.nomeFantasia,
+            razaoSocial: f.razaoSocial,
+          }))
+      );
+    } catch (error) {
+      toast.error("Erro ao carregar fornecedores");
+    }
+  };
+
+  // Conferência automática: importa relatório do fornecedor (CSV) e confere valores
+  const handleImportarRelatorioFornecedor = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      // Suporte básico: CSV com colunas [vendaId, valorComissao, status]
+      const linhas = text.split(/\r?\n/).filter(l => l.trim());
+      if (linhas.length < 2) throw new Error("Arquivo CSV vazio ou inválido");
+      const cabecalho = linhas[0].split(",");
+      const idxVenda = cabecalho.findIndex(h => h.toLowerCase().includes("venda"));
+      const idxValor = cabecalho.findIndex(h => h.toLowerCase().includes("valor"));
+      const idxStatus = cabecalho.findIndex(h => h.toLowerCase().includes("status"));
+      let conferidos = 0;
+      for (let i = 1; i < linhas.length; i++) {
+        const cols = linhas[i].split(",");
+        if (cols.length < Math.max(idxVenda, idxValor, idxStatus) + 1) continue;
+        const vendaId = cols[idxVenda];
+        const valor = parseFloat(cols[idxValor].replace(/[^\d.,]/g, '').replace(',', '.'));
+        const status = cols[idxStatus]?.toLowerCase();
+        const comissao = comissoes.find(c => c.vendaId === vendaId);
+        if (comissao && Math.abs(comissao.valorComissao - valor) < 0.01) {
+          // Atualiza status para conferido/recebido se bater
+          await updateDoc(doc(db, "comissoesReceber", comissao.id!), {
+            status: status === "recebido" ? "recebido" : "conferido",
+            atualizadoEm: Timestamp.fromDate(new Date()),
+          });
+          conferidos++;
+        }
+      }
+      toast.success(`${conferidos} comissões conferidas automaticamente!`);
+      await carregarComissoes();
+    } catch (error) {
+      toast.error("Erro ao importar/conferir relatório");
+    }
+    setImportDialogOpen(false);
+  };
+
   useEffect(() => {
     carregarComissoes();
     carregarFornecedores();
-    const carregarFornecedores = async () => {
-      try {
-        const fornecedoresData = await getFornecedores();
-        setFornecedores(fornecedoresData);
-      } catch (error) {
-        toast.error("Erro ao carregar fornecedores");
-      }
-    };
-    // Conferência automática: importa relatório do fornecedor (CSV) e confere valores
-    const handleImportarRelatorioFornecedor = async (event: React.ChangeEvent<HTMLInputElement>) => {
-      const file = event.target.files?.[0];
-      if (!file) return;
-      try {
-        const text = await file.text();
-        // Suporte básico: CSV com colunas [vendaId, valorComissao, status]
-        const linhas = text.split(/\r?\n/).filter(l => l.trim());
-        const cabecalho = linhas[0].split(",");
-        const idxVenda = cabecalho.findIndex(h => h.toLowerCase().includes("venda"));
-        const idxValor = cabecalho.findIndex(h => h.toLowerCase().includes("valor"));
-        const idxStatus = cabecalho.findIndex(h => h.toLowerCase().includes("status"));
-        let conferidos = 0;
-        for (let i = 1; i < linhas.length; i++) {
-          const cols = linhas[i].split(",");
-          const vendaId = cols[idxVenda];
-          const valor = parseFloat(cols[idxValor].replace(/[^\d.,]/g, '').replace(',', '.'));
-          const status = cols[idxStatus]?.toLowerCase();
-          const comissao = comissoes.find(c => c.vendaId === vendaId);
-          if (comissao && Math.abs(comissao.valorComissao - valor) < 0.01) {
-            // Atualiza status para conferido/recebido se bater
-            await updateDoc(doc(db, "comissoesReceber", comissao.id!), {
-              status: status === "recebido" ? "recebido" : "conferido",
-              atualizadoEm: Timestamp.fromDate(new Date()),
-            });
-            conferidos++;
-          }
-        }
-        toast.success(`${conferidos} comissões conferidas automaticamente!`);
-        await carregarComissoes();
-      } catch (error) {
-        toast.error("Erro ao importar/conferir relatório");
-      }
-      setImportDialogOpen(false);
-    };
   }, []);
 
   const carregarComissoes = async () => {
