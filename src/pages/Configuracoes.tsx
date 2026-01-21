@@ -154,6 +154,16 @@ export default function Configuracoes() {
 
   const carregarConfiguracoes = async () => {
     try {
+      // Carregar preferência de tema do localStorage primeiro
+      const savedTheme = localStorage.getItem('theme');
+      if (savedTheme === 'dark') {
+        setAparencia(prev => ({ ...prev, modoEscuro: true }));
+        document.documentElement.classList.add("dark");
+      } else {
+        setAparencia(prev => ({ ...prev, modoEscuro: false }));
+        document.documentElement.classList.remove("dark");
+      }
+
       const configDoc = await getDoc(doc(db, "configuracoes", "geral"));
       if (configDoc.exists()) {
         const data = configDoc.data();
@@ -162,7 +172,13 @@ export default function Configuracoes() {
         if (data.permissoesCargo) setPermissoesCargo(data.permissoesCargo);
         if (data.permissoesCargo) setPermissoesCargo(data.permissoesCargo);
         if (data.seguranca) setSeguranca(data.seguranca);
-        if (data.aparencia) setAparencia(data.aparencia);
+        // Não sobrescrever aparência se já foi carregada do localStorage
+        if (data.aparencia && !savedTheme) {
+          setAparencia(data.aparencia);
+          if (data.aparencia.modoEscuro) {
+            document.documentElement.classList.add("dark");
+          }
+        }
       }
     } catch (error) {
       console.error("Erro ao carregar configurações:", error);
@@ -238,7 +254,9 @@ export default function Configuracoes() {
     setSalvando(true);
     try {
       await setDoc(doc(db, "configuracoes", "geral"), { aparencia }, { merge: true });
-      toast.success("Preferências de aparência salvas!");
+      
+      // Salvar no localStorage para persistir entre sessões
+      localStorage.setItem('theme', aparencia.modoEscuro ? 'dark' : 'light');
       
       // Aplicar tema escuro
       if (aparencia.modoEscuro) {
@@ -246,6 +264,8 @@ export default function Configuracoes() {
       } else {
         document.documentElement.classList.remove("dark");
       }
+      
+      toast.success("Preferências de aparência salvas!");
     } catch (error) {
       console.error(error);
       toast.error("Erro ao salvar aparência");
