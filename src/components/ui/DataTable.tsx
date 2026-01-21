@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import { ReactNode, useState, useMemo } from "react";
 import {
   Table,
   TableBody,
@@ -51,7 +51,23 @@ export function DataTable<T extends { id: string | number }>({
   deleteLabel,
   customActions,
 }: DataTableProps<T>) {
+  const [searchTerm, setSearchTerm] = useState("");
   const hasActions = onEdit || onDelete || onView || (customActions && customActions.length > 0);
+
+  // Filtrar dados baseado no termo de busca
+  const filteredData = useMemo(() => {
+    if (!searchTerm.trim()) return data;
+
+    const term = searchTerm.toLowerCase();
+    
+    return data.filter((item) => {
+      // Buscar em todas as colunas do item
+      return Object.values(item).some((value) => {
+        if (value == null) return false;
+        return String(value).toLowerCase().includes(term);
+      });
+    });
+  }, [data, searchTerm]);
 
   return (
     <div className="bg-card rounded-xl border border-border/50 shadow-sm overflow-hidden animate-fade-in">
@@ -59,7 +75,12 @@ export function DataTable<T extends { id: string | number }>({
       <div className="p-4 border-b border-border">
         <div className="relative w-full max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input placeholder={searchPlaceholder} className="pl-9" />
+          <Input 
+            placeholder={searchPlaceholder} 
+            className="pl-9"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
         </div>
       </div>
 
@@ -76,66 +97,81 @@ export function DataTable<T extends { id: string | number }>({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {data.map((item) => (
-            <TableRow key={item.id} className="cursor-pointer hover:bg-muted/50">
-              {columns.map((column) => (
-                <TableCell key={String(column.key)} className={column.className}>
-                  {column.render
-                    ? column.render(item)
-                    : String(item[column.key as keyof T] ?? "")}
-                </TableCell>
-              ))}
-              {hasActions && (
-                <TableCell className="text-right">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <MoreHorizontal className="w-4 h-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      {onView && (
-                        <DropdownMenuItem onClick={() => onView(item)}>
-                          Visualizar
-                        </DropdownMenuItem>
-                      )}
-                      {onEdit && (
-                        <DropdownMenuItem onClick={() => onEdit(item)}>
-                          Editar
-                        </DropdownMenuItem>
-                      )}
-                      {customActions && customActions
-                        .filter((action) => action != null && action !== undefined)
-                        .map((action, index) => (
-                        <DropdownMenuItem
-                          key={index}
-                          onClick={() => action.onClick(item)}
-                          className={typeof action.className === 'function' ? action.className(item) : action.className}
-                        >
-                          {action.label(item)}
-                        </DropdownMenuItem>
-                      ))}
-                      {onDelete && (
-                        <DropdownMenuItem
-                          onClick={() => onDelete(item)}
-                          className="text-destructive focus:text-destructive"
-                        >
-                          {deleteLabel ? deleteLabel(item) : "Excluir"}
-                        </DropdownMenuItem>
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
-              )}
+          {filteredData.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={columns.length + (hasActions ? 1 : 0)} className="text-center py-8 text-muted-foreground">
+                {searchTerm ? "Nenhum resultado encontrado" : "Nenhum registro encontrado"}
+              </TableCell>
             </TableRow>
-          ))}
+          ) : (
+            filteredData.map((item) => (
+              <TableRow key={item.id} className="cursor-pointer hover:bg-muted/50">
+                {columns.map((column) => (
+                  <TableCell key={String(column.key)} className={column.className}>
+                    {column.render
+                      ? column.render(item)
+                      : String(item[column.key as keyof T] ?? "")}
+                  </TableCell>
+                ))}
+                {hasActions && (
+                  <TableCell className="text-right">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreHorizontal className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        {onView && (
+                          <DropdownMenuItem onClick={() => onView(item)}>
+                            Visualizar
+                          </DropdownMenuItem>
+                        )}
+                        {onEdit && (
+                          <DropdownMenuItem onClick={() => onEdit(item)}>
+                            Editar
+                          </DropdownMenuItem>
+                        )}
+                        {customActions && customActions.map((action, index) => (
+                          <DropdownMenuItem
+                            key={index}
+                            onClick={() => action.onClick(item)}
+                            className={typeof action.className === 'function' ? action.className(item) : action.className}
+                          >
+                            {action.label(item)}
+                          </DropdownMenuItem>
+                        ))}
+                        {onDelete && (
+                          <DropdownMenuItem
+                            onClick={() => onDelete(item)}
+                            className="text-destructive focus:text-destructive"
+                          >
+                            {deleteLabel ? deleteLabel(item) : "Excluir"}
+                          </DropdownMenuItem>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                )}
+              </TableRow>
+            ))
+          )}
         </TableBody>
       </Table>
 
       {/* Pagination */}
       <div className="p-4 border-t border-border flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          Mostrando <span className="font-medium">{data.length}</span> registros
+          {searchTerm ? (
+            <>
+              Mostrando <span className="font-medium">{filteredData.length}</span> de{" "}
+              <span className="font-medium">{data.length}</span> registros
+            </>
+          ) : (
+            <>
+              Mostrando <span className="font-medium">{data.length}</span> registros
+            </>
+          )}
         </p>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" disabled>
