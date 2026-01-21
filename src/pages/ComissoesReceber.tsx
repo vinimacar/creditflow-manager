@@ -51,6 +51,9 @@ export default function ComissoesReceber() {
   const { hasPermission, user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [comissoes, setComissoes] = useState<(ComissaoReceber & { fornecedorNome: string; vendedorNome: string; clienteNome: string; produtoNome: string })[]>([]);
+  const [fornecedores, setFornecedores] = useState<{ id: string; nomeFantasia: string; razaoSocial: string }[]>([]);
+  const [filtroFornecedor, setFiltroFornecedor] = useState<string>("");
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [comissaoSelecionada, setComissaoSelecionada] = useState<(ComissaoReceber & { fornecedorNome: string; vendedorNome: string; clienteNome: string; produtoNome: string }) | null>(null);
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
@@ -64,6 +67,50 @@ export default function ComissoesReceber() {
 
   useEffect(() => {
     carregarComissoes();
+    carregarFornecedores();
+    const carregarFornecedores = async () => {
+      try {
+        const fornecedoresData = await getFornecedores();
+        setFornecedores(fornecedoresData);
+      } catch (error) {
+        toast.error("Erro ao carregar fornecedores");
+      }
+    };
+    // Conferência automática: importa relatório do fornecedor (CSV) e confere valores
+    const handleImportarRelatorioFornecedor = async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        // Suporte básico: CSV com colunas [vendaId, valorComissao, status]
+        const linhas = text.split(/\r?\n/).filter(l => l.trim());
+        const cabecalho = linhas[0].split(",");
+        const idxVenda = cabecalho.findIndex(h => h.toLowerCase().includes("venda"));
+        const idxValor = cabecalho.findIndex(h => h.toLowerCase().includes("valor"));
+        const idxStatus = cabecalho.findIndex(h => h.toLowerCase().includes("status"));
+        let conferidos = 0;
+        for (let i = 1; i < linhas.length; i++) {
+          const cols = linhas[i].split(",");
+          const vendaId = cols[idxVenda];
+          const valor = parseFloat(cols[idxValor].replace(/[^\d.,]/g, '').replace(',', '.'));
+          const status = cols[idxStatus]?.toLowerCase();
+          const comissao = comissoes.find(c => c.vendaId === vendaId);
+          if (comissao && Math.abs(comissao.valorComissao - valor) < 0.01) {
+            // Atualiza status para conferido/recebido se bater
+            await updateDoc(doc(db, "comissoesReceber", comissao.id!), {
+              status: status === "recebido" ? "recebido" : "conferido",
+              atualizadoEm: Timestamp.fromDate(new Date()),
+            });
+            conferidos++;
+          }
+        }
+        toast.success(`${conferidos} comissões conferidas automaticamente!`);
+        await carregarComissoes();
+      } catch (error) {
+        toast.error("Erro ao importar/conferir relatório");
+      }
+      setImportDialogOpen(false);
+    };
   }, []);
 
   const carregarComissoes = async () => {
@@ -267,6 +314,9 @@ export default function ComissoesReceber() {
   const comissoesFiltradas = filtroStatus === "todos"
     ? comissoes
     : comissoes.filter(c => c.status === filtroStatus);
+  const comissoesFornecedorFiltradas = filtroFornecedor
+    ? comissoesFiltradas.filter(c => c.fornecedorNome === fornecedores.find(f => f.id === filtroFornecedor)?.nomeFantasia)
+    : comissoesFiltradas;
 
   const totalPendente = comissoes.filter(c => c.status === 'pendente').reduce((sum, c) => sum + c.valorComissao, 0);
   const totalRecebido = comissoes.filter(c => c.status === 'recebido').reduce((sum, c) => sum + c.valorComissao, 0);
@@ -328,13 +378,11 @@ export default function ComissoesReceber() {
       </div>
 
       {/* Filtros */}
-      <Card className="p-4">
+      <Card className="p-4 flex flex-col md:flex-row gap-4 items-center">
         <div className="flex items-center gap-4">
           <Label>Filtrar por Status:</Label>
           <Select value={filtroStatus} onValueChange={setFiltroStatus}>
-            <SelectTrigger className="w-48">
-              <SelectValue />
-            </SelectTrigger>
+            <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="todos">Todos</SelectItem>
               <SelectItem value="pendente">Pendente</SelectItem>
@@ -342,6 +390,34 @@ export default function ComissoesReceber() {
               <SelectItem value="atrasado">Atrasado</SelectItem>
             </SelectContent>
           </Select>
+        </div>
+        <div className="flex items-center gap-4">
+          <Label>Filtrar por Fornecedor:</Label>
+          <Select value={filtroFornecedor} onValueChange={setFiltroFornecedor}>
+            <SelectTrigger className="w-56"><SelectValue placeholder="Todos" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">Todos</SelectItem>
+              {fornecedores.map(f => (
+                <SelectItem key={f.id} value={f.id}>{f.nomeFantasia || f.razaoSocial}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setImportDialogOpen(true)}>
+            Importar relatório do fornecedor
+          </Button>
+          {importDialogOpen && (
+            <input type="file" accept=".csv" style={{ display: 'none' }} id="input-relatorio-fornecedor" onChange={handleImportarRelatorioFornecedor} />
+          )}
+          {importDialogOpen && (
+            <Button variant="secondary" size="sm" onClick={() => document.getElementById('input-relatorio-fornecedor')?.click()}>
+              Selecionar arquivo CSV
+            </Button>
+          )}
+          {importDialogOpen && (
+            <Button variant="outline" size="sm" onClick={() => setImportDialogOpen(false)}>Cancelar</Button>
+          )}
         </div>
       </Card>
 
@@ -362,7 +438,7 @@ export default function ComissoesReceber() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {comissoesFiltradas.map((comissao) => (
+            {comissoesFornecedorFiltradas.map((comissao) => (
               <TableRow key={comissao.id}>
                 <TableCell>{format(comissao.dataVenda, "dd/MM/yyyy")}</TableCell>
                 <TableCell>{comissao.clienteNome}</TableCell>
@@ -391,7 +467,7 @@ export default function ComissoesReceber() {
                 </TableCell>
               </TableRow>
             ))}
-            {comissoesFiltradas.length === 0 && (
+            {comissoesFornecedorFiltradas.length === 0 && (
               <TableRow>
                 <TableCell colSpan={9} className="text-center text-muted-foreground">
                   Nenhuma comissão encontrada
