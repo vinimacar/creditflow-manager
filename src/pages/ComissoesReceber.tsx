@@ -52,7 +52,7 @@ export default function ComissoesReceber() {
   const [loading, setLoading] = useState(true);
   const [comissoes, setComissoes] = useState<(ComissaoReceber & { fornecedorNome: string; vendedorNome: string; clienteNome: string; produtoNome: string })[]>([]);
   const [fornecedores, setFornecedores] = useState<{ id: string; nomeFantasia: string; razaoSocial: string }[]>([]);
-  const [filtroFornecedor, setFiltroFornecedor] = useState<string>("");
+  const [filtroFornecedor, setFiltroFornecedor] = useState<string>("todos");
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [comissaoSelecionada, setComissaoSelecionada] = useState<(ComissaoReceber & { fornecedorNome: string; vendedorNome: string; clienteNome: string; produtoNome: string }) | null>(null);
@@ -327,9 +327,10 @@ export default function ComissoesReceber() {
   const comissoesFiltradas = filtroStatus === "todos"
     ? comissoes
     : comissoes.filter(c => c.status === filtroStatus);
-  const comissoesFornecedorFiltradas = filtroFornecedor
-    ? comissoesFiltradas.filter(c => c.fornecedorNome === fornecedores.find(f => f.id === filtroFornecedor)?.nomeFantasia)
-    : comissoesFiltradas;
+  const comissoesFornecedorFiltradas =
+    filtroFornecedor === "todos"
+      ? comissoesFiltradas
+      : comissoesFiltradas.filter(c => c.fornecedorNome === fornecedores.find(f => f.id === filtroFornecedor)?.nomeFantasia);
 
   const totalPendente = comissoes.filter(c => c.status === 'pendente').reduce((sum, c) => sum + c.valorComissao, 0);
   const totalRecebido = comissoes.filter(c => c.status === 'recebido').reduce((sum, c) => sum + c.valorComissao, 0);
@@ -409,7 +410,7 @@ export default function ComissoesReceber() {
           <Select value={filtroFornecedor} onValueChange={setFiltroFornecedor}>
             <SelectTrigger className="w-56"><SelectValue placeholder="Todos" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Todos</SelectItem>
+              <SelectItem value="todos">Todos</SelectItem>
               {fornecedores.map(f => (
                 <SelectItem key={f.id} value={f.id}>{f.nomeFantasia || f.razaoSocial}</SelectItem>
               ))}
