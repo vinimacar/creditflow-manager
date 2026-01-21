@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { FiltrosDinamicosRelatorio, type FiltrosRelatorio } from "@/components/relatorios/FiltrosDinamicosRelatorio";
 import { GraficoModerno } from "@/components/relatorios/GraficoModerno";
 import {
@@ -12,9 +13,12 @@ import {
   DollarSign,
   Users,
   Package,
-  Building2,
   FileSpreadsheet,
   HelpCircle,
+  AlertCircle,
+  BarChart3,
+  PieChart,
+  Activity,
 } from "lucide-react";
 import {
   Tooltip,
@@ -36,22 +40,28 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { getVendas, getFuncionarios, getProdutos, getFornecedores, getClientes, getDespesas, type Venda, type Funcionario, type Produto, type Fornecedor, type Cliente, type Despesa } from "@/lib/firestore";
+import { getVendas, getFuncionarios, getProdutos, getFornecedores, getClientes, getDespesas, type Venda, type Funcionario, type Produto, type Cliente, type Despesa } from "@/lib/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { calcularComissoes, calcularTotalComissoesFornecedor } from "@/lib/calculos-comissoes";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { FolhaPagamento } from "@/types/folhaPagamento";
+import { Separator } from "@/components/ui/separator";
 
-interface DadosRelatorio {
-  vendas: Array<{ mes: string; valor: number; quantidade: number }>;
-  funcionarios: Array<{ nome: string; vendas: number; comissao: number; comissaoFornecedor: number }>;
-  produtos: Array<{ nome: string; valor: number }>;
-  fornecedores: Array<{ nome: string; valor: number }>;
-  clientes: Array<{ nome: string; vendas: number; valor: number }>;
-  despesas: Array<{ mes: string; valor: number; quantidade: number }>;
-  receitas: Array<{ mes: string; valor: number }>;
-  lucros: Array<{ mes: string; valor: number }>;
+interface VendaDetalhada {
+  id: string;
+  data: Date;
+  cliente: string;
+  cpf: string;
+  funcionario: string;
+  produto: string;
+  valorContrato: number;
+  prazo: number;
+  comissaoFuncionario: number;
+  comissaoFuncionarioPerc: number;
+  comissaoFornecedor: number;
+  comissaoFornecedorPerc: number;
+  status: string;
 }
 
 export default function Relatorios() {
@@ -61,314 +71,75 @@ export default function Relatorios() {
   });
   const [gerando, setGerando] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [dadosRelatorio, setDadosRelatorio] = useState<DadosRelatorio | null>(null);
+  
+  // Dados brutos do banco
   const [vendasCompletas, setVendasCompletas] = useState<Venda[]>([]);
   const [clientesCompletos, setClientesCompletos] = useState<Cliente[]>([]);
   const [funcionariosCompletos, setFuncionariosCompletos] = useState<Funcionario[]>([]);
   const [produtosCompletos, setProdutosCompletos] = useState<Produto[]>([]);
   const [despesasCompletas, setDespesasCompletas] = useState<Despesa[]>([]);
+  const [folhasPagamento, setFolhasPagamento] = useState<FolhaPagamento[]>([]);
 
+  // Carregar dados do banco
   useEffect(() => {
     let mounted = true;
-    const abortController = new AbortController();
 
-    const loadData = async () => {
+    const carregarDados = async () => {
       try {
-        await carregarDados(mounted);
+        const [vendas, funcionarios, produtos, fornecedores, clientes, despesas, folhasSnapshot] = await Promise.all([
+          getVendas(),
+          getFuncionarios(),
+          getProdutos(),
+          getFornecedores(),
+          getClientes(),
+          getDespesas(),
+          getDocs(collection(db, "folhaPagamento")),
+        ]);
+
+        if (!mounted) return;
+
+        const folhas = folhasSnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+          criadoEm: doc.data().criadoEm?.toDate(),
+          atualizadoEm: doc.data().atualizadoEm?.toDate(),
+          dataPagamento: doc.data().dataPagamento?.toDate(),
+        })) as FolhaPagamento[];
+
+        setVendasCompletas(vendas);
+        setClientesCompletos(clientes);
+        setFuncionariosCompletos(funcionarios);
+        setProdutosCompletos(produtos);
+        setDespesasCompletas(despesas);
+        setFolhasPagamento(folhas);
+        setLoading(false);
       } catch (error) {
-        if (mounted && !abortController.signal.aborted) {
+        if (mounted) {
           console.error("Erro ao carregar dados:", error);
           toast.error("Erro ao carregar dados do relatório");
+          setLoading(false);
         }
       }
     };
 
-    loadData();
+    carregarDados();
 
     return () => {
       mounted = false;
-      abortController.abort();
     };
   }, []);
 
-  const carregarDados = async (mounted = true) => {
-    try {
-      const [vendas, funcionarios, produtos, fornecedores, clientes, despesas, folhasSnapshot] = await Promise.all([
-        getVendas(),
-        getFuncionarios(),
-        getProdutos(),
-        getFornecedores(),
-        getClientes(),
-        getDespesas(),
-        getDocs(collection(db, "folhaPagamento")),
-      ]).catch(err => {
-        console.error("Erro ao buscar dados:", err);
-        throw err;
-      });
-
-      if (!mounted) return;
-
-      // Processar folhas de pagamento
-      const folhasPagamento = folhasSnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-        criadoEm: doc.data().criadoEm?.toDate(),
-        atualizadoEm: doc.data().atualizadoEm?.toDate(),
-        dataPagamento: doc.data().dataPagamento?.toDate(),
-      })) as FolhaPagamento[];
-
-      // Armazenar dados completos para filtragem
-      setVendasCompletas(vendas);
-      setClientesCompletos(clientes);
-      setFuncionariosCompletos(funcionarios);
-      setProdutosCompletos(produtos);
-      setDespesasCompletas(despesas);
-
-      // Gerar dados de vendas por mês (últimos 6 meses)
-      const vendasPorMes: Array<{ mes: string; valor: number; quantidade: number }> = [];
-      const despesasPorMes: Array<{ mes: string; valor: number; quantidade: number }> = [];
-      const receitasPorMes: Array<{ mes: string; valor: number }> = [];
-      const lucrosPorMes: Array<{ mes: string; valor: number }> = [];
-      const agora = new Date();
-      
-      for (let i = 5; i >= 0; i--) {
-        const mesData = subMonths(agora, i);
-        const inicioMes = startOfMonth(mesData);
-        const fimMes = endOfMonth(mesData);
-        
-        const vendasDoMes = vendas.filter((v) => {
-          const dataVenda = v.createdAt?.toDate?.() || new Date(v.createdAt);
-          return dataVenda >= inicioMes && dataVenda <= fimMes;
-        });
-
-        const despesasDoMes = despesas.filter((d) => {
-          const dataDespesa = new Date(d.dataVencimento);
-          return dataDespesa >= inicioMes && dataDespesa <= fimMes;
-        });
-
-        // Incluir folhas de pagamento do mês nas despesas
-        const folhasDoMes = folhasPagamento.filter((f) => {
-          const mesRef = f.mesReferencia + "-01";
-          const dataFolha = new Date(mesRef);
-          return dataFolha >= inicioMes && dataFolha <= fimMes;
-        });
-
-        const valorVendas = vendasDoMes.reduce((sum, v) => sum + v.valorContrato, 0);
-        const valorDespesas = despesasDoMes.reduce((sum, d) => sum + d.valor, 0);
-        const valorFolhas = folhasDoMes.reduce((sum, f) => sum + f.salarioLiquido, 0);
-        const valorDespesasTotal = valorDespesas + valorFolhas;
-        
-        // Calcular comissões de fornecedores usando função centralizada
-        const comissoesFornecedorMes = calcularTotalComissoesFornecedor(vendasDoMes, produtos);
-        
-        vendasPorMes.push({
-          mes: format(mesData, "MMM", { locale: ptBR }),
-          valor: valorVendas,
-          quantidade: vendasDoMes.length,
-        });
-
-        despesasPorMes.push({
-          mes: format(mesData, "MMM", { locale: ptBR }),
-          valor: valorDespesasTotal,
-          quantidade: despesasDoMes.length + folhasDoMes.length,
-        });
-
-        receitasPorMes.push({
-          mes: format(mesData, "MMM", { locale: ptBR }),
-          valor: comissoesFornecedorMes,
-        });
-
-        lucrosPorMes.push({
-          mes: format(mesData, "MMM", { locale: ptBR }),
-          valor: comissoesFornecedorMes - valorDespesasTotal,
-        });
-      }
-
-      // Calcular vendas por funcionário usando função centralizada
-      const vendaPorFunc = new Map<string, { vendas: number; comissao: number; comissaoFornecedor: number }>();
-      vendas.forEach((venda) => {
-        const produto = produtos.find(p => p.id === venda.produtoId);
-        
-        // Usar função centralizada para garantir consistência
-        const comissoesCalculadas = calcularComissoes(venda, produto);
-        
-        const current = vendaPorFunc.get(venda.funcionarioId) || { vendas: 0, comissao: 0, comissaoFornecedor: 0 };
-        vendaPorFunc.set(venda.funcionarioId, {
-          vendas: current.vendas + 1,
-          comissao: current.comissao + comissoesCalculadas.comissaoAgente,
-          comissaoFornecedor: current.comissaoFornecedor + comissoesCalculadas.comissaoFornecedor,
-        });
-      });
-
-      const funcionariosData = Array.from(vendaPorFunc.entries())
-        .map(([id, stats]) => {
-          const func = funcionarios.find((f) => f.id === id);
-          return {
-            nome: func?.nome || "Desconhecido",
-            vendas: stats.vendas,
-            comissao: stats.comissao,
-            comissaoFornecedor: stats.comissaoFornecedor,
-          };
-        })
-        .sort((a, b) => b.vendas - a.vendas)
-        .slice(0, 5);
-
-      // Calcular vendas por produto
-      const vendaPorProd = new Map<string, number>();
-      vendas.forEach((venda) => {
-        const current = vendaPorProd.get(venda.produtoId) || 0;
-        vendaPorProd.set(venda.produtoId, current + venda.valorContrato);
-      });
-
-      const produtosData = Array.from(vendaPorProd.entries())
-        .map(([id, valor]) => {
-          const prod = produtos.find((p) => p.id === id);
-          return {
-            nome: prod?.nome || "Desconhecido",
-            valor,
-          };
-        })
-        .sort((a, b) => b.valor - a.valor)
-        .slice(0, 4);
-
-      // Mock de fornecedores (pode ser melhorado com dados reais se disponível)
-      const fornecedoresData = fornecedores.slice(0, 4).map((f) => ({
-        nome: f.razaoSocial,
-        valor: Math.random() * 300000 + 100000, // Valores simulados
-      }));
-
-      // Calcular vendas por cliente
-      const vendaPorCliente = new Map<string, { vendas: number; valor: number }>();
-      vendas.forEach((venda) => {
-        const current = vendaPorCliente.get(venda.clienteId) || { vendas: 0, valor: 0 };
-        vendaPorCliente.set(venda.clienteId, {
-          vendas: current.vendas + 1,
-          valor: current.valor + venda.valorContrato,
-        });
-      });
-
-      const clientesData = Array.from(vendaPorCliente.entries())
-        .map(([id, stats]) => {
-          const cliente = clientes.find((c) => c.id === id);
-          return {
-            nome: cliente?.nome || "Desconhecido",
-            vendas: stats.vendas,
-            valor: stats.valor,
-          };
-        })
-        .sort((a, b) => b.valor - a.valor)
-        .slice(0, 10);
-
-      if (mounted) {
-        setDadosRelatorio({
-          vendas: vendasPorMes,
-          funcionarios: funcionariosData,
-          produtos: produtosData,
-          fornecedores: fornecedoresData,
-          clientes: clientesData,
-          despesas: despesasPorMes,
-          receitas: receitasPorMes,
-          lucros: lucrosPorMes,
-        });
-      }
-    } catch (error) {
-      console.error("Erro ao carregar dados do relatório:", error);
-      if (mounted) {
-        toast.error("Erro ao carregar dados do relatório");
-      }
-    } finally {
-      if (mounted) {
-        setLoading(false);
-      }
-    }
-  };
-
-  // Filtrar vendas com base nos filtros aplicados
-  const dadosFiltrados = useMemo(() => {
-    if (!filtros.periodo && !filtros.cliente && !filtros.funcionario && !filtros.produto) {
-      return null;
-    }
-
-    let vendas = vendasCompletas;
-
-    // Aplicar filtro de período
-    if (filtros.periodo?.from) {
-      vendas = vendas.filter(v => {
-        const dataVenda = v.createdAt?.toDate?.() || new Date(v.createdAt);
-        const from = filtros.periodo!.from!;
-        const to = filtros.periodo!.to || from;
-        return dataVenda >= from && dataVenda <= to;
-      });
-    }
-
-    // Aplicar filtro de cliente
-    if (filtros.cliente) {
-      const cliente = clientesCompletos.find(c => c.nome === filtros.cliente);
-      if (cliente) {
-        vendas = vendas.filter(v => v.clienteId === cliente.id);
-      }
-    }
-
-    // Aplicar filtro de funcionário
-    if (filtros.funcionario) {
-      const funcionario = funcionariosCompletos.find(f => f.nome === filtros.funcionario);
-      if (funcionario) {
-        vendas = vendas.filter(v => v.funcionarioId === funcionario.id);
-      }
-    }
-
-    // Aplicar filtro de produto
-    if (filtros.produto) {
-      const produto = produtosCompletos.find(p => p.nome === filtros.produto);
-      if (produto) {
-        vendas = vendas.filter(v => v.produtoId === produto.id);
-      }
-    }
-
-    return vendas.map(v => {
+  // Processar vendas detalhadas
+  const vendasDetalhadas: VendaDetalhada[] = useMemo(() => {
+    return vendasCompletas.map(v => {
       const cliente = clientesCompletos.find(c => c.id === v.clienteId);
       const funcionario = funcionariosCompletos.find(f => f.id === v.funcionarioId);
       const produto = produtosCompletos.find(p => p.id === v.produtoId);
       
-      // Usar comissão salva na venda ou calcular
-      let comissaoPercentual = v.comissaoPercentual || v.comissaoAgentePercentual || 0;
-      let comissaoCalculada = v.comissao || v.comissaoAgente || 0;
-      
-      // Se não houver comissão salva, calcular usando tabela de faixas ou percentual fixo
-      if (!comissaoCalculada && produto) {
-        // Verificar se comissão está ativa no produto
-        const comissaoAtiva = produto.comissaoAtiva !== false;
-        
-        if (comissaoAtiva) {
-          if (produto.comissoes && produto.comissoes.length > 0) {
-            const faixaAplicavel = produto.comissoes.find(
-              faixa => v.valorContrato >= faixa.valorMin && v.valorContrato <= faixa.valorMax
-            );
-            
-            if (faixaAplicavel) {
-              comissaoPercentual = faixaAplicavel.percentual;
-            } else {
-              // Se não há faixa aplicável ativa, comissão é zero
-              comissaoPercentual = 0;
-            }
-          } else {
-            comissaoPercentual = produto.comissaoAgente || produto.comissao || 0;
-          }
-          
-          comissaoCalculada = v.valorContrato * (comissaoPercentual / 100);
-        } else {
-          // Comissão desativada no produto
-          comissaoPercentual = 0;
-          comissaoCalculada = 0;
-        }
-      }
-      
-      // Calcular comissão do fornecedor (valor a receber) - usar valor salvo ou calcular
-      const comissaoFornecedorPercentual = v.comissaoFornecedorPercentual || produto?.comissaoFornecedor || 0;
-      const valorAReceber = v.comissaoFornecedor || (v.valorContrato * comissaoFornecedorPercentual / 100);
+      const comissoes = calcularComissoes(v, produto);
       
       return {
-        id: v.id,
+        id: v.id || '',
         data: v.createdAt?.toDate?.() || new Date(v.createdAt),
         cliente: cliente?.nome || "N/A",
         cpf: cliente?.cpf || "N/A",
@@ -376,214 +147,203 @@ export default function Relatorios() {
         produto: produto?.nome || "N/A",
         valorContrato: v.valorContrato,
         prazo: v.prazo,
-        comissao: comissaoCalculada,
-        comissaoPercentual: comissaoPercentual,
-        comissaoFornecedorPercentual: comissaoFornecedorPercentual,
-        valorAReceber: valorAReceber,
-        status: v.status,
+        comissaoFuncionario: comissoes.comissaoAgente,
+        comissaoFuncionarioPerc: comissoes.comissaoAgentePercentual,
+        comissaoFornecedor: comissoes.comissaoFornecedor,
+        comissaoFornecedorPerc: comissoes.comissaoFornecedorPercentual,
+        status: v.status || 'aprovada',
       };
     });
-  }, [filtros, vendasCompletas, clientesCompletos, funcionariosCompletos, produtosCompletos]);
+  }, [vendasCompletas, clientesCompletos, funcionariosCompletos, produtosCompletos]);
 
-  // Recalcular dados dos gráficos baseado nos filtros
-  const dadosGraficos = useMemo(() => {
-    if (!dadosRelatorio) return null;
+  // Filtrar vendas baseado nos filtros aplicados
+  const vendasFiltradas = useMemo(() => {
+    let vendas = vendasDetalhadas;
 
-    // Se não há filtros E tipo é "geral", usar dados originais
-    if (filtros.tipoRelatorio === "geral" && !filtros.periodo && !filtros.cliente && !filtros.funcionario && !filtros.produto) {
-      return dadosRelatorio;
-    }
-
-    // Filtrar vendas
-    let vendasFiltradas = vendasCompletas;
-
+    // Filtro de período
     if (filtros.periodo?.from) {
-      vendasFiltradas = vendasFiltradas.filter(v => {
-        const dataVenda = v.createdAt?.toDate?.() || new Date(v.createdAt);
+      vendas = vendas.filter(v => {
         const from = filtros.periodo!.from!;
         const to = filtros.periodo!.to || from;
-        return dataVenda >= from && dataVenda <= to;
+        return v.data >= from && v.data <= to;
       });
     }
 
+    // Filtro de cliente
     if (filtros.cliente) {
-      const cliente = clientesCompletos.find(c => c.nome === filtros.cliente);
-      if (cliente) {
-        vendasFiltradas = vendasFiltradas.filter(v => v.clienteId === cliente.id);
-      }
+      vendas = vendas.filter(v => v.cliente === filtros.cliente);
     }
 
+    // Filtro de funcionário
     if (filtros.funcionario) {
-      const funcionario = funcionariosCompletos.find(f => f.nome === filtros.funcionario);
-      if (funcionario) {
-        vendasFiltradas = vendasFiltradas.filter(v => v.funcionarioId === funcionario.id);
-      }
+      vendas = vendas.filter(v => v.funcionario === filtros.funcionario);
     }
 
+    // Filtro de produto
     if (filtros.produto) {
-      const produto = produtosCompletos.find(p => p.nome === filtros.produto);
-      if (produto) {
-        vendasFiltradas = vendasFiltradas.filter(v => v.produtoId === produto.id);
-      }
+      vendas = vendas.filter(v => v.produto === filtros.produto);
     }
 
-    // Recalcular vendas por mês com dados filtrados
-    const vendasPorMes: Array<{ mes: string; valor: number; quantidade: number }> = [];
-    const despesasPorMes: Array<{ mes: string; valor: number; quantidade: number }> = [];
-    const receitasPorMes: Array<{ mes: string; valor: number }> = [];
-    const lucrosPorMes: Array<{ mes: string; valor: number }> = [];
-    const agora = new Date();
+    return vendas;
+  }, [vendasDetalhadas, filtros]);
+
+  // KPIs principais (sempre baseados nos dados filtrados ou completos)
+  const kpis = useMemo(() => {
+    const vendas = vendasFiltradas;
+    
+    const totalMovimentado = vendas.reduce((sum, v) => sum + v.valorContrato, 0);
+    const totalComissoesFornecedor = vendas.reduce((sum, v) => sum + v.comissaoFornecedor, 0);
+    const totalComissoesFuncionarios = vendas.reduce((sum, v) => sum + v.comissaoFuncionario, 0);
+    
+    // Despesas no período filtrado
+    let despesasPeriodo = despesasCompletas;
+    if (filtros.periodo?.from) {
+      despesasPeriodo = despesasCompletas.filter(d => {
+        const dataDespesa = new Date(d.dataVencimento);
+        const from = filtros.periodo!.from!;
+        const to = filtros.periodo!.to || from;
+        return dataDespesa >= from && dataDespesa <= to;
+      });
+    }
+    
+    const totalDespesas = despesasPeriodo.reduce((sum, d) => sum + d.valor, 0);
+    
+    // Folhas de pagamento no período
+    let folhasPeriodo = folhasPagamento;
+    if (filtros.periodo?.from) {
+      folhasPeriodo = folhasPagamento.filter(f => {
+        const mesRef = f.mesReferencia + "-01";
+        const dataFolha = new Date(mesRef);
+        const from = startOfMonth(filtros.periodo!.from!);
+        const to = endOfMonth(filtros.periodo!.to || filtros.periodo!.from!);
+        return dataFolha >= from && dataFolha <= to;
+      });
+    }
+    
+    const totalFolhas = folhasPeriodo.reduce((sum, f) => sum + f.salarioLiquido, 0);
+    const totalDespesasGeral = totalDespesas + totalFolhas;
+    
+    const receitaLiquida = totalComissoesFornecedor - totalDespesasGeral;
+    const margemLucro = totalComissoesFornecedor > 0 ? (receitaLiquida / totalComissoesFornecedor) * 100 : 0;
+    const ticketMedio = vendas.length > 0 ? totalMovimentado / vendas.length : 0;
+    
+    return {
+      totalMovimentado,
+      totalComissoesFornecedor,
+      totalComissoesFuncionarios,
+      totalDespesas: totalDespesasGeral,
+      receitaLiquida,
+      margemLucro,
+      ticketMedio,
+      quantidadeVendas: vendas.length,
+      quantidadeFuncionarios: new Set(vendas.map(v => v.funcionario)).size,
+    };
+  }, [vendasFiltradas, despesasCompletas, folhasPagamento, filtros.periodo]);
+
+  // Dados para gráficos
+  const dadosGraficos = useMemo(() => {
+    const vendas = vendasFiltradas;
+    
+    // Vendas por mês (últimos 6 meses)
+    const vendasPorMes = [];
+    const despesasPorMes = [];
+    const receitasPorMes = [];
+    const lucrosPorMes = [];
     
     for (let i = 5; i >= 0; i--) {
-      const mesData = subMonths(agora, i);
+      const mesData = subMonths(new Date(), i);
       const inicioMes = startOfMonth(mesData);
       const fimMes = endOfMonth(mesData);
-
-      const vendasDoMes = vendasFiltradas.filter((v) => {
-        const dataVenda = v.createdAt?.toDate?.() || new Date(v.createdAt);
-        return dataVenda >= inicioMes && dataVenda <= fimMes;
-      });
-
-      const despesasDoMes = despesasCompletas.filter((d) => {
+      
+      const vendasDoMes = vendas.filter(v => v.data >= inicioMes && v.data <= fimMes);
+      const despesasDoMes = despesasCompletas.filter(d => {
         const dataDespesa = new Date(d.dataVencimento);
         return dataDespesa >= inicioMes && dataDespesa <= fimMes;
       });
-
+      
       const valorVendas = vendasDoMes.reduce((sum, v) => sum + v.valorContrato, 0);
       const valorDespesas = despesasDoMes.reduce((sum, d) => sum + d.valor, 0);
+      const valorReceitas = vendasDoMes.reduce((sum, v) => sum + v.comissaoFornecedor, 0);
       
       vendasPorMes.push({
-        mes: format(mesData, "MMM", { locale: ptBR }),
+        mes: format(mesData, "MMM/yy", { locale: ptBR }),
         valor: valorVendas,
         quantidade: vendasDoMes.length,
       });
-
+      
       despesasPorMes.push({
-        mes: format(mesData, "MMM", { locale: ptBR }),
+        mes: format(mesData, "MMM/yy", { locale: ptBR }),
         valor: valorDespesas,
-        quantidade: despesasDoMes.length,
       });
-
+      
       receitasPorMes.push({
-        mes: format(mesData, "MMM", { locale: ptBR }),
-        valor: valorVendas,
+        mes: format(mesData, "MMM/yy", { locale: ptBR }),
+        valor: valorReceitas,
       });
-
+      
       lucrosPorMes.push({
-        mes: format(mesData, "MMM", { locale: ptBR }),
-        valor: valorVendas - valorDespesas,
+        mes: format(mesData, "MMM/yy", { locale: ptBR }),
+        valor: valorReceitas - valorDespesas,
       });
     }
-
-    // Recalcular vendas por funcionário
-    const vendaPorFunc = new Map<string, { vendas: number; comissao: number; comissaoFornecedor: number }>();
-    vendasFiltradas.forEach((venda) => {
-      const produto = produtosCompletos.find(p => p.id === venda.produtoId);
-      
-      // Comissão do agente - importar da venda (priority 1) ou calcular do produto
-      let comissaoCalculada = venda.comissaoAgente || venda.comissao || 0;
-      if (!comissaoCalculada && produto) {
-        // Verificar se comissão está ativa no produto
-        const comissaoAtiva = produto.comissaoAtiva !== false;
-        
-        if (comissaoAtiva) {
-          const comissaoPercentual = venda.comissaoAgentePercentual || venda.comissaoPercentual || produto?.comissaoAgente || produto?.comissao || 0;
-          comissaoCalculada = venda.valorContrato * (comissaoPercentual / 100);
-        } else {
-          comissaoCalculada = 0;
-        }
-      }
-      
-      // Comissão do fornecedor - sempre importar da venda (dados reais salvos)
-      let comissaoFornecedorCalculada = venda.comissaoFornecedor || 0;
-      if (!comissaoFornecedorCalculada && venda.comissaoFornecedorPercentual) {
-        comissaoFornecedorCalculada = venda.valorContrato * (venda.comissaoFornecedorPercentual / 100);
-      } else if (!comissaoFornecedorCalculada && produto?.comissaoFornecedor) {
-        comissaoFornecedorCalculada = venda.valorContrato * (produto.comissaoFornecedor / 100);
-      }
-      
-      const current = vendaPorFunc.get(venda.funcionarioId) || { vendas: 0, comissao: 0, comissaoFornecedor: 0 };
-      vendaPorFunc.set(venda.funcionarioId, {
+    
+    // Top 5 funcionários
+    const vendaPorFunc = new Map<string, { vendas: number; comissao: number }>();
+    vendas.forEach(v => {
+      const current = vendaPorFunc.get(v.funcionario) || { vendas: 0, comissao: 0 };
+      vendaPorFunc.set(v.funcionario, {
         vendas: current.vendas + 1,
-        comissao: current.comissao + comissaoCalculada,
-        comissaoFornecedor: current.comissaoFornecedor + comissaoFornecedorCalculada,
+        comissao: current.comissao + v.comissaoFuncionario,
       });
     });
-
-    const funcionariosData = Array.from(vendaPorFunc.entries())
-      .map(([id, stats]) => {
-        const func = funcionariosCompletos.find((f) => f.id === id);
-        return {
-          nome: func?.nome || "Desconhecido",
-          vendas: stats.vendas,
-          comissao: stats.comissao,
-          comissaoFornecedor: stats.comissaoFornecedor,
-        };
-      })
-      .sort((a, b) => b.vendas - a.vendas)
+    
+    const topFuncionarios = Array.from(vendaPorFunc.entries())
+      .map(([nome, stats]) => ({ nome, ...stats }))
+      .sort((a, b) => b.comissao - a.comissao)
       .slice(0, 5);
-
-    // Recalcular vendas por produto
+    
+    // Top 5 produtos
     const vendaPorProd = new Map<string, number>();
-    vendasFiltradas.forEach((venda) => {
-      const current = vendaPorProd.get(venda.produtoId) || 0;
-      vendaPorProd.set(venda.produtoId, current + venda.valorContrato);
+    vendas.forEach(v => {
+      const current = vendaPorProd.get(v.produto) || 0;
+      vendaPorProd.set(v.produto, current + v.valorContrato);
     });
-
-    const produtosData = Array.from(vendaPorProd.entries())
-      .map(([id, valor]) => {
-        const prod = produtosCompletos.find((p) => p.id === id);
-        return {
-          nome: prod?.nome || "Desconhecido",
-          valor,
-          comissao: prod?.comissao || 0,
-        };
-      })
+    
+    const topProdutos = Array.from(vendaPorProd.entries())
+      .map(([nome, valor]) => ({ nome, valor }))
       .sort((a, b) => b.valor - a.valor)
-      .slice(0, 4);
-
-    // Recalcular vendas por cliente
+      .slice(0, 5);
+    
+    // Top 10 clientes
     const vendaPorCliente = new Map<string, { vendas: number; valor: number }>();
-    vendasFiltradas.forEach((venda) => {
-      const current = vendaPorCliente.get(venda.clienteId) || { vendas: 0, valor: 0 };
-      vendaPorCliente.set(venda.clienteId, {
+    vendas.forEach(v => {
+      const current = vendaPorCliente.get(v.cliente) || { vendas: 0, valor: 0 };
+      vendaPorCliente.set(v.cliente, {
         vendas: current.vendas + 1,
-        valor: current.valor + venda.valorContrato,
+        valor: current.valor + v.valorContrato,
       });
     });
-
-    const clientesData = Array.from(vendaPorCliente.entries())
-      .map(([id, stats]) => {
-        const cliente = clientesCompletos.find((c) => c.id === id);
-        return {
-          nome: cliente?.nome || "Desconhecido",
-          vendas: stats.vendas,
-          valor: stats.valor,
-        };
-      })
+    
+    const topClientes = Array.from(vendaPorCliente.entries())
+      .map(([nome, stats]) => ({ nome, ...stats }))
       .sort((a, b) => b.valor - a.valor)
       .slice(0, 10);
-
+    
     return {
-      vendas: vendasPorMes,
-      funcionarios: funcionariosData,
-      produtos: produtosData,
-      fornecedores: dadosRelatorio.fornecedores,
-      clientes: clientesData,
-      despesas: despesasPorMes,
-      receitas: receitasPorMes,
-      lucros: lucrosPorMes,
+      vendasPorMes,
+      despesasPorMes,
+      receitasPorMes,
+      lucrosPorMes,
+      topFuncionarios,
+      topProdutos,
+      topClientes,
     };
-  }, [filtros, dadosRelatorio, vendasCompletas, clientesCompletos, funcionariosCompletos, produtosCompletos, despesasCompletas]);
+  }, [vendasFiltradas, despesasCompletas]);
 
-  const handleExportarDados = () => {
-    if (!dadosFiltrados || dadosFiltrados.length === 0) {
-      toast.error("Nenhum dado filtrado para exportar");
-      return;
-    }
-
+  // Exportar Excel
+  const handleExportarExcel = () => {
     try {
-      const dadosExport = dadosFiltrados.map((venda) => ({
+      const dadosExport = vendasFiltradas.map((venda) => ({
         "Data": format(venda.data, "dd/MM/yyyy HH:mm", { locale: ptBR }),
         "Cliente": venda.cliente,
         "CPF": venda.cpf,
@@ -591,111 +351,40 @@ export default function Relatorios() {
         "Produto": venda.produto,
         "Valor Contrato": venda.valorContrato,
         "Prazo (meses)": venda.prazo,
-        "Comissão": venda.comissao,
+        "Comissão Funcionário (%)": venda.comissaoFuncionarioPerc,
+        "Comissão Funcionário (R$)": venda.comissaoFuncionario,
+        "Comissão Fornecedor (%)": venda.comissaoFornecedorPerc,
+        "Comissão Fornecedor (R$)": venda.comissaoFornecedor,
         "Status": venda.status,
       }));
 
-      // Criar workbook e worksheet
       const wb = XLSX.utils.book_new();
       const ws = XLSX.utils.json_to_sheet(dadosExport);
 
-      // Definir largura das colunas
       ws['!cols'] = [
-        { wch: 18 },  // Data
-        { wch: 25 },  // Cliente
-        { wch: 15 },  // CPF
-        { wch: 25 },  // Funcionário
-        { wch: 30 },  // Produto
-        { wch: 15 },  // Valor Contrato
-        { wch: 15 },  // Prazo
-        { wch: 15 },  // Comissão
-        { wch: 12 },  // Status
+        { wch: 18 }, { wch: 30 }, { wch: 15 }, { wch: 30 }, { wch: 35 },
+        { wch: 15 }, { wch: 12 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 12 },
       ];
 
-      // Adicionar worksheet ao workbook
       XLSX.utils.book_append_sheet(wb, ws, "Relatório");
+      XLSX.writeFile(wb, `relatorio_${format(new Date(), "yyyyMMdd_HHmmss")}.xlsx`);
 
-      // Exportar arquivo
-      XLSX.writeFile(wb, `relatorio_filtrado_${format(new Date(), "yyyyMMdd_HHmmss")}.xlsx`);
-
-      toast.success(`${dadosFiltrados.length} registros exportados com sucesso!`);
+      toast.success(`${vendasFiltradas.length} registros exportados com sucesso!`);
     } catch (error) {
       console.error("Erro ao exportar dados:", error);
       toast.error("Erro ao exportar dados");
     }
   };
 
-  const estatisticas = useMemo(() => {
-    const dados = dadosGraficos || dadosRelatorio;
-    if (!dados) return null;
-    
-    const totalVendas = dados.vendas.reduce((sum, v) => sum + v.valor, 0); // Valor total negociado pelos agentes
-    const totalAnterior = dados.vendas.slice(0, -1).reduce((sum, v) => sum + v.valor, 0);
-    const crescimento = totalAnterior > 0 ? ((totalVendas - totalAnterior) / totalAnterior) * 100 : 0;
-    
-    // Receita Bruta = soma das comissões pagas pelos fornecedores (de TODAS as vendas filtradas)
-    const totalComissoes = calcularTotalComissoesFornecedor(vendasCompletas, produtosCompletos);
-    
-    const totalDespesas = dados.despesas.reduce((sum, d) => sum + d.valor, 0);
-    const totalReceitas = dados.receitas.reduce((sum, r) => sum + r.valor, 0);
-    const receitaLiquida = totalComissoes - totalDespesas; // Receita líquida = comissões dos fornecedores - despesas
-    const lucroTotal = totalReceitas - totalDespesas;
-    const margemLucro = totalComissoes > 0 ? (receitaLiquida / totalComissoes) * 100 : 0;
-
-    return {
-      totalVendas, // Valor movimentado (negociado)
-      crescimento,
-      ticketMedio: totalVendas / dados.vendas.reduce((sum, v) => sum + v.quantidade, 0) || 0,
-      totalFuncionarios: dados.funcionarios.length,
-      produtoMaisVendido: dados.produtos[0]?.nome || "N/A",
-      totalComissoes, // Receita bruta (comissões recebidas dos fornecedores)
-      totalDespesas,
-      totalReceitas,
-      receitaLiquida, // Receita líquida
-      lucroTotal,
-      margemLucro,
-    };
-  }, [dadosGraficos, dadosRelatorio, vendasCompletas, produtosCompletos]);
-
-  const gerarFeedback = () => {
-    if (!estatisticas) return { tipo: "neutro" as const, mensagem: "Carregando dados..." };
-    
-    if (estatisticas.crescimento > 10) {
-      return {
-        tipo: "positivo" as const,
-        mensagem: `Excelente! Crescimento de ${estatisticas.crescimento.toFixed(1)}% em relação ao período anterior. Continue com o ótimo trabalho!`,
-      };
-    } else if (estatisticas.crescimento < 0) {
-      return {
-        tipo: "negativo" as const,
-        mensagem: `Atenção: Queda de ${Math.abs(estatisticas.crescimento).toFixed(1)}% nas vendas. Recomenda-se revisar estratégias e motivar a equipe.`,
-      };
-    } else {
-      return {
-        tipo: "neutro" as const,
-        mensagem: `Crescimento moderado de ${estatisticas.crescimento.toFixed(1)}%. Há oportunidades para melhorar o desempenho.`,
-      };
-    }
-  };
-
-  const handleGerarRelatorio = () => {
-    toast.success("Relatório gerado com sucesso!");
-  };
-
-  const handleImprimir = async () => {
-    if (!dadosRelatorio || !estatisticas) {
-      toast.error("Dados ainda não carregados");
-      return;
-    }
-    
+  // Exportar PDF
+  const handleExportarPDF = async () => {
     setGerando(true);
     try {
       const doc = new jsPDF();
       const pageWidth = doc.internal.pageSize.getWidth();
       let y = 20;
 
-      // Cabeçalho
-      doc.setFontSize(22);
+      doc.setFontSize(20);
       doc.setFont("helvetica", "bold");
       doc.text("Relatório Gerencial", pageWidth / 2, y, { align: "center" });
       
@@ -714,78 +403,19 @@ export default function Relatorios() {
         startY: y,
         head: [["Métrica", "Valor"]],
         body: [
-          ["Total de Vendas", `R$ ${estatisticas.totalVendas.toLocaleString("pt-BR")}`],
-          ["Total Comissão Fornecedor", `R$ ${dadosFiltrados.reduce((sum, v) => sum + v.valorAReceber, 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`],
-          ["Crescimento", `${estatisticas.crescimento > 0 ? "+" : ""}${estatisticas.crescimento.toFixed(1)}%`],
-          ["Ticket Médio", `R$ ${estatisticas.ticketMedio.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`],
-          ["Total de Funcionários", estatisticas.totalFuncionarios.toString()],
-          ["Produto Mais Vendido", estatisticas.produtoMaisVendido],
+          ["Total Movimentado", `R$ ${kpis.totalMovimentado.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`],
+          ["Receita Bruta (Comissões)", `R$ ${kpis.totalComissoesFornecedor.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`],
+          ["Total de Despesas", `R$ ${kpis.totalDespesas.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`],
+          ["Receita Líquida", `R$ ${kpis.receitaLiquida.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`],
+          ["Margem de Lucro", `${kpis.margemLucro.toFixed(2)}%`],
+          ["Ticket Médio", `R$ ${kpis.ticketMedio.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`],
+          ["Quantidade de Vendas", kpis.quantidadeVendas.toString()],
         ],
         theme: "grid",
         headStyles: { fillColor: [59, 130, 246] },
       });
 
-      // Vendas por Funcionário
-      doc.addPage();
-      y = 20;
-      doc.setFontSize(14);
-      doc.setFont("helvetica", "bold");
-      doc.text("Desempenho por Funcionário", 14, y);
-
-      y += 10;
-      autoTable(doc, {
-        startY: y,
-        head: [["Funcionário", "Vendas", "Comissão"]],
-        body: dadosRelatorio.funcionarios.map(f => [
-          f.nome,
-          f.vendas.toString(),
-          `R$ ${f.comissao.toLocaleString("pt-BR")}`,
-        ]),
-        theme: "striped",
-        headStyles: { fillColor: [59, 130, 246] },
-      });
-
-      // Vendas por Produto
-      doc.addPage();
-      y = 20;
-      doc.setFontSize(14);
-      doc.setFont("helvetica", "bold");
-      doc.text("Vendas por Produto", 14, y);
-
-      y += 10;
-      autoTable(doc, {
-        startY: y,
-        head: [["Produto", "Valor Total"]],
-        body: dadosRelatorio.produtos.map(p => [
-          p.nome,
-          `R$ ${p.valor.toLocaleString("pt-BR")}`,
-        ]),
-        theme: "striped",
-        headStyles: { fillColor: [59, 130, 246] },
-      });
-
-      // Top 10 Clientes
-      doc.addPage();
-      y = 20;
-      doc.setFontSize(14);
-      doc.setFont("helvetica", "bold");
-      doc.text("Top 10 Clientes", 14, y);
-
-      y += 10;
-      autoTable(doc, {
-        startY: y,
-        head: [["Cliente", "Qtd. Vendas", "Valor Total"]],
-        body: dadosRelatorio.clientes.map(c => [
-          c.nome,
-          c.vendas.toString(),
-          `R$ ${c.valor.toLocaleString("pt-BR")}`,
-        ]),
-        theme: "striped",
-        headStyles: { fillColor: [59, 130, 246] },
-      });
-
-      // Detalhamento das Vendas com Valores a Receber
-      if (dadosFiltrados.length > 0) {
+      if (vendasFiltradas.length > 0) {
         doc.addPage();
         y = 20;
         doc.setFontSize(14);
@@ -795,29 +425,21 @@ export default function Relatorios() {
         y += 10;
         autoTable(doc, {
           startY: y,
-          head: [["Data", "Cliente", "Produto", "Valor Contrato", "Comissão Fornecedor", "Comissão Funcionário"]],
-          body: dadosFiltrados.map(v => [
+          head: [["Data", "Cliente", "Produto", "Valor", "Comissão Fornecedor", "Comissão Funcionário"]],
+          body: vendasFiltradas.slice(0, 50).map(v => [
             format(v.data, "dd/MM/yyyy", { locale: ptBR }),
-            v.cliente,
-            v.produto,
+            v.cliente.length > 20 ? v.cliente.substring(0, 20) + '...' : v.cliente,
+            v.produto.length > 20 ? v.produto.substring(0, 20) + '...' : v.produto,
             `R$ ${v.valorContrato.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
-            `R$ ${v.valorAReceber.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
-            `R$ ${v.comissao.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
+            `R$ ${v.comissaoFornecedor.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
+            `R$ ${v.comissaoFuncionario.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
           ]),
           theme: "striped",
           headStyles: { fillColor: [59, 130, 246] },
-          columnStyles: {
-            0: { cellWidth: 25 },
-            1: { cellWidth: 35 },
-            2: { cellWidth: 35 },
-            3: { cellWidth: 30, halign: 'right' },
-            4: { cellWidth: 30, halign: 'right' },
-            5: { cellWidth: 30, halign: 'right' },
-          },
+          styles: { fontSize: 8 },
         });
       }
 
-      // Rodapé
       const pageCount = doc.getNumberOfPages();
       for (let i = 1; i <= pageCount; i++) {
         doc.setPage(i);
@@ -832,10 +454,9 @@ export default function Relatorios() {
 
       doc.save(`relatorio_${format(new Date(), "yyyyMMdd_HHmmss")}.pdf`);
       toast.success("Relatório exportado com sucesso!");
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "Erro desconhecido";
-      console.error("Erro ao gerar PDF:", errorMessage, error);
-      toast.error("Erro ao gerar o relatório. Tente novamente.");
+    } catch (error) {
+      console.error("Erro ao gerar PDF:", error);
+      toast.error("Erro ao gerar o relatório");
     } finally {
       setGerando(false);
     }
@@ -846,7 +467,7 @@ export default function Relatorios() {
       <div className="space-y-6">
         <PageHeader
           title="Relatórios Gerenciais"
-          description="Análise completa do desempenho e resultados"
+          description="Painel de análise e gestão empresarial"
         />
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {[1, 2, 3, 4].map((i) => (
@@ -858,106 +479,188 @@ export default function Relatorios() {
     );
   }
 
-  const feedback = gerarFeedback();
+  const temFiltros = !!(filtros.periodo?.from || filtros.cliente || filtros.funcionario || filtros.produto);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-8">
       <PageHeader
         title="Relatórios Gerenciais"
-        description="Análises inteligentes e insights para tomada de decisões"
+        description="Painel completo de análise e tomada de decisões estratégicas"
       />
 
-      {/* KPIs */}
+      {/* Indicador de filtros ativos */}
+      {temFiltros && (
+        <Card className="p-4 bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-5 h-5 text-blue-600" />
+            <div className="flex-1">
+              <h4 className="font-semibold text-blue-900 dark:text-blue-100">Filtros Aplicados</h4>
+              <p className="text-sm text-blue-700 dark:text-blue-300">
+                Exibindo {vendasFiltradas.length} de {vendasDetalhadas.length} vendas
+                {filtros.periodo?.from && ` • Período: ${format(filtros.periodo.from, "dd/MM/yyyy", { locale: ptBR })}`}
+                {filtros.periodo?.to && ` até ${format(filtros.periodo.to, "dd/MM/yyyy", { locale: ptBR })}`}
+                {filtros.cliente && ` • Cliente: ${filtros.cliente}`}
+                {filtros.funcionario && ` • Funcionário: ${filtros.funcionario}`}
+                {filtros.produto && ` • Produto: ${filtros.produto}`}
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setFiltros({ tipoRelatorio: "geral", agrupamento: "mes" })}
+              className="border-blue-600 text-blue-600 hover:bg-blue-100"
+            >
+              Limpar Filtros
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      {/* KPIs Principais */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="p-6 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900">
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <p className="text-sm font-medium text-blue-900 dark:text-blue-100">Movimentado</p>
-              <h3 className="text-2xl font-bold mt-2 text-blue-700 dark:text-blue-300">
-                R$ {estatisticas!.totalVendas.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-              </h3>
-              <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">Valor total dos contratos</p>
+        <Card className="p-6 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900 border-blue-200">
+          <div className="flex items-center justify-between mb-3">
+            <div className="p-2 bg-blue-500 rounded-lg">
+              <DollarSign className="w-6 h-6 text-white" />
             </div>
-            <DollarSign className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger>
+                  <HelpCircle className="w-4 h-4 text-blue-600" />
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Valor total de todos os contratos negociados</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
+          <h3 className="text-sm font-medium text-blue-900 dark:text-blue-100">Total Movimentado</h3>
+          <p className="text-2xl font-bold mt-1 text-blue-700 dark:text-blue-300">
+            R$ {kpis.totalMovimentado.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+          </p>
+          <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">
+            {kpis.quantidadeVendas} {kpis.quantidadeVendas === 1 ? 'venda' : 'vendas'}
+          </p>
         </Card>
 
-        <Card className="p-6 bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950 dark:to-green-900">
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <p className="text-sm font-medium text-green-900 dark:text-green-100">Receita Bruta</p>
-              <h3 className="text-2xl font-bold mt-2 text-green-700 dark:text-green-300">
-                R$ {estatisticas!.totalComissoes.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-              </h3>
-              <p className="text-xs text-green-700 dark:text-green-300 mt-1">Comissões recebidas dos fornecedores</p>
+        <Card className="p-6 bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950 dark:to-green-900 border-green-200">
+          <div className="flex items-center justify-between mb-3">
+            <div className="p-2 bg-green-500 rounded-lg">
+              <TrendingUp className="w-6 h-6 text-white" />
             </div>
-            <DollarSign className="w-8 h-8 text-green-600 dark:text-green-400" />
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger>
+                  <HelpCircle className="w-4 h-4 text-green-600" />
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Comissões recebidas dos fornecedores/bancos</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
+          <h3 className="text-sm font-medium text-green-900 dark:text-green-100">Receita Bruta</h3>
+          <p className="text-2xl font-bold mt-1 text-green-700 dark:text-green-300">
+            R$ {kpis.totalComissoesFornecedor.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+          </p>
+          <p className="text-xs text-green-600 dark:text-green-400 mt-2">
+            Comissões de fornecedores
+          </p>
         </Card>
 
-        <Card className="p-6 bg-gradient-to-br from-red-50 to-red-100 dark:from-red-950 dark:to-red-900">
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <p className="text-sm font-medium text-red-900 dark:text-red-100">Total de Despesas</p>
-              <h3 className="text-2xl font-bold mt-2 text-red-700 dark:text-red-300">
-                R$ {estatisticas!.totalDespesas.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-              </h3>
-              <p className="text-xs text-red-700 dark:text-red-300 mt-1">Despesas + Folhas de Pagamento</p>
+        <Card className="p-6 bg-gradient-to-br from-red-50 to-red-100 dark:from-red-950 dark:to-red-900 border-red-200">
+          <div className="flex items-center justify-between mb-3">
+            <div className="p-2 bg-red-500 rounded-lg">
+              <TrendingDown className="w-6 h-6 text-white" />
             </div>
-            <DollarSign className="w-8 h-8 text-red-600 dark:text-red-400" />
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger>
+                  <HelpCircle className="w-4 h-4 text-red-600" />
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Despesas operacionais + Folhas de pagamento</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
+          <h3 className="text-sm font-medium text-red-900 dark:text-red-100">Total de Despesas</h3>
+          <p className="text-2xl font-bold mt-1 text-red-700 dark:text-red-300">
+            R$ {kpis.totalDespesas.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+          </p>
+          <p className="text-xs text-red-600 dark:text-red-400 mt-2">
+            Operacionais + Folha
+          </p>
         </Card>
 
-        <Card className={`p-6 bg-gradient-to-br ${estatisticas!.receitaLiquida >= 0 ? 'from-emerald-50 to-emerald-100 dark:from-emerald-950 dark:to-emerald-900' : 'from-orange-50 to-orange-100 dark:from-orange-950 dark:to-orange-900'}`}>
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <p className={`text-sm font-medium ${estatisticas!.receitaLiquida >= 0 ? 'text-emerald-900 dark:text-emerald-100' : 'text-orange-900 dark:text-orange-100'}`}>
-                Receita Líquida
-              </p>
-              <h3 className={`text-2xl font-bold mt-2 ${estatisticas!.receitaLiquida >= 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-orange-700 dark:text-orange-300'}`}>
-                R$ {estatisticas!.receitaLiquida.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-              </h3>
-              <p className={`text-xs mt-1 flex items-center gap-1 font-semibold ${estatisticas!.receitaLiquida >= 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-orange-700 dark:text-orange-300'}`}>
-                {estatisticas!.receitaLiquida >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                Margem: {estatisticas!.margemLucro.toFixed(1)}%
-              </p>
+        <Card className={`p-6 bg-gradient-to-br border-2 ${
+          kpis.receitaLiquida >= 0 
+            ? 'from-emerald-50 to-emerald-100 dark:from-emerald-950 dark:to-emerald-900 border-emerald-300'
+            : 'from-orange-50 to-orange-100 dark:from-orange-950 dark:to-orange-900 border-orange-300'
+        }`}>
+          <div className="flex items-center justify-between mb-3">
+            <div className={`p-2 rounded-lg ${kpis.receitaLiquida >= 0 ? 'bg-emerald-500' : 'bg-orange-500'}`}>
+              <Activity className="w-6 h-6 text-white" />
             </div>
-            <DollarSign className={`w-8 h-8 ${estatisticas!.receitaLiquida >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-orange-600 dark:text-orange-400'}`} />
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger>
+                  <HelpCircle className={`w-4 h-4 ${kpis.receitaLiquida >= 0 ? 'text-emerald-600' : 'text-orange-600'}`} />
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Receita Bruta - Despesas Totais</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+          <h3 className={`text-sm font-medium ${kpis.receitaLiquida >= 0 ? 'text-emerald-900 dark:text-emerald-100' : 'text-orange-900 dark:text-orange-100'}`}>
+            Receita Líquida
+          </h3>
+          <p className={`text-2xl font-bold mt-1 ${kpis.receitaLiquida >= 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-orange-700 dark:text-orange-300'}`}>
+            R$ {kpis.receitaLiquida.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+          </p>
+          <div className="flex items-center gap-2 mt-2">
+            {kpis.receitaLiquida >= 0 ? <TrendingUp className="w-4 h-4 text-emerald-600" /> : <TrendingDown className="w-4 h-4 text-orange-600" />}
+            <p className={`text-xs font-semibold ${kpis.receitaLiquida >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-orange-600 dark:text-orange-400'}`}>
+              Margem: {kpis.margemLucro.toFixed(1)}%
+            </p>
           </div>
         </Card>
       </div>
 
       {/* KPIs Secundários */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <Card className="p-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className="p-5 border-l-4 border-l-blue-500">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-muted-foreground">Ticket Médio</p>
-              <h3 className="text-2xl font-bold mt-2">
-                R$ {estatisticas!.ticketMedio.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+              <p className="text-sm text-muted-foreground font-medium">Ticket Médio</p>
+              <h3 className="text-xl font-bold mt-1">
+                R$ {kpis.ticketMedio.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
               </h3>
             </div>
-            <DollarSign className="w-8 h-8 text-blue-600" />
+            <BarChart3 className="w-8 h-8 text-blue-500 opacity-80" />
           </div>
         </Card>
 
-        <Card className="p-6">
+        <Card className="p-5 border-l-4 border-l-purple-500">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-muted-foreground">Funcionários Ativos</p>
-              <h3 className="text-2xl font-bold mt-2">{estatisticas!.totalFuncionarios}</h3>
+              <p className="text-sm text-muted-foreground font-medium">Comissões Pagas</p>
+              <h3 className="text-xl font-bold mt-1">
+                R$ {kpis.totalComissoesFuncionarios.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+              </h3>
             </div>
-            <Users className="w-8 h-8 text-purple-600" />
+            <Users className="w-8 h-8 text-purple-500 opacity-80" />
           </div>
         </Card>
 
-        <Card className="p-6">
+        <Card className="p-5 border-l-4 border-l-orange-500">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-muted-foreground">Produto Destaque</p>
-              <h3 className="text-lg font-bold mt-2">{estatisticas!.produtoMaisVendido}</h3>
+              <p className="text-sm text-muted-foreground font-medium">Funcionários Ativos</p>
+              <h3 className="text-xl font-bold mt-1">{kpis.quantidadeFuncionarios}</h3>
             </div>
-            <Package className="w-8 h-8 text-orange-600" />
+            <Package className="w-8 h-8 text-orange-500 opacity-80" />
           </div>
         </Card>
       </div>
@@ -966,103 +669,209 @@ export default function Relatorios() {
       <FiltrosDinamicosRelatorio
         filtros={filtros}
         onFiltrosChange={setFiltros}
-        fornecedores={dadosRelatorio!.fornecedores.map(f => f.nome)}
-        funcionarios={dadosRelatorio!.funcionarios.map(f => f.nome)}
-        produtos={dadosRelatorio!.produtos.map(p => p.nome)}
-        clientes={dadosRelatorio!.clientes.map(c => c.nome)}
-        onGerarRelatorio={handleGerarRelatorio}
+        fornecedores={[]}
+        funcionarios={funcionariosCompletos.map(f => f.nome)}
+        produtos={produtosCompletos.map(p => p.nome)}
+        clientes={clientesCompletos.map(c => c.nome)}
+        onGerarRelatorio={() => toast.success("Filtros aplicados!")}
       />
 
-      {/* Tabela de Dados Filtrados */}
-      {dadosFiltrados && dadosFiltrados.length > 0 && (
-        <Card>
-          <div className="p-6 border-b flex justify-between items-center">
-            <div>
-              <h3 className="text-lg font-semibold">Registros Filtrados</h3>
-              <p className="text-sm text-muted-foreground">
-                {dadosFiltrados.length} {dadosFiltrados.length === 1 ? "registro encontrado" : "registros encontrados"}
-              </p>
-            </div>
-            <Button onClick={handleExportarDados} className="gap-2">
+      {/* Gráficos de Desempenho */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <GraficoModerno
+          titulo="Evolução de Vendas (6 meses)"
+          tipo="linha"
+          dados={{
+            labels: dadosGraficos.vendasPorMes.map(v => v.mes),
+            valores: dadosGraficos.vendasPorMes.map(v => v.valor),
+          }}
+        />
+
+        <GraficoModerno
+          titulo="Receitas x Despesas"
+          tipo="barra"
+          dados={{
+            labels: dadosGraficos.receitasPorMes.map(r => r.mes),
+            valores: dadosGraficos.receitasPorMes.map(r => r.valor),
+            comparacao: dadosGraficos.despesasPorMes.map(d => d.valor),
+          }}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <GraficoModerno
+          titulo="Top 5 Funcionários (Comissões)"
+          tipo="barra"
+          dados={{
+            labels: dadosGraficos.topFuncionarios.map(f => f.nome.split(" ")[0]),
+            valores: dadosGraficos.topFuncionarios.map(f => f.comissao),
+          }}
+        />
+
+        <GraficoModerno
+          titulo="Top 5 Produtos (Valor)"
+          tipo="pizza"
+          dados={{
+            labels: dadosGraficos.topProdutos.map(p => p.nome.length > 15 ? p.nome.substring(0, 15) + '...' : p.nome),
+            valores: dadosGraficos.topProdutos.map(p => p.valor),
+          }}
+        />
+
+        <GraficoModerno
+          titulo="Evolução de Lucros"
+          tipo="linha"
+          dados={{
+            labels: dadosGraficos.lucrosPorMes.map(l => l.mes),
+            valores: dadosGraficos.lucrosPorMes.map(l => l.valor),
+          }}
+        />
+      </div>
+
+      {/* Tabela de Vendas Detalhadas */}
+      <Card>
+        <div className="p-6 border-b flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <FileSpreadsheet className="w-5 h-5" />
+              Vendas Detalhadas
+            </h3>
+            <p className="text-sm text-muted-foreground mt-1">
+              {vendasFiltradas.length} {vendasFiltradas.length === 1 ? 'venda' : 'vendas'} • Total: R$ {vendasFiltradas.reduce((sum, v) => sum + v.valorContrato, 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={handleExportarExcel} className="gap-2">
               <FileSpreadsheet className="w-4 h-4" />
-              Exportar Excel
+              Excel
             </Button>
+            <Button variant="outline" size="sm" onClick={handleExportarPDF} disabled={gerando} className="gap-2">
+              <Download className="w-4 h-4" />
+              {gerando ? "Gerando..." : "PDF"}
+            </Button>
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/50">
+                <TableHead className="w-[120px]">Data</TableHead>
+                <TableHead>Cliente</TableHead>
+                <TableHead>Funcionário</TableHead>
+                <TableHead>Produto</TableHead>
+                <TableHead className="text-right">Valor</TableHead>
+                <TableHead className="text-right">Prazo</TableHead>
+                <TableHead className="text-right bg-green-50 dark:bg-green-950">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger className="flex items-center justify-end gap-1 w-full">
+                        Comissão Func.
+                        <HelpCircle className="w-3 h-3" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Comissão paga ao funcionário</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </TableHead>
+                <TableHead className="text-right bg-blue-50 dark:bg-blue-950">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger className="flex items-center justify-end gap-1 w-full">
+                        Comissão Forn.
+                        <HelpCircle className="w-3 h-3" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Comissão recebida do fornecedor</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </TableHead>
+                <TableHead className="text-center">Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {vendasFiltradas.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                    <div className="flex flex-col items-center gap-2">
+                      <AlertCircle className="w-8 h-8 opacity-50" />
+                      <p>Nenhuma venda encontrada com os filtros aplicados</p>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                vendasFiltradas.slice(0, 100).map((venda) => (
+                  <TableRow key={venda.id} className="hover:bg-muted/50">
+                    <TableCell className="whitespace-nowrap font-mono text-xs">
+                      {format(venda.data, "dd/MM/yyyy", { locale: ptBR })}
+                    </TableCell>
+                    <TableCell className="font-medium">{venda.cliente}</TableCell>
+                    <TableCell>{venda.funcionario}</TableCell>
+                    <TableCell className="max-w-[200px] truncate">{venda.produto}</TableCell>
+                    <TableCell className="text-right font-semibold">
+                      R$ {venda.valorContrato.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                    </TableCell>
+                    <TableCell className="text-right">{venda.prazo}m</TableCell>
+                    <TableCell className="text-right bg-green-50 dark:bg-green-950 font-semibold text-green-700 dark:text-green-400">
+                      R$ {venda.comissaoFuncionario.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                    </TableCell>
+                    <TableCell className="text-right bg-blue-50 dark:bg-blue-950 font-semibold text-blue-700 dark:text-blue-400">
+                      R$ {venda.comissaoFornecedor.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Badge variant={venda.status === "aprovada" ? "default" : venda.status === "pendente" ? "secondary" : "destructive"}>
+                        {venda.status}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+          {vendasFiltradas.length > 100 && (
+            <div className="p-4 text-center text-sm text-muted-foreground bg-muted/30">
+              Exibindo 100 de {vendasFiltradas.length} vendas. Exporte para Excel para ver todas.
+            </div>
+          )}
+        </div>
+      </Card>
+
+      {/* Tabela Top 10 Clientes */}
+      {dadosGraficos.topClientes.length > 0 && (
+        <Card>
+          <div className="p-6 border-b">
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <PieChart className="w-5 h-5" />
+              Top 10 Clientes
+            </h3>
+            <p className="text-sm text-muted-foreground mt-1">
+              Maiores clientes por valor total de contratos
+            </p>
           </div>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>Data</TableHead>
+                <TableRow className="bg-muted/50">
+                  <TableHead className="w-[60px]">#</TableHead>
                   <TableHead>Cliente</TableHead>
-                  <TableHead>CPF</TableHead>
-                  <TableHead>Funcionário</TableHead>
-                  <TableHead>Produto</TableHead>
-                  <TableHead className="text-right">Valor Contrato</TableHead>
-                  <TableHead className="text-right">Prazo</TableHead>
-                  <TableHead className="text-right bg-blue-50">
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger className="flex items-center justify-end gap-1 w-full">
-                          Comissão Fornecedor
-                          <HelpCircle className="w-3 h-3" />
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Valor da comissão que será paga pelo fornecedor/banco</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </TableHead>
-                  <TableHead className="text-right bg-green-50">
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger className="flex items-center justify-end gap-1 w-full">
-                          Comissão Funcionário (%)
-                          <HelpCircle className="w-3 h-3" />
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Percentual da comissão do funcionário/vendedor</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </TableHead>
-                  <TableHead className="text-right bg-green-50">
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger className="flex items-center justify-end gap-1 w-full">
-                          Comissão Funcionário (R$)
-                          <HelpCircle className="w-3 h-3" />
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Valor em reais da comissão do funcionário/vendedor</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Qtd. Vendas</TableHead>
+                  <TableHead className="text-right">Valor Total</TableHead>
+                  <TableHead className="text-right">Ticket Médio</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {dadosFiltrados.map((venda) => (
-                  <TableRow key={venda.id}>
-                    <TableCell className="whitespace-nowrap">{format(venda.data, "dd/MM/yyyy HH:mm", { locale: ptBR })}</TableCell>
-                    <TableCell className="font-medium">{venda.cliente}</TableCell>
-                    <TableCell>{venda.cpf}</TableCell>
-                    <TableCell>{venda.funcionario}</TableCell>
-                    <TableCell>{venda.produto}</TableCell>
-                    <TableCell className="text-right">R$ {venda.valorContrato.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</TableCell>
-                    <TableCell className="text-right">{venda.prazo} meses</TableCell>
-                    <TableCell className="text-right bg-blue-50 font-semibold text-blue-700">R$ {venda.valorAReceber.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</TableCell>
-                    <TableCell className="text-right bg-green-50 font-semibold text-green-700">{venda.comissaoPercentual.toFixed(2)}%</TableCell>
-                    <TableCell className="text-right bg-green-50 font-semibold text-green-700">R$ {venda.comissao.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</TableCell>
-                    <TableCell>
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${
-                        venda.status === "aprovada" ? "bg-green-100 text-green-800" :
-                        venda.status === "pendente" ? "bg-yellow-100 text-yellow-800" :
-                        venda.status === "em_analise" ? "bg-blue-100 text-blue-800" :
-                        "bg-red-100 text-red-800"
-                      }`}>
-                        {venda.status.replace("_", " ")}
-                      </span>
+                {dadosGraficos.topClientes.map((cliente, index) => (
+                  <TableRow key={cliente.nome}>
+                    <TableCell className="font-bold text-muted-foreground">
+                      {index + 1}º
+                    </TableCell>
+                    <TableCell className="font-medium">{cliente.nome}</TableCell>
+                    <TableCell className="text-right">{cliente.vendas}</TableCell>
+                    <TableCell className="text-right font-semibold text-blue-700 dark:text-blue-400">
+                      R$ {cliente.valor.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                    </TableCell>
+                    <TableCell className="text-right text-muted-foreground">
+                      R$ {(cliente.valor / cliente.vendas).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -1072,323 +881,17 @@ export default function Relatorios() {
         </Card>
       )}
 
-      {/* Tabela de Despesas de Folha de Pagamento */}
-      {despesasCompletas && despesasCompletas.filter(d => d.origem === "folha_pagamento").length > 0 && (
-        <Card>
-          <div className="p-6 border-b">
-            <div>
-              <h3 className="text-lg font-semibold">Despesas de Folha de Pagamento</h3>
-              <p className="text-sm text-muted-foreground">
-                {despesasCompletas.filter(d => d.origem === "folha_pagamento").length} folha(s) importada(s) como despesa
-              </p>
-            </div>
-          </div>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Descrição</TableHead>
-                  <TableHead>Vencimento</TableHead>
-                  <TableHead>Pagamento</TableHead>
-                  <TableHead className="text-right">Valor</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Observações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {despesasCompletas
-                  .filter(d => d.origem === "folha_pagamento")
-                  .sort((a, b) => new Date(b.dataVencimento).getTime() - new Date(a.dataVencimento).getTime())
-                  .map((despesa) => (
-                    <TableRow key={despesa.id}>
-                      <TableCell className="font-medium">{despesa.descricao}</TableCell>
-                      <TableCell>
-                        {format(new Date(despesa.dataVencimento), "dd/MM/yyyy", { locale: ptBR })}
-                      </TableCell>
-                      <TableCell>
-                        {despesa.dataPagamento
-                          ? format(new Date(despesa.dataPagamento), "dd/MM/yyyy", { locale: ptBR })
-                          : "-"}
-                      </TableCell>
-                      <TableCell className="text-right font-semibold text-red-600">
-                        R$ {despesa.valor.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                      </TableCell>
-                      <TableCell>
-                        <span className={`px-2 py-1 rounded text-xs font-medium ${
-                          despesa.status === "Pago" ? "bg-green-100 text-green-800" :
-                          despesa.status === "Pendente" ? "bg-yellow-100 text-yellow-800" :
-                          "bg-red-100 text-red-800"
-                        }`}>
-                          {despesa.status}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground max-w-xs truncate">
-                        {despesa.observacoes || "-"}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-              </TableBody>
-            </Table>
-          </div>
-        </Card>
-      )}
-
-      {/* Ações */}
-      <div className="flex gap-3 justify-end">
+      {/* Botões de Ação */}
+      <div className="flex justify-end gap-3 pt-4">
         <Button 
           variant="outline" 
-          className="gap-2" 
-          onClick={() => {
-            try {
-              window.print();
-            } catch (error) {
-              console.error("Erro ao imprimir:", error);
-              toast.error("Erro ao abrir impressão");
-            }
-          }}
+          onClick={() => window.print()} 
+          className="gap-2"
         >
           <Printer className="w-4 h-4" />
           Imprimir
         </Button>
-        <Button className="gap-2" onClick={handleImprimir} disabled={gerando}>
-          <Download className="w-4 h-4" />
-          {gerando ? "Gerando PDF..." : "Exportar PDF"}
-        </Button>
       </div>
-
-      {/* Gráficos Dinâmicos baseados no tipo de relatório */}
-      {filtros.tipoRelatorio === "geral" && (
-        <>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <GraficoModerno
-              titulo="Evolução de Vendas"
-              tipo="linha"
-              dados={{
-                labels: (dadosGraficos || dadosRelatorio)!.vendas.map(v => v.mes),
-                valores: (dadosGraficos || dadosRelatorio)!.vendas.map(v => v.valor),
-              }}
-              feedback={feedback}
-            />
-
-            <GraficoModerno
-              titulo="Vendas por Produto"
-              tipo="pizza"
-              dados={{
-                labels: (dadosGraficos || dadosRelatorio)!.produtos.map(p => p.nome),
-                valores: (dadosGraficos || dadosRelatorio)!.produtos.map(p => p.valor),
-              }}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <GraficoModerno
-              titulo="Receitas x Despesas"
-              tipo="barra"
-              dados={{
-                labels: (dadosGraficos || dadosRelatorio)!.receitas.map(r => r.mes),
-                valores: (dadosGraficos || dadosRelatorio)!.receitas.map(r => r.valor),
-                comparacao: (dadosGraficos || dadosRelatorio)!.despesas.map(d => d.valor),
-              }}
-            />
-
-            <GraficoModerno
-              titulo="Evolução de Lucros"
-              tipo="linha"
-              dados={{
-                labels: (dadosGraficos || dadosRelatorio)!.lucros.map(l => l.mes),
-                valores: (dadosGraficos || dadosRelatorio)!.lucros.map(l => l.valor),
-              }}
-            />
-
-            <GraficoModerno
-              titulo="Despesas por Período"
-              tipo="barra"
-              dados={{
-                labels: (dadosGraficos || dadosRelatorio)!.despesas.map(d => d.mes),
-                valores: (dadosGraficos || dadosRelatorio)!.despesas.map(d => d.valor),
-              }}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <GraficoModerno
-              titulo="Desempenho por Funcionário"
-              tipo="barra"
-              dados={{
-                labels: (dadosGraficos || dadosRelatorio)!.funcionarios.map(f => f.nome.split(" ")[0]),
-                valores: (dadosGraficos || dadosRelatorio)!.funcionarios.map(f => f.comissao),
-              }}
-            />
-
-            <GraficoModerno
-              titulo="Vendas por Fornecedor"
-              tipo="barra"
-              dados={{
-                labels: (dadosGraficos || dadosRelatorio)!.fornecedores.map(f => f.nome.replace("Banco ", "")),
-                valores: (dadosGraficos || dadosRelatorio)!.fornecedores.map(f => f.valor),
-              }}
-            />
-
-            <GraficoModerno
-              titulo="Top 10 Clientes"
-              tipo="barra"
-              dados={{
-                labels: (dadosGraficos || dadosRelatorio)!.clientes.map(c => c.nome.split(" ")[0]),
-                valores: (dadosGraficos || dadosRelatorio)!.clientes.map(c => c.valor),
-              }}
-            />
-          </div>
-        </>
-      )}
-
-      {filtros.tipoRelatorio === "vendas" && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <GraficoModerno
-            titulo="Evolução de Vendas"
-            tipo="linha"
-            dados={{
-              labels: (dadosGraficos || dadosRelatorio)!.vendas.map(v => v.mes),
-              valores: (dadosGraficos || dadosRelatorio)!.vendas.map(v => v.valor),
-            }}
-            feedback={feedback}
-          />
-          <GraficoModerno
-            titulo="Quantidade de Vendas"
-            tipo="barra"
-            dados={{
-              labels: (dadosGraficos || dadosRelatorio)!.vendas.map(v => v.mes),
-              valores: (dadosGraficos || dadosRelatorio)!.vendas.map(v => v.quantidade),
-            }}
-          />
-        </div>
-      )}
-
-      {filtros.tipoRelatorio === "receitas" && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <GraficoModerno
-            titulo="Evolução de Receitas"
-            tipo="linha"
-            dados={{
-              labels: (dadosGraficos || dadosRelatorio)!.receitas.map(r => r.mes),
-              valores: (dadosGraficos || dadosRelatorio)!.receitas.map(r => r.valor),
-            }}
-          />
-          <GraficoModerno
-            titulo="Receitas x Despesas"
-            tipo="barra"
-            dados={{
-              labels: (dadosGraficos || dadosRelatorio)!.receitas.map(r => r.mes),
-              valores: (dadosGraficos || dadosRelatorio)!.receitas.map(r => r.valor),
-              comparacao: (dadosGraficos || dadosRelatorio)!.despesas.map(d => d.valor),
-            }}
-          />
-        </div>
-      )}
-
-      {filtros.tipoRelatorio === "despesas" && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <GraficoModerno
-            titulo="Evolução de Despesas"
-            tipo="linha"
-            dados={{
-              labels: (dadosGraficos || dadosRelatorio)!.despesas.map(d => d.mes),
-              valores: (dadosGraficos || dadosRelatorio)!.despesas.map(d => d.valor),
-            }}
-          />
-          <GraficoModerno
-            titulo="Despesas por Período"
-            tipo="barra"
-            dados={{
-              labels: (dadosGraficos || dadosRelatorio)!.despesas.map(d => d.mes),
-              valores: (dadosGraficos || dadosRelatorio)!.despesas.map(d => d.valor),
-            }}
-          />
-        </div>
-      )}
-
-      {filtros.tipoRelatorio === "lucros" && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <GraficoModerno
-            titulo="Evolução de Lucros"
-            tipo="linha"
-            dados={{
-              labels: (dadosGraficos || dadosRelatorio)!.lucros.map(l => l.mes),
-              valores: (dadosGraficos || dadosRelatorio)!.lucros.map(l => l.valor),
-            }}
-          />
-          <GraficoModerno
-            titulo="Análise de Lucros"
-            tipo="barra"
-            dados={{
-              labels: (dadosGraficos || dadosRelatorio)!.lucros.map(l => l.mes),
-              valores: (dadosGraficos || dadosRelatorio)!.lucros.map(l => l.valor),
-            }}
-          />
-        </div>
-      )}
-
-      {filtros.tipoRelatorio === "funcionarios" && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <GraficoModerno
-            titulo="Comissões por Funcionário"
-            tipo="barra"
-            dados={{
-              labels: (dadosGraficos || dadosRelatorio)!.funcionarios.map(f => f.nome.split(" ")[0]),
-              valores: (dadosGraficos || dadosRelatorio)!.funcionarios.map(f => f.comissao),
-            }}
-          />
-          <GraficoModerno
-            titulo="Vendas por Funcionário"
-            tipo="pizza"
-            dados={{
-              labels: (dadosGraficos || dadosRelatorio)!.funcionarios.map(f => f.nome.split(" ")[0]),
-              valores: (dadosGraficos || dadosRelatorio)!.funcionarios.map(f => f.vendas),
-            }}
-          />
-        </div>
-      )}
-
-      {filtros.tipoRelatorio === "produtos" && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <GraficoModerno
-            titulo="Vendas por Produto"
-            tipo="pizza"
-            dados={{
-              labels: (dadosGraficos || dadosRelatorio)!.produtos.map(p => p.nome),
-              valores: (dadosGraficos || dadosRelatorio)!.produtos.map(p => p.valor),
-            }}
-          />
-          <GraficoModerno
-            titulo="Top Produtos"
-            tipo="barra"
-            dados={{
-              labels: (dadosGraficos || dadosRelatorio)!.produtos.map(p => p.nome),
-              valores: (dadosGraficos || dadosRelatorio)!.produtos.map(p => p.valor),
-            }}
-          />
-        </div>
-      )}
-
-      {filtros.tipoRelatorio === "fornecedores" && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <GraficoModerno
-            titulo="Vendas por Fornecedor"
-            tipo="barra"
-            dados={{
-              labels: (dadosGraficos || dadosRelatorio)!.fornecedores.map(f => f.nome.replace("Banco ", "")),
-              valores: (dadosGraficos || dadosRelatorio)!.fornecedores.map(f => f.valor),
-            }}
-          />
-          <GraficoModerno
-            titulo="Distribuição por Fornecedor"
-            tipo="pizza"
-            dados={{
-              labels: (dadosGraficos || dadosRelatorio)!.fornecedores.map(f => f.nome.replace("Banco ", "")),
-              valores: (dadosGraficos || dadosRelatorio)!.fornecedores.map(f => f.valor),
-            }}
-          />
-        </div>
-      )}
     </div>
   );
 }
