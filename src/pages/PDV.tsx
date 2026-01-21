@@ -486,7 +486,7 @@ export default function PDV() {
     }
   };
 
-  const handleEmitirContrato = () => {
+  const handleEmitirContrato = async () => {
     if (!selectedCliente || !selectedProduto || !valorContrato || !prazo) {
       toast.error("Preencha os dados da venda para emitir o contrato");
       return;
@@ -494,58 +494,259 @@ export default function PDV() {
 
     const cliente = clientes.find((c) => c.id === selectedCliente);
     const produtoInfo = produtos.find((p) => p.id === selectedProduto);
+    
+    // Buscar configurações da empresa
+    let empresaConfig;
+    try {
+      empresaConfig = await getEmpresaConfig();
+    } catch (error) {
+      console.error("Erro ao buscar configurações da empresa:", error);
+    }
 
     const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 15;
+    const maxWidth = pageWidth - (margin * 2);
+    let y = 20;
     
     // Cabeçalho
-    doc.setFontSize(18);
+    doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
-    doc.text("CONTRATO DE EMPRÉSTIMO", 105, 20, { align: "center" });
+    const titulo = doc.splitTextToSize("CONTRATO DE PRESTAÇÃO DE SERVIÇOS DE INTERMEDIAÇÃO DE NEGÓCIOS BANCÁRIOS", maxWidth);
+    titulo.forEach((linha: string) => {
+      doc.text(linha, pageWidth / 2, y, { align: "center" });
+      y += 6;
+    });
     
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.text(`Contrato Nº: VND-${Date.now().toString().slice(-6)}`, 105, 30, { align: "center" });
-    
-    // Dados do cliente
-    let y = 50;
-    doc.setFontSize(12);
-    doc.setFont("helvetica", "bold");
-    doc.text("DADOS DO CONTRATANTE", 20, y);
-    
-    y += 10;
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.text(`Nome: ${cliente?.nome || ""}`, 20, y);
-    y += 7;
-    doc.text(`CPF: ${cliente?.cpf || ""}`, 20, y);
-    y += 7;
-    doc.text(`Endereço: ${cliente?.endereco || ""}`, 20, y);
-    
-    // Dados do contrato
-    y += 15;
-    doc.setFontSize(12);
-    doc.setFont("helvetica", "bold");
-    doc.text("DADOS DO CONTRATO", 20, y);
-    
-    y += 10;
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.text(`Produto: ${produtoInfo?.nome || ""}`, 20, y);
-    y += 7;
-    doc.text(`Valor: R$ ${parseFloat(valorContrato).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`, 20, y);
-    y += 7;
-    doc.text(`Prazo: ${prazo} meses`, 20, y);
-    y += 7;
-    doc.text(`Data: ${new Date().toLocaleDateString("pt-BR")}`, 20, y);
-    
-    // Rodapé
-    y = 250;
-    doc.setFontSize(8);
-    doc.text("_".repeat(80), 20, y);
     y += 5;
-    doc.text("Assinatura do Contratante", 20, y);
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.text("Pelo presente instrumento particular, de um lado:", margin, y);
     
-    doc.save(`contrato_${Date.now()}.pdf`);
+    // CONTRATADA
+    y += 8;
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text("CONTRATADA:", margin, y);
+    
+    y += 6;
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    const nomeEmpresa = empresaConfig?.nome || "[NOME DA EMPRESA]";
+    const cnpjEmpresa = empresaConfig?.cnpj || "[CNPJ]";
+    const enderecoEmpresa = empresaConfig?.endereco || "[ENDEREÇO COMPLETO]";
+    
+    doc.text(`${nomeEmpresa}, pessoa jurídica de direito privado, inscrita no CNPJ sob nº ${cnpjEmpresa},`, margin, y);
+    y += 5;
+    doc.text(`com sede à ${enderecoEmpresa}, doravante denominada CONTRATADA;`, margin, y);
+    
+    // CONTRATANTE
+    y += 10;
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text("CONTRATANTE:", margin, y);
+    
+    y += 6;
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.text(`${cliente?.nome || "[NOME DO CLIENTE]"}, ${cliente?.nacionalidade || "[nacionalidade]"}, ${cliente?.estadoCivil || "[estado civil]"},`, margin, y);
+    y += 5;
+    doc.text(`${cliente?.profissao || "[profissão]"}, portador(a) do CPF nº ${cliente?.cpf || "[CPF]"} e RG nº ${cliente?.rg || "[RG]"},`, margin, y);
+    y += 5;
+    doc.text(`residente e domiciliado(a) à ${cliente?.endereco || "[ENDEREÇO]"}, doravante denominado(a) CONTRATANTE;`, margin, y);
+    
+    y += 10;
+    doc.setFontSize(9);
+    doc.text("Têm entre si justo e contratado o que segue:", margin, y);
+    
+    // CLÁUSULAS
+    y += 10;
+    const clausulas = [
+      {
+        titulo: "CLÁUSULA 1ª – DO OBJETO",
+        texto: [
+          "1.1. O presente contrato tem por objeto a prestação de serviços de intermediação de operações financeiras, consistentes na análise, encaminhamento e acompanhamento de propostas junto a instituições financeiras, referentes às seguintes modalidades:",
+          "• Empréstimo consignado;",
+          "• Empréstimo pessoal;",
+          "• Refinanciamento;",
+          "• Portabilidade de crédito;",
+          "• Troca de crédito ou renegociação de dívidas;",
+          "• Outras operações financeiras permitidas em lei.",
+          "",
+          "1.2. A CONTRATADA não é instituição financeira, não concede crédito próprio e não garante aprovação das operações, atuando exclusivamente como intermediadora entre o CONTRATANTE e as instituições financeiras."
+        ]
+      },
+      {
+        titulo: "CLÁUSULA 2ª – DAS OBRIGAÇÕES DA CONTRATADA",
+        texto: [
+          "2.1. Compete à CONTRATADA:",
+          "a) Analisar as informações fornecidas pelo CONTRATANTE;",
+          "b) Encaminhar propostas às instituições financeiras conveniadas;",
+          "c) Acompanhar o andamento da proposta até sua conclusão ou recusa;",
+          "d) Prestar informações claras sobre o status da operação;",
+          "e) Manter sigilo sobre os dados pessoais e financeiros do CONTRATANTE."
+        ]
+      },
+      {
+        titulo: "CLÁUSULA 3ª – DAS OBRIGAÇÕES DO CONTRATANTE",
+        texto: [
+          "3.1. Compete ao CONTRATANTE:",
+          "a) Fornecer informações e documentos verdadeiros e completos;",
+          "b) Autorizar consultas cadastrais, inclusive junto a órgãos de proteção ao crédito;",
+          "c) Ler atentamente as condições finais da operação antes da assinatura junto à instituição financeira;",
+          "d) Responsabilizar-se integralmente pelo cumprimento das obrigações assumidas com o banco ou financeira."
+        ]
+      },
+      {
+        titulo: "CLÁUSULA 4ª – DA REMUNERAÇÃO",
+        texto: [
+          "4.1. Pelos serviços prestados, a CONTRATADA fará jus a uma remuneração, que poderá ocorrer das seguintes formas:",
+          "• Comissão paga diretamente pela instituição financeira;",
+          "• Comissão descontada do valor liberado;",
+          "• Pagamento direto pelo CONTRATANTE, conforme previamente acordado.",
+          "",
+          "4.2. O valor da remuneração será informado previamente ao CONTRATANTE, sendo devida apenas em caso de efetiva concretização da operação financeira."
+        ]
+      }
+    ];
+
+    clausulas.forEach((clausula) => {
+      if (y > 250) {
+        doc.addPage();
+        y = 20;
+      }
+      
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "bold");
+      doc.text(clausula.titulo, margin, y);
+      y += 6;
+      
+      doc.setFont("helvetica", "normal");
+      clausula.texto.forEach((linha) => {
+        const linhas = doc.splitTextToSize(linha, maxWidth);
+        linhas.forEach((l: string) => {
+          if (y > 270) {
+            doc.addPage();
+            y = 20;
+          }
+          doc.text(l, margin, y);
+          y += 5;
+        });
+      });
+      y += 3;
+    });
+
+    // Nova página para demais cláusulas
+    doc.addPage();
+    y = 20;
+
+    const clausulas2 = [
+      {
+        titulo: "CLÁUSULA 5ª – DA NÃO GARANTIA DE CRÉDITO",
+        texto: [
+          "5.1. O CONTRATANTE declara ciência de que a aprovação, valor, taxa de juros, prazo e demais condições são definidos exclusivamente pela instituição financeira.",
+          "",
+          "5.2. A CONTRATADA não se responsabiliza por recusas, alterações de condições ou cancelamentos promovidos pela instituição financeira."
+        ]
+      },
+      {
+        titulo: "CLÁUSULA 6ª – DA AUTORIZAÇÃO PARA TRATAMENTO DE DADOS (LGPD)",
+        texto: [
+          "6.1. O CONTRATANTE autoriza expressamente a CONTRATADA a coletar, armazenar, tratar e compartilhar seus dados pessoais e financeiros, exclusivamente para fins de análise e intermediação das operações financeiras, nos termos da Lei nº 13.709/2018 (Lei Geral de Proteção de Dados – LGPD).",
+          "",
+          "6.2. Os dados serão tratados com confidencialidade e segurança, não sendo utilizados para fins diversos dos previstos neste contrato."
+        ]
+      },
+      {
+        titulo: "CLÁUSULA 7ª – DA VIGÊNCIA E RESCISÃO",
+        texto: [
+          "7.1. O presente contrato entra em vigor na data de sua assinatura e terá validade até a conclusão da operação ou manifestação formal de desistência.",
+          "",
+          "7.2. O CONTRATANTE poderá desistir do serviço a qualquer momento antes da formalização da operação, sem ônus, desde que não haja proposta aprovada."
+        ]
+      },
+      {
+        titulo: "CLÁUSULA 8ª – DA RESPONSABILIDADE",
+        texto: [
+          "8.1. A CONTRATADA não se responsabiliza por:",
+          "• Inadimplência do CONTRATANTE;",
+          "• Cláusulas contratuais firmadas diretamente com a instituição financeira;",
+          "• Uso indevido das informações fornecidas pelo CONTRATANTE a terceiros estranhos à relação contratual."
+        ]
+      },
+      {
+        titulo: "CLÁUSULA 9ª – DO FORO",
+        texto: [
+          `9.1. Fica eleito o foro da comarca de ${empresaConfig?.cidade || "[CIDADE/UF]"}, com renúncia de qualquer outro, por mais privilegiado que seja, para dirimir dúvidas oriundas deste contrato.`
+        ]
+      }
+    ];
+
+    clausulas2.forEach((clausula) => {
+      if (y > 250) {
+        doc.addPage();
+        y = 20;
+      }
+      
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "bold");
+      doc.text(clausula.titulo, margin, y);
+      y += 6;
+      
+      doc.setFont("helvetica", "normal");
+      clausula.texto.forEach((linha) => {
+        const linhas = doc.splitTextToSize(linha, maxWidth);
+        linhas.forEach((l: string) => {
+          if (y > 270) {
+            doc.addPage();
+            y = 20;
+          }
+          doc.text(l, margin, y);
+          y += 5;
+        });
+      });
+      y += 3;
+    });
+
+    // Assinaturas
+    if (y > 230) {
+      doc.addPage();
+      y = 20;
+    }
+
+    y += 10;
+    doc.setFontSize(9);
+    doc.text("E, por estarem justas e contratadas, firmam o presente instrumento em duas vias de igual teor.", margin, y);
+    
+    y += 15;
+    const cidadeData = `${empresaConfig?.cidade || "[CIDADE]"}, ${format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}.`;
+    doc.text(cidadeData, margin, y);
+    
+    y += 20;
+    doc.text("_".repeat(60), margin, y);
+    y += 5;
+    doc.setFont("helvetica", "bold");
+    doc.text("CONTRATANTE", margin, y);
+    y += 5;
+    doc.setFont("helvetica", "normal");
+    doc.text(`Nome: ${cliente?.nome || ""}`, margin, y);
+    y += 5;
+    doc.text(`CPF: ${cliente?.cpf || ""}`, margin, y);
+    
+    y += 15;
+    doc.text("_".repeat(60), margin, y);
+    y += 5;
+    doc.setFont("helvetica", "bold");
+    doc.text("CONTRATADA", margin, y);
+    y += 5;
+    doc.setFont("helvetica", "normal");
+    doc.text(`Nome do representante: ${empresaConfig?.representante || ""}`, margin, y);
+    y += 5;
+    doc.text(`CPF: ${empresaConfig?.cpfRepresentante || ""}`, margin, y);
+    y += 5;
+    doc.text(`Cargo: ${empresaConfig?.cargoRepresentante || ""}`, margin, y);
+    
+    doc.save(`contrato_${cliente?.nome?.replace(/\s+/g, '_')}_${Date.now()}.pdf`);
     toast.success("Contrato emitido com sucesso!");
   };
 
@@ -904,6 +1105,272 @@ export default function PDV() {
     return result 
       ? [parseInt(result[1], 16), parseInt(result[2], 16), parseInt(result[3], 16)]
       : [41, 128, 185]; // Azul padrão
+  };
+
+  // Função para emitir contrato de uma venda existente
+  const handleEmitirContratoVenda = async (venda: Venda) => {
+    const cliente = clientes.find((c) => c.id === venda.clienteId);
+    const produtoInfo = produtos.find((p) => p.id === venda.produtoId);
+    
+    if (!cliente || !produtoInfo) {
+      toast.error("Dados da venda incompletos para gerar contrato");
+      return;
+    }
+    
+    // Buscar configurações da empresa
+    let empresaConfig;
+    try {
+      empresaConfig = await getEmpresaConfig();
+    } catch (error) {
+      console.error("Erro ao buscar configurações da empresa:", error);
+    }
+
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 15;
+    const maxWidth = pageWidth - (margin * 2);
+    let y = 20;
+    
+    // Cabeçalho
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    const titulo = doc.splitTextToSize("CONTRATO DE PRESTAÇÃO DE SERVIÇOS DE INTERMEDIAÇÃO DE NEGÓCIOS BANCÁRIOS", maxWidth);
+    titulo.forEach((linha: string) => {
+      doc.text(linha, pageWidth / 2, y, { align: "center" });
+      y += 6;
+    });
+    
+    y += 5;
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.text("Pelo presente instrumento particular, de um lado:", margin, y);
+    
+    // CONTRATADA
+    y += 8;
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text("CONTRATADA:", margin, y);
+    
+    y += 6;
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    const nomeEmpresa = empresaConfig?.nome || "[NOME DA EMPRESA]";
+    const cnpjEmpresa = empresaConfig?.cnpj || "[CNPJ]";
+    const enderecoEmpresa = empresaConfig?.endereco || "[ENDEREÇO COMPLETO]";
+    
+    doc.text(`${nomeEmpresa}, pessoa jurídica de direito privado, inscrita no CNPJ sob nº ${cnpjEmpresa},`, margin, y);
+    y += 5;
+    doc.text(`com sede à ${enderecoEmpresa}, doravante denominada CONTRATADA;`, margin, y);
+    
+    // CONTRATANTE
+    y += 10;
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text("CONTRATANTE:", margin, y);
+    
+    y += 6;
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.text(`${cliente.nome || "[NOME DO CLIENTE]"}, ${cliente.nacionalidade || "[nacionalidade]"}, ${cliente.estadoCivil || "[estado civil]"},`, margin, y);
+    y += 5;
+    doc.text(`${cliente.profissao || "[profissão]"}, portador(a) do CPF nº ${cliente.cpf || "[CPF]"} e RG nº ${cliente.rg || "[RG]"},`, margin, y);
+    y += 5;
+    doc.text(`residente e domiciliado(a) à ${cliente.endereco || "[ENDEREÇO]"}, doravante denominado(a) CONTRATANTE;`, margin, y);
+    
+    y += 10;
+    doc.setFontSize(9);
+    doc.text("Têm entre si justo e contratado o que segue:", margin, y);
+    
+    // CLÁUSULAS
+    y += 10;
+    const clausulas = [
+      {
+        titulo: "CLÁUSULA 1ª – DO OBJETO",
+        texto: [
+          "1.1. O presente contrato tem por objeto a prestação de serviços de intermediação de operações financeiras, consistentes na análise, encaminhamento e acompanhamento de propostas junto a instituições financeiras, referentes às seguintes modalidades:",
+          "• Empréstimo consignado;",
+          "• Empréstimo pessoal;",
+          "• Refinanciamento;",
+          "• Portabilidade de crédito;",
+          "• Troca de crédito ou renegociação de dívidas;",
+          "• Outras operações financeiras permitidas em lei.",
+          "",
+          "1.2. A CONTRATADA não é instituição financeira, não concede crédito próprio e não garante aprovação das operações, atuando exclusivamente como intermediadora entre o CONTRATANTE e as instituições financeiras."
+        ]
+      },
+      {
+        titulo: "CLÁUSULA 2ª – DAS OBRIGAÇÕES DA CONTRATADA",
+        texto: [
+          "2.1. Compete à CONTRATADA:",
+          "a) Analisar as informações fornecidas pelo CONTRATANTE;",
+          "b) Encaminhar propostas às instituições financeiras conveniadas;",
+          "c) Acompanhar o andamento da proposta até sua conclusão ou recusa;",
+          "d) Prestar informações claras sobre o status da operação;",
+          "e) Manter sigilo sobre os dados pessoais e financeiros do CONTRATANTE."
+        ]
+      },
+      {
+        titulo: "CLÁUSULA 3ª – DAS OBRIGAÇÕES DO CONTRATANTE",
+        texto: [
+          "3.1. Compete ao CONTRATANTE:",
+          "a) Fornecer informações e documentos verdadeiros e completos;",
+          "b) Autorizar consultas cadastrais, inclusive junto a órgãos de proteção ao crédito;",
+          "c) Ler atentamente as condições finais da operação antes da assinatura junto à instituição financeira;",
+          "d) Responsabilizar-se integralmente pelo cumprimento das obrigações assumidas com o banco ou financeira."
+        ]
+      },
+      {
+        titulo: "CLÁUSULA 4ª – DA REMUNERAÇÃO",
+        texto: [
+          "4.1. Pelos serviços prestados, a CONTRATADA fará jus a uma remuneração, que poderá ocorrer das seguintes formas:",
+          "• Comissão paga diretamente pela instituição financeira;",
+          "• Comissão descontada do valor liberado;",
+          "• Pagamento direto pelo CONTRATANTE, conforme previamente acordado.",
+          "",
+          "4.2. O valor da remuneração será informado previamente ao CONTRATANTE, sendo devida apenas em caso de efetiva concretização da operação financeira."
+        ]
+      }
+    ];
+
+    clausulas.forEach((clausula) => {
+      if (y > 250) {
+        doc.addPage();
+        y = 20;
+      }
+      
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "bold");
+      doc.text(clausula.titulo, margin, y);
+      y += 6;
+      
+      doc.setFont("helvetica", "normal");
+      clausula.texto.forEach((linha) => {
+        const linhas = doc.splitTextToSize(linha, maxWidth);
+        linhas.forEach((l: string) => {
+          if (y > 270) {
+            doc.addPage();
+            y = 20;
+          }
+          doc.text(l, margin, y);
+          y += 5;
+        });
+      });
+      y += 3;
+    });
+
+    // Nova página para demais cláusulas
+    doc.addPage();
+    y = 20;
+
+    const clausulas2 = [
+      {
+        titulo: "CLÁUSULA 5ª – DA NÃO GARANTIA DE CRÉDITO",
+        texto: [
+          "5.1. O CONTRATANTE declara ciência de que a aprovação, valor, taxa de juros, prazo e demais condições são definidos exclusivamente pela instituição financeira.",
+          "",
+          "5.2. A CONTRATADA não se responsabiliza por recusas, alterações de condições ou cancelamentos promovidos pela instituição financeira."
+        ]
+      },
+      {
+        titulo: "CLÁUSULA 6ª – DA AUTORIZAÇÃO PARA TRATAMENTO DE DADOS (LGPD)",
+        texto: [
+          "6.1. O CONTRATANTE autoriza expressamente a CONTRATADA a coletar, armazenar, tratar e compartilhar seus dados pessoais e financeiros, exclusivamente para fins de análise e intermediação das operações financeiras, nos termos da Lei nº 13.709/2018 (Lei Geral de Proteção de Dados – LGPD).",
+          "",
+          "6.2. Os dados serão tratados com confidencialidade e segurança, não sendo utilizados para fins diversos dos previstos neste contrato."
+        ]
+      },
+      {
+        titulo: "CLÁUSULA 7ª – DA VIGÊNCIA E RESCISÃO",
+        texto: [
+          "7.1. O presente contrato entra em vigor na data de sua assinatura e terá validade até a conclusão da operação ou manifestação formal de desistência.",
+          "",
+          "7.2. O CONTRATANTE poderá desistir do serviço a qualquer momento antes da formalização da operação, sem ônus, desde que não haja proposta aprovada."
+        ]
+      },
+      {
+        titulo: "CLÁUSULA 8ª – DA RESPONSABILIDADE",
+        texto: [
+          "8.1. A CONTRATADA não se responsabiliza por:",
+          "• Inadimplência do CONTRATANTE;",
+          "• Cláusulas contratuais firmadas diretamente com a instituição financeira;",
+          "• Uso indevido das informações fornecidas pelo CONTRATANTE a terceiros estranhos à relação contratual."
+        ]
+      },
+      {
+        titulo: "CLÁUSULA 9ª – DO FORO",
+        texto: [
+          `9.1. Fica eleito o foro da comarca de ${empresaConfig?.cidade || "[CIDADE/UF]"}, com renúncia de qualquer outro, por mais privilegiado que seja, para dirimir dúvidas oriundas deste contrato.`
+        ]
+      }
+    ];
+
+    clausulas2.forEach((clausula) => {
+      if (y > 250) {
+        doc.addPage();
+        y = 20;
+      }
+      
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "bold");
+      doc.text(clausula.titulo, margin, y);
+      y += 6;
+      
+      doc.setFont("helvetica", "normal");
+      clausula.texto.forEach((linha) => {
+        const linhas = doc.splitTextToSize(linha, maxWidth);
+        linhas.forEach((l: string) => {
+          if (y > 270) {
+            doc.addPage();
+            y = 20;
+          }
+          doc.text(l, margin, y);
+          y += 5;
+        });
+      });
+      y += 3;
+    });
+
+    // Assinaturas
+    if (y > 230) {
+      doc.addPage();
+      y = 20;
+    }
+
+    y += 10;
+    doc.setFontSize(9);
+    doc.text("E, por estarem justas e contratadas, firmam o presente instrumento em duas vias de igual teor.", margin, y);
+    
+    y += 15;
+    const dataVenda = venda.createdAt?.toDate?.() || new Date();
+    const cidadeData = `${empresaConfig?.cidade || "[CIDADE]"}, ${format(dataVenda, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}.`;
+    doc.text(cidadeData, margin, y);
+    
+    y += 20;
+    doc.text("_".repeat(60), margin, y);
+    y += 5;
+    doc.setFont("helvetica", "bold");
+    doc.text("CONTRATANTE", margin, y);
+    y += 5;
+    doc.setFont("helvetica", "normal");
+    doc.text(`Nome: ${cliente.nome || ""}`, margin, y);
+    y += 5;
+    doc.text(`CPF: ${cliente.cpf || ""}`, margin, y);
+    
+    y += 15;
+    doc.text("_".repeat(60), margin, y);
+    y += 5;
+    doc.setFont("helvetica", "bold");
+    doc.text("CONTRATADA", margin, y);
+    y += 5;
+    doc.setFont("helvetica", "normal");
+    doc.text(`Nome do representante: ${empresaConfig?.representante || ""}`, margin, y);
+    y += 5;
+    doc.text(`CPF: ${empresaConfig?.cpfRepresentante || ""}`, margin, y);
+    y += 5;
+    doc.text(`Cargo: ${empresaConfig?.cargoRepresentante || ""}`, margin, y);
+    
+    doc.save(`contrato_${cliente.nome?.replace(/\s+/g, '_')}_${venda.vendaId || venda.id}.pdf`);
+    toast.success("Contrato emitido com sucesso!");
   };
 
   return (
@@ -1405,41 +1872,112 @@ export default function PDV() {
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            {podeEditarOuEstornar() ? (
-                              <div className="flex gap-2">
-                                {venda.status !== "cancelada" && (
-                                  <>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => handleAbrirEditar(venda)}
-                                      title="Editar venda"
-                                    >
-                                      <Edit className="w-4 h-4" />
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="destructive"
-                                      onClick={() => handleAbrirEstornar(venda)}
-                                      title="Estornar venda (cancelar)"
-                                    >
-                                      <XCircle className="w-4 h-4" />
-                                    </Button>
-                                  </>
-                                )}
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="border-red-600 text-red-600 hover:bg-red-50 hover:text-red-700"
-                                  onClick={() => handleAbrirExcluir(venda)}
-                                  title="Excluir venda permanentemente"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
-                              </div>
-                            ) : (
-                              <span className="text-xs text-muted-foreground">Sem permissão</span>
-                            )}
+                            <div className="flex flex-wrap gap-2">
+                              {/* Botão Emitir Contrato - disponível para todos */}
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="border-blue-600 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+                                onClick={() => handleEmitirContratoVenda(venda)}
+                                title="Emitir Contrato"
+                              >
+                                <FileText className="w-4 h-4" />
+                              </Button>
+                              
+                              {/* Botão Controle de Venda - disponível para todos */}
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="border-green-600 text-green-600 hover:bg-green-50 hover:text-green-700"
+                                onClick={() => {
+                                  // Função para imprimir controle de venda específico
+                                  const funcionario = funcionarios.find(f => f.id === venda.funcionarioId);
+                                  const fornecedor = fornecedores.find(f => f.id === produto?.fornecedorId);
+                                  
+                                  const doc = new jsPDF();
+                                  doc.setFontSize(20);
+                                  doc.setFont("helvetica", "bold");
+                                  doc.text("CONTROLE DE VENDA", 105, 20, { align: "center" });
+                                  
+                                  doc.setFontSize(10);
+                                  doc.setFont("helvetica", "normal");
+                                  doc.text(`Gerado em: ${new Date().toLocaleString("pt-BR")}`, 105, 30, { align: "center" });
+                                  doc.text(`ID: ${venda.vendaId || venda.id}`, 105, 37, { align: "center" });
+                                  
+                                  let y = 55;
+                                  doc.setFillColor(240, 240, 240);
+                                  doc.rect(20, y - 6, 170, 8, 'F');
+                                  doc.setFontSize(12);
+                                  doc.setFont("helvetica", "bold");
+                                  doc.text("DADOS DO CLIENTE", 25, y);
+                                  
+                                  y += 12;
+                                  doc.setFontSize(10);
+                                  doc.setFont("helvetica", "normal");
+                                  doc.text(`Nome: ${cliente?.nome || ""}`, 25, y);
+                                  y += 7;
+                                  doc.text(`CPF: ${cliente?.cpf || ""}`, 25, y);
+                                  
+                                  y += 15;
+                                  doc.setFillColor(240, 240, 240);
+                                  doc.rect(20, y - 6, 170, 8, 'F');
+                                  doc.setFontSize(12);
+                                  doc.setFont("helvetica", "bold");
+                                  doc.text("DETALHES DA VENDA", 25, y);
+                                  
+                                  y += 12;
+                                  doc.setFontSize(10);
+                                  doc.setFont("helvetica", "normal");
+                                  doc.text(`Produto: ${produto?.nome || ""}`, 25, y);
+                                  y += 7;
+                                  doc.text(`Valor: R$ ${Number(venda.valorContrato).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`, 25, y);
+                                  y += 7;
+                                  doc.text(`Prazo: ${venda.prazo} meses`, 25, y);
+                                  y += 7;
+                                  doc.text(`Funcionário: ${funcionario?.nome || ""}`, 25, y);
+                                  
+                                  doc.save(`controle_${venda.vendaId || venda.id}.pdf`);
+                                  toast.success("Controle de Venda gerado!");
+                                }}
+                                title="Imprimir Controle de Venda"
+                              >
+                                <Download className="w-4 h-4" />
+                              </Button>
+                              
+                              {podeEditarOuEstornar() && (
+                                <>
+                                  {venda.status !== "cancelada" && (
+                                    <>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => handleAbrirEditar(venda)}
+                                        title="Editar venda"
+                                      >
+                                        <Edit className="w-4 h-4" />
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="destructive"
+                                        onClick={() => handleAbrirEstornar(venda)}
+                                        title="Estornar venda (cancelar)"
+                                      >
+                                        <XCircle className="w-4 h-4" />
+                                      </Button>
+                                    </>
+                                  )}
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="border-red-600 text-red-600 hover:bg-red-50 hover:text-red-700"
+                                    onClick={() => handleAbrirExcluir(venda)}
+                                    title="Excluir venda permanentemente"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </>
+                              )}
+                            </div>
                           </TableCell>
                         </TableRow>
                       );

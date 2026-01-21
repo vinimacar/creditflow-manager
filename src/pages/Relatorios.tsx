@@ -342,7 +342,7 @@ export default function Relatorios() {
         if (comissaoAtiva) {
           if (produto.comissoes && produto.comissoes.length > 0) {
             const faixaAplicavel = produto.comissoes.find(
-              faixa => v.valorContrato >= faixa.valorMin && v.valorContrato <= faixa.valorMax && faixa.ativa !== false
+              faixa => v.valorContrato >= faixa.valorMin && v.valorContrato <= faixa.valorMax
             );
             
             if (faixaAplicavel) {

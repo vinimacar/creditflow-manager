@@ -20,7 +20,7 @@ interface SearchResult {
   title: string;
   subtitle: string;
   extra?: string;
-  data?: any;
+  data?: Cliente | Produto | Venda;
 }
 
 export function GlobalSearch() {
