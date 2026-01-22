@@ -51,6 +51,50 @@ Sistema completo de gestão de crédito consignado com validações de CPF, CNPJ
 - Conciliação bancária
 - Controle de pagamentos
 
+### 📑 Gestão de Contratos (com Firestore)
+- Cadastro, listagem e atualização de contratos
+- Assinaturas eletrônicas e manuais
+- Aditivos contratuais
+- Status do contrato (ativo, renovação, cancelado, etc)
+- Persistência em tempo real no Firebase Firestore
+
+#### Exemplo de uso (TypeScript):
+
+```typescript
+import {
+  criarContrato,
+  listarContratos,
+  adicionarAssinatura,
+  adicionarAditivo,
+  atualizarStatusContrato
+} from './src/lib/contrato';
+
+// Criar um contrato
+const novo = await criarContrato({
+  clienteId: 'idCliente',
+  status: 'ativo',
+  dataInicio: new Date(),
+  dataFim: new Date(),
+});
+
+// Listar contratos
+const contratos = await listarContratos();
+
+// Adicionar assinatura
+await adicionarAssinatura(novo.id, {
+  signatario: 'João',
+  tipo: 'eletrônica',
+});
+
+// Adicionar aditivo
+await adicionarAditivo(novo.id, {
+  descricao: 'Aditivo de prazo',
+});
+
+// Atualizar status
+await atualizarStatusContrato(novo.id, 'em renovação');
+```
+
 ## 🛠️ Tecnologias
 
 - **React 18** - Framework frontend
