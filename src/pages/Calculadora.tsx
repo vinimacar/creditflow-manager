@@ -75,6 +75,7 @@ export default function CalculadoraPage() {
           </div>
         </div>
       )}
+      {/* SPA fallback script removed as it is not valid in React JSX */}
     </div>
   );
 }
