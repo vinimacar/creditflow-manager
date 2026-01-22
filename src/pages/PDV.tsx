@@ -199,13 +199,13 @@ export default function PDV() {
   const comissaoPerc = comissaoCalculada.percentual;
   const comissaoValor = comissaoCalculada.valor.toFixed(2);
   
-  // Comissões do fornecedor e funcionário
+  // Comissões do fornecedor e agente
   const comissaoFornecedorPerc = produto?.comissaoFornecedor || 0;
-  const comissaoFuncionarioPerc = comissaoCalculada.percentual;
+  const comissaoAgentePerc = comissaoCalculada.percentual;
   const comissaoFornecedorValor = valorContrato
     ? (parseFloat(valorContrato) * (comissaoFornecedorPerc / 100)).toFixed(2)
     : "0.00";
-  const comissaoFuncionarioValor = comissaoValor;
+  const comissaoAgenteValor = comissaoValor;
   
   // Verificar se pode visualizar comissões
   const podeVisualizarComissoes = userProfile?.role === "gerente" || userProfile?.role === "admin";
