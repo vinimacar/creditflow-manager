@@ -48,6 +48,7 @@ const menuItems = [
   { icon: ShoppingCart, label: "PDV", path: "/pdv", roles: ["admin", "gerente", "agente", "atendente"] },
   { icon: FileBarChart, label: "Relatórios", path: "/relatorios", roles: ["admin", "gerente"] },
   { icon: Scale, label: "Conciliação", path: "/conciliacao", roles: ["admin", "gerente"] },
+  { icon: DollarSign, label: "Calculadora", path: "/calculadora", roles: ["admin", "gerente", "agente", "atendente"] },
 ];
 
 const bottomMenuItems = [
