@@ -1,5 +1,16 @@
 import React, { useState } from 'react';
 import { simularEmprestimo, TipoEmprestimo } from '../lib/calculadora';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableHead,
+  TableRow,
+  TableCell,
+} from '@/components/ui/table';
 
 const tipos: { label: string; value: TipoEmprestimo }[] = [
   { label: 'Consignado', value: 'consignado' },
@@ -24,24 +35,29 @@ export default function CalculadoraPage() {
       <h1 className="text-2xl font-bold mb-4">Calculadora de Empréstimos</h1>
       <form onSubmit={simular} className="space-y-4 bg-white dark:bg-zinc-900 rounded shadow p-4">
         <div>
-          <label className="block mb-1">Tipo de Empréstimo</label>
-          <select value={tipo} onChange={e => setTipo(e.target.value as TipoEmprestimo)} className="input">
+          <Label htmlFor="tipo">Tipo de Empréstimo</Label>
+          <select
+            id="tipo"
+            value={tipo}
+            onChange={e => setTipo(e.target.value as TipoEmprestimo)}
+            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          >
             {tipos.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
           </select>
         </div>
         <div>
-          <label className="block mb-1">Valor solicitado (R$)</label>
-          <input type="number" min={100} step={100} value={valor} onChange={e => setValor(Number(e.target.value))} className="input" />
+          <Label htmlFor="valor">Valor solicitado (R$)</Label>
+          <Input type="number" min={100} step={100} id="valor" value={valor} onChange={e => setValor(Number(e.target.value))} />
         </div>
         <div>
-          <label className="block mb-1">Taxa de juros anual (%)</label>
-          <input type="number" min={0} step={0.01} value={taxa} onChange={e => setTaxa(Number(e.target.value))} className="input" />
+          <Label htmlFor="taxa">Taxa de juros anual (%)</Label>
+          <Input type="number" min={0} step={0.01} id="taxa" value={taxa} onChange={e => setTaxa(Number(e.target.value))} />
         </div>
         <div>
-          <label className="block mb-1">Prazo (meses)</label>
-          <input type="number" min={1} max={120} value={prazo} onChange={e => setPrazo(Number(e.target.value))} className="input" />
+          <Label htmlFor="prazo">Prazo (meses)</Label>
+          <Input type="number" min={1} max={120} id="prazo" value={prazo} onChange={e => setPrazo(Number(e.target.value))} />
         </div>
-        <button type="submit" className="btn btn-primary w-full">Simular</button>
+        <Button type="submit" className="w-full">Simular</Button>
       </form>
       {resultado && (
         <div className="mt-6 bg-zinc-50 dark:bg-zinc-800 rounded p-4">
@@ -50,28 +66,28 @@ export default function CalculadoraPage() {
           <div>Total pago: <b>R$ {resultado.valorTotal.toFixed(2)}</b></div>
           <div>Prazos: <b>{resultado.prazoMeses} meses</b></div>
           <div className="overflow-x-auto mt-4">
-            <table className="min-w-full text-xs">
-              <thead>
-                <tr>
-                  <th>Mês</th>
-                  <th>Saldo Devedor</th>
-                  <th>Juros</th>
-                  <th>Amortização</th>
-                  <th>Parcela</th>
-                </tr>
-              </thead>
-              <tbody>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Mês</TableHead>
+                  <TableHead>Saldo Devedor</TableHead>
+                  <TableHead>Juros</TableHead>
+                  <TableHead>Amortização</TableHead>
+                  <TableHead>Parcela</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {resultado.tabela.map((linha) => (
-                  <tr key={linha.mes}>
-                    <td>{linha.mes}</td>
-                    <td>R$ {linha.saldoDevedor.toFixed(2)}</td>
-                    <td>R$ {linha.juros.toFixed(2)}</td>
-                    <td>R$ {linha.amortizacao.toFixed(2)}</td>
-                    <td>R$ {linha.parcela.toFixed(2)}</td>
-                  </tr>
+                  <TableRow key={linha.mes}>
+                    <TableCell>{linha.mes}</TableCell>
+                    <TableCell>R$ {linha.saldoDevedor.toFixed(2)}</TableCell>
+                    <TableCell>R$ {linha.juros.toFixed(2)}</TableCell>
+                    <TableCell>R$ {linha.amortizacao.toFixed(2)}</TableCell>
+                    <TableCell>R$ {linha.parcela.toFixed(2)}</TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
         </div>
       )}
