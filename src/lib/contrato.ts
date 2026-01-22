@@ -90,8 +90,18 @@ export async function listarContratos(): Promise<Contrato[]> {
       atualizadoEm: data.atualizadoEm?.toDate ? data.atualizadoEm.toDate() : data.atualizadoEm,
       dataInicio: data.dataInicio?.toDate ? data.dataInicio.toDate() : data.dataInicio,
       dataFim: data.dataFim?.toDate ? data.dataFim.toDate() : data.dataFim,
-      assinaturas: (data.assinaturas || []).map((a: any) => ({ ...a, data: a.data?.toDate ? a.data.toDate() : a.data })),
-      aditivos: (data.aditivos || []).map((a: any) => ({ ...a, data: a.data?.toDate ? a.data.toDate() : a.data })),
+      assinaturas: (data.assinaturas || []).map((a: AssinaturaContrato & { data: unknown }) => ({
+        ...a,
+        data: (typeof a.data === 'object' && a.data !== null && 'toDate' in a.data && typeof (a.data as { toDate?: () => Date }).toDate === 'function')
+          ? (a.data as { toDate: () => Date }).toDate()
+          : a.data,
+      })),
+      aditivos: (data.aditivos || []).map((a: AditivoContrato & { data: unknown }) => ({
+        ...a,
+        data: (typeof a.data === 'object' && a.data !== null && 'toDate' in a.data && typeof (a.data as { toDate?: () => Date }).toDate === 'function')
+          ? (a.data as { toDate: () => Date }).toDate()
+          : a.data,
+      })),
     } as Contrato;
   });
 }
