@@ -28,7 +28,6 @@ function CalculadoraNormal() {
     } else if (value === '=') {
       try {
         const res = eval(display);
-        const res = eval(display);
         setResult(res.toString());
       } catch {
         setResult('Erro');
