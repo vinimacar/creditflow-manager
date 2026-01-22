@@ -17,6 +17,73 @@ const tipos: { label: string; value: TipoEmprestimo }[] = [
   { label: 'Pessoal', value: 'pessoal' },
 ];
 
+function CalculadoraNormal() {
+  const [display, setDisplay] = useState('');
+  const [result, setResult] = useState('');
+
+  function handleButtonClick(value: string) {
+    if (value === 'C') {
+      setDisplay('');
+      setResult('');
+    } else if (value === '=') {
+      try {
+        const res = eval(display);
+        const res = eval(display);
+        setResult(res.toString());
+      } catch {
+        setResult('Erro');
+      }
+    } else {
+      setDisplay((prev) => prev + value);
+    }
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    const allowed = '0123456789+-*/.()';
+    if (allowed.includes(e.key)) {
+      setDisplay((prev) => prev + e.key);
+    } else if (e.key === 'Enter') {
+      handleButtonClick('=');
+    } else if (e.key === 'Backspace') {
+      setDisplay((prev) => prev.slice(0, -1));
+    } else if (e.key === 'Escape') {
+      handleButtonClick('C');
+    }
+  }
+
+  const buttons = [
+    ['7', '8', '9', '/'],
+    ['4', '5', '6', '*'],
+    ['1', '2', '3', '-'],
+    ['0', '.', 'C', '+'],
+    ['(', ')', '=', ''],
+  ];
+
+  return (
+    <div className="max-w-xs mx-auto mb-8">
+      <h2 className="text-lg font-semibold mb-2">Calculadora Normal</h2>
+      <div className="bg-white dark:bg-zinc-900 rounded shadow p-4">
+        <input
+          type="text"
+          value={display}
+          onChange={e => setDisplay(e.target.value)}
+          onKeyDown={handleKeyDown}
+          className="mb-2 w-full h-12 text-xl px-2 rounded border border-input bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+          placeholder="Digite ou use os botões"
+        />
+        <div className="mb-2 text-right text-base text-muted-foreground">{result && <>={result}</>}</div>
+        <div className="grid grid-cols-4 gap-2">
+          {buttons.flat().map((btn, i) => btn ? (
+            <Button key={i} type="button" variant={btn === '=' ? 'secondary' : 'outline'} size="lg" onClick={() => handleButtonClick(btn)}>
+              {btn}
+            </Button>
+          ) : <div key={i} />)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function CalculadoraPage() {
   const [tipo, setTipo] = useState<TipoEmprestimo>('consignado');
   const [valor, setValor] = useState(10000);
@@ -32,7 +99,9 @@ export default function CalculadoraPage() {
 
   return (
     <div className="max-w-2xl mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">Calculadora de Empréstimos</h1>
+      <h1 className="text-2xl font-bold mb-4">Calculadora</h1>
+      <CalculadoraNormal />
+      <h2 className="text-lg font-semibold mb-2">Simulador de Empréstimos</h2>
       <form onSubmit={simular} className="space-y-4 bg-white dark:bg-zinc-900 rounded shadow p-4">
         <div>
           <Label htmlFor="tipo">Tipo de Empréstimo</Label>
