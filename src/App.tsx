@@ -1,12 +1,4 @@
 import CalculadoraPage from "./pages/Calculadora";
-      <Route
-        path="/calculadora"
-        element={
-          <AppLayout>
-            <CalculadoraPage />
-          </AppLayout>
-        }
-      />
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -65,6 +57,14 @@ function AppRoutes() {
 
   return (
     <Routes>
+      <Route
+        path="/calculadora"
+        element={
+          <AppLayout>
+            <CalculadoraPage />
+          </AppLayout>
+        }
+      />
       <Route
         path="/"
         element={
