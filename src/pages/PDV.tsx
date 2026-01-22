@@ -186,8 +186,8 @@ export default function PDV() {
       };
     }
     
-    // Caso contrário, usar comissão fixa do agente
-    const percentual = produto.comissaoAgente || produto.comissao || 0;
+    // Caso contrário, usar comissão fixa do funcionário
+    const percentual = produto.comissaoFuncionario || produto.comissao || 0;
     return {
       percentual,
       valor: (valorContratoNum * percentual) / 100
@@ -199,13 +199,13 @@ export default function PDV() {
   const comissaoPerc = comissaoCalculada.percentual;
   const comissaoValor = comissaoCalculada.valor.toFixed(2);
   
-  // Comissões do fornecedor e agente
+  // Comissões do fornecedor e funcionário
   const comissaoFornecedorPerc = produto?.comissaoFornecedor || 0;
-  const comissaoAgentePerc = comissaoCalculada.percentual;
+  const comissaoFuncionarioPerc = comissaoCalculada.percentual;
   const comissaoFornecedorValor = valorContrato
     ? (parseFloat(valorContrato) * (comissaoFornecedorPerc / 100)).toFixed(2)
     : "0.00";
-  const comissaoAgenteValor = comissaoValor;
+  const comissaoFuncionarioValor = comissaoValor;
   
   // Verificar se pode visualizar comissões
   const podeVisualizarComissoes = userProfile?.role === "gerente" || userProfile?.role === "admin";
@@ -242,12 +242,12 @@ export default function PDV() {
         valorContrato: valorContratoNum,
         numeroContrato: numeroContrato || "",
         prazo: parseInt(prazo),
-        comissao: comissaoCalculadaAgente.valor, // Comissão do agente em R$
-        comissaoPercentual: comissaoCalculadaAgente.percentual, // Comissão do agente em %
+        comissao: comissaoCalculadaAgente.valor, // Comissão do funcionário em R$
+        comissaoPercentual: comissaoCalculadaAgente.percentual, // Comissão do funcionário em %
         comissaoFornecedor: comissaoFornecedorValor,
         comissaoFornecedorPercentual: comissaoFornecedorPerc,
-        comissaoAgente: comissaoCalculadaAgente.valor,
-        comissaoAgentePercentual: comissaoCalculadaAgente.percentual,
+        comissaoFuncionario: comissaoCalculadaAgente.valor,
+        comissaoFuncionarioPercentual: comissaoCalculadaAgente.percentual,
         status: "aprovada",
         criadoPor: userProfile?.uid || "",
         createdAt: dataVendaTimestamp,
