@@ -199,13 +199,13 @@ export default function PDV() {
   const comissaoPerc = comissaoCalculada.percentual;
   const comissaoValor = comissaoCalculada.valor.toFixed(2);
   
-  // Comissões do fornecedor e agente
+  // Comissões do fornecedor e funcionário
   const comissaoFornecedorPerc = produto?.comissaoFornecedor || 0;
-  const comissaoAgentePerc = comissaoCalculada.percentual;
+  const comissaoFuncionarioPerc = comissaoCalculada.percentual;
   const comissaoFornecedorValor = valorContrato
     ? (parseFloat(valorContrato) * (comissaoFornecedorPerc / 100)).toFixed(2)
     : "0.00";
-  const comissaoAgenteValor = comissaoValor;
+  const comissaoFuncionarioValor = comissaoValor;
   
   // Verificar se pode visualizar comissões
   const podeVisualizarComissoes = userProfile?.role === "gerente" || userProfile?.role === "admin";
@@ -1706,9 +1706,9 @@ export default function PDV() {
                   
                   <Separator />
                   <div className="flex justify-between items-center py-2">
-                    <span className="text-muted-foreground">Comissão Agente ({comissaoAgentePerc}%)</span>
+                    <span className="text-muted-foreground">Comissão Funcionário ({comissaoFuncionarioPerc}%)</span>
                     <span className="font-semibold text-success text-lg">
-                      R$ {parseFloat(comissaoAgenteValor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                      R$ {parseFloat(comissaoFuncionarioValor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                     </span>
                   </div>
                 </>
