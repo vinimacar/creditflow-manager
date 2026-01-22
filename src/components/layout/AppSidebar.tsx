@@ -120,7 +120,9 @@ export function AppSidebar({ collapsed, onCollapse, mobileOpen, onMobileToggle }
             {menuItems
               .filter((item) => hasPermission(item.roles as any))
               .map((item) => {
-                const isActive = location.pathname === item.path;
+                // Suporte para HashRouter: considera hash na URL para rotas SPA
+                const currentPath = location.pathname + (location.hash || "");
+                const isActive = currentPath === item.path || location.pathname === item.path;
                 return (
                   <Link
                     key={item.path}
@@ -155,7 +157,9 @@ export function AppSidebar({ collapsed, onCollapse, mobileOpen, onMobileToggle }
             {bottomMenuItems
               .filter((item) => hasPermission(item.roles as any))
               .map((item) => {
-                const isActive = location.pathname === item.path;
+                // Suporte para HashRouter: considera hash na URL para rotas SPA
+                const currentPath = location.pathname + (location.hash || "");
+                const isActive = currentPath === item.path || location.pathname === item.path;
                 return (
                   <Link
                     key={item.path}
